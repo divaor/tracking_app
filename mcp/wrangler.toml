@@ -6,6 +6,10 @@
 name = "tracker-mcp"
 main = "worker.js"
 compatibility_date = "2025-09-01"
+# Serve only https://tracker-mcp.<subdomain>.workers.dev, without the extra
+# per-version preview URLs Cloudflare adds by default.
+workers_dev = true
+preview_urls = false
 
 [vars]
 # owner/repo of your private data repository (the one the app syncs to).
