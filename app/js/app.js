@@ -54,6 +54,14 @@ function viewTitle(route) {
   }
 }
 
+// Links like #/item/<id> (used in the connector's replies) open that item.
+function takeItemLink() {
+  const match = /^#\/item\/([^/?#]+)/.exec(location.hash);
+  if (!match) return null;
+  history.replaceState(null, '', '#/');
+  return decodeURIComponent(match[1]);
+}
+
 const isTyping = (el) => el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
 const TEXT_FILE = /\.(md|markdown|mdx|txt)$/i;
 
@@ -115,6 +123,7 @@ export function App() {
   const [fileDrag, setFileDrag] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [, setTick] = useState(0);
+  const [linkedItem, setLinkedItem] = useState(takeItemLink);
   const searchRef = useRef(null);
   const modalRef = useRef(null);
   const contentRef = useRef(null);
@@ -125,6 +134,8 @@ export function App() {
   useEffect(() => onSettings((s) => setSettingsState(s)), []);
   useEffect(() => {
     const onHash = () => {
+      const linked = takeItemLink();
+      if (linked) setLinkedItem(linked);
       setRoute(parseHash());
       setDrawer(false);
       contentRef.current?.scrollTo?.(0, 0);
@@ -167,6 +178,25 @@ export function App() {
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
+
+  useEffect(() => {
+    if (!linkedItem) return undefined;
+    if (store.get(linkedItem)) {
+      setLinkedItem(null);
+      if (!modalRef.current) openModal({ id: linkedItem });
+      return undefined;
+    }
+    // Not here yet (e.g. Claude just added it): sync, then give up quietly.
+    let cancelled = false;
+    syncNow().then(() => {
+      if (cancelled || store.get(linkedItem)) return;
+      setLinkedItem(null);
+      toast('That item is not on this device. Check that GitHub sync is set up.', { kind: 'error' });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [items, linkedItem]);
 
   const dismissToast = (id) => setToasts((list) => list.filter((t) => t.id !== id));
   const toast = (message, opts = {}) => {

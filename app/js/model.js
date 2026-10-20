@@ -41,13 +41,25 @@ export const KINDS = {
     { id: 'other', label: 'Other' },
   ],
   doc: [
+    { id: 'proposal', label: 'Proposal' },
+    { id: 'artifact', label: 'Artifact' },
     { id: 'claude', label: 'Claude doc' },
     { id: 'readme', label: 'README' },
-    { id: 'article', label: 'Article / link' },
     { id: 'spec', label: 'Spec / plan' },
+    { id: 'report', label: 'Report' },
+    { id: 'article', label: 'Article / link' },
     { id: 'other', label: 'Other' },
   ],
 };
+
+// The user's verdict on something sent for review (proposals, artifacts).
+export const DECISIONS = [
+  { id: 'approved', label: 'Approved' },
+  { id: 'changes', label: 'Changes requested' },
+  { id: 'rejected', label: 'Rejected' },
+];
+const DECISION_IDS = DECISIONS.map((d) => d.id);
+export const decisionLabel = (id) => DECISIONS.find((d) => d.id === id)?.label ?? '';
 
 export function kindLabel(type, kind) {
   return KINDS[type]?.find((k) => k.id === kind)?.label ?? '';
@@ -56,7 +68,7 @@ export function kindLabel(type, kind) {
 const EPOCH = '1970-01-01T00:00:00.000Z';
 const KNOWN_KEYS = [
   'id', 'type', 'title', 'status', 'priority', 'kind', 'project', 'tags', 'url', 'due', 'notes',
-  'createdAt', 'updatedAt', 'startedAt', 'completedAt', 'deleted',
+  'files', 'decision', 'feedback', 'createdAt', 'updatedAt', 'startedAt', 'completedAt', 'deleted',
 ];
 
 export const nowIso = () => new Date().toISOString();
@@ -103,6 +115,25 @@ export function cleanTags(tags) {
 
 const cleanDate = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '');
 
+// Attached files live in the data repo; items only keep a reference to them.
+export function cleanFiles(files) {
+  if (!Array.isArray(files)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const f of files) {
+    if (!f || typeof f !== 'object' || typeof f.path !== 'string' || !f.path || seen.has(f.path)) continue;
+    seen.add(f.path);
+    out.push({
+      path: f.path,
+      name: text(f.name) || f.path.split('/').pop(),
+      size: Number.isFinite(f.size) ? f.size : 0,
+      sha: text(f.sha),
+      addedAt: isoOr(f.addedAt, ''),
+    });
+  }
+  return out;
+}
+
 export function normalizeItem(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const id = typeof r.id === 'string' && r.id ? r.id : newId();
@@ -123,6 +154,9 @@ export function normalizeItem(raw) {
     url: text(r.url).trim(),
     due: cleanDate(r.due),
     notes: text(r.notes),
+    files: cleanFiles(r.files),
+    decision: DECISION_IDS.includes(r.decision) ? r.decision : '',
+    feedback: text(r.feedback),
     createdAt,
     updatedAt,
     startedAt: isoOr(r.startedAt, ''),
@@ -229,7 +263,9 @@ export function matchesQuery(item, query) {
   const terms = text(query).toLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return true;
   const tags = item.tags.map((t) => t.toLowerCase());
-  const haystack = [item.title, item.notes, item.project, item.url, kindLabel(item.type, item.kind)].join('\n').toLowerCase();
+  const haystack = [item.title, item.notes, item.feedback, item.project, item.url, kindLabel(item.type, item.kind), ...item.files.map((f) => f.name)]
+    .join('\n')
+    .toLowerCase();
   return terms.every((term) => {
     if (term.startsWith('#') && term.length > 1) return tags.some((t) => t.startsWith(term.slice(1)));
     return haystack.includes(term) || tags.some((t) => t.includes(term));
@@ -398,4 +434,44 @@ export function toggleChecklistItem(markdown, target) {
 export function titleFromMarkdown(markdown, fallback = '') {
   const m = /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/m.exec(text(markdown));
   return m ? m[1].trim() : fallback;
+}
+
+// ---- Files ---------------------------------------------------------------
+
+export function slugify(value, max = 48) {
+  const slug = text(value)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, max)
+    .replace(/-+$/, '');
+  return slug || 'item';
+}
+
+// A file name that is safe as a single path segment in the repo.
+export function safeFileName(name, fallback = 'document.md') {
+  const base = text(name).split(/[\\/]/).pop().trim();
+  const cleaned = base.replace(/[^\w.\- ]+/g, '').replace(/\s+/g, '-').replace(/^\.+/, '').slice(0, 96);
+  return cleaned && /[^.]/.test(cleaned) ? cleaned : fallback;
+}
+
+const EXTENSIONS = {
+  markdown: ['md', 'markdown', 'mdx'],
+  html: ['html', 'htm'],
+  svg: ['svg'],
+};
+
+export function fileKind(name) {
+  const ext = text(name).split('.').pop().toLowerCase();
+  for (const [kind, list] of Object.entries(EXTENSIONS)) if (list.includes(ext)) return kind;
+  return 'text';
+}
+
+export function formatBytes(bytes) {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

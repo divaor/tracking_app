@@ -1,5 +1,5 @@
 import { html, useState } from '../../vendor/preact-htm.js';
-import { checklistProgress, isOverdue, kindLabel, nextStatus, statusLabel, TYPES, typeInfo } from '../model.js';
+import { checklistProgress, decisionLabel, isOverdue, kindLabel, nextStatus, statusLabel, TYPES, typeInfo } from '../model.js';
 import { formatDue, timeAgo } from '../format.js';
 import { Icon, StatusIcon } from './icons.js';
 
@@ -22,6 +22,13 @@ export function PriorityMark({ priority }) {
   return html`<span class="priority priority-${priority}"><${Icon} name="flag" size=${12} />${priority === 'urgent' ? 'Urgent' : 'High'}</span>`;
 }
 
+const DECISION_ICON = { approved: 'thumbUp', changes: 'rotate', rejected: 'x' };
+
+export function DecisionBadge({ decision }) {
+  if (!decision) return null;
+  return html`<span class="decision decision-${decision}"><${Icon} name=${DECISION_ICON[decision]} size=${12} />${decisionLabel(decision)}</span>`;
+}
+
 export function ItemMeta({ item, today, maxTags = 3 }) {
   const progress = checklistProgress(item.notes);
   const parts = [];
@@ -31,6 +38,9 @@ export function ItemMeta({ item, today, maxTags = 3 }) {
   if (item.project) parts.push(html`<span class="meta"><${Icon} name="folder" size=${13} />${item.project}</span>`);
   if (progress.total) {
     parts.push(html`<span class="meta ${progress.done === progress.total ? 'complete' : ''}"><${Icon} name="checklist" size=${13} />${progress.done}/${progress.total}</span>`);
+  }
+  if (item.files.length) {
+    parts.push(html`<span class="meta" title=${item.files.map((f) => f.name).join(', ')}><${Icon} name="paperclip" size=${13} />${item.files.length}</span>`);
   }
   if (item.url) parts.push(html`<span class="meta" title=${item.url}><${Icon} name="link" size=${13} /></span>`);
   for (const tag of item.tags.slice(0, maxTags)) parts.push(html`<span class="tag">#${tag}</span>`);
@@ -59,6 +69,7 @@ export function ItemCard({ item, onOpen, onStatus, today, draggable = false, sho
     </div>
     <div class="card-foot">
       ${showType && html`<${TypeBadge} type=${item.type} kind=${item.kind} />`}
+      <${DecisionBadge} decision=${item.decision} />
       <${PriorityMark} priority=${item.priority} />
       <${ItemMeta} item=${item} today=${today} maxTags=${2} />
     </div>
@@ -74,6 +85,7 @@ export function ItemRow({ item, onOpen, onStatus, today }) {
       <div class="row-title">${item.title || 'Untitled'}</div>
       <${ItemMeta} item=${item} today=${today} />
     </div>
+    <${DecisionBadge} decision=${item.decision} />
     <${PriorityMark} priority=${item.priority} />
   </div>`;
 }

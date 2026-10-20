@@ -7,14 +7,18 @@ import {
   cleanTags,
   createItem,
   diffCounts,
+  fileKind,
   filterItems,
+  formatBytes,
   mergeItems,
   normalizeItem,
   parseDocument,
   parseQuickAdd,
   pruneTombstones,
   reviveItem,
+  safeFileName,
   serializeDocument,
+  slugify,
   sortItems,
   titleFromMarkdown,
   toggleChecklistItem,
@@ -177,4 +181,38 @@ test('checklists: progress and toggling skip code fences', () => {
 test('titleFromMarkdown uses the first heading', () => {
   assert.equal(titleFromMarkdown('intro\n## Design notes ##\n# Later'), 'Design notes');
   assert.equal(titleFromMarkdown('no heading', 'fallback'), 'fallback');
+});
+
+test('files and review fields are normalized', () => {
+  const item = normalizeItem({
+    id: 'f',
+    type: 'doc',
+    kind: 'proposal',
+    decision: 'maybe',
+    feedback: 7,
+    files: [{ path: 'files/a/p.md', size: 12, sha: 'abc' }, { path: 'files/a/p.md' }, { name: 'no path' }, null],
+  });
+  assert.equal(item.kind, 'proposal');
+  assert.equal(item.decision, '');
+  assert.equal(item.feedback, '7');
+  assert.deepEqual(item.files, [{ path: 'files/a/p.md', name: 'p.md', size: 12, sha: 'abc', addedAt: '' }]);
+  assert.equal(normalizeItem({ id: 'g', decision: 'approved' }).decision, 'approved');
+  assert.deepEqual(filterItems([item], { query: 'p.md' }).map((i) => i.id), ['f']);
+});
+
+test('slugify, safeFileName, fileKind and formatBytes', () => {
+  assert.equal(slugify('  Café: Sync Design v2!! '), 'cafe-sync-design-v2');
+  assert.equal(slugify('***'), 'item');
+  assert.equal(slugify('a'.repeat(80)).length, 48);
+  assert.equal(safeFileName('../../etc/passwd'), 'passwd');
+  assert.equal(safeFileName('my report (final).md'), 'my-report-final.md');
+  assert.equal(safeFileName('..', 'x.md'), 'x.md');
+  assert.equal(safeFileName(''), 'document.md');
+  assert.equal(fileKind('README.MD'), 'markdown');
+  assert.equal(fileKind('page.htm'), 'html');
+  assert.equal(fileKind('logo.svg'), 'svg');
+  assert.equal(fileKind('main.py'), 'text');
+  assert.equal(formatBytes(0), '0 B');
+  assert.equal(formatBytes(2048), '2.0 KB');
+  assert.equal(formatBytes(3 * 1024 * 1024), '3.0 MB');
 });

@@ -1,6 +1,8 @@
 import { html, useEffect, useMemo, useRef, useState } from '../../vendor/preact-htm.js';
 import {
   cleanTags,
+  DECISIONS,
+  decisionLabel,
   KINDS,
   PRIORITIES,
   STATUSES,
@@ -13,7 +15,8 @@ import {
 import { formatDateTime, formatDue } from '../format.js';
 import { renderMarkdown } from '../markdown.js';
 import { Icon } from './icons.js';
-import { PriorityMark, Segmented, TypeBadge } from './components.js';
+import { DecisionBadge, PriorityMark, Segmented, TypeBadge } from './components.js';
+import { FilesPanel } from './fileViewer.js';
 
 const NOTES_PLACEHOLDER = {
   task: 'Details, links, or a checklist:\n- [ ] first step\n- [ ] second step',
@@ -70,6 +73,42 @@ function shortUrl(url) {
   }
 }
 
+const DECISION_ICONS = { approved: 'thumbUp', changes: 'rotate', rejected: 'x' };
+const DECISION_VERBS = { approved: 'Approve', changes: 'Request changes', rejected: 'Reject' };
+
+export const isReviewable = (item) => item.type === 'doc' && (item.files.length > 0 || ['proposal', 'artifact'].includes(item.kind) || Boolean(item.decision));
+
+// The user's verdict and feedback; Claude reads both back through the connector.
+function ReviewPanel({ item, actions }) {
+  const [feedback, setFeedback] = useState(item.feedback);
+  useEffect(() => setFeedback(item.feedback), [item.feedback]);
+  const decide = (decision) => {
+    const next = item.decision === decision ? '' : decision;
+    actions.update(item.id, { decision: next, feedback, ...(next ? { status: 'done' } : {}) });
+    if (next) actions.toast(`${decisionLabel(next)} — Claude can read your feedback from any session`);
+  };
+  return html`<section class="review-panel">
+    <h3><${Icon} name="checklist" size=${16} />Your review</h3>
+    <div class="decision-buttons" role="group" aria-label="Decision">
+      ${DECISIONS.map(
+        (d) => html`<button type="button" key=${d.id} class="btn decision-${d.id} ${item.decision === d.id ? 'active' : ''}"
+          aria-pressed=${item.decision === d.id} onClick=${() => decide(d.id)}>
+          <${Icon} name=${DECISION_ICONS[d.id]} size=${16} />${item.decision === d.id ? d.label : DECISION_VERBS[d.id]}
+        </button>`,
+      )}
+    </div>
+    <textarea class="feedback-input" rows="4" value=${feedback} onInput=${(e) => setFeedback(e.currentTarget.value)}
+      placeholder="Feedback for Claude: what to change, questions, decisions…" aria-label="Feedback" />
+    <div class="review-foot">
+      <span class="muted small">Ask Claude to “check my tracker for feedback” to act on it.</span>
+      <button type="button" class="btn sm" disabled=${feedback === item.feedback} onClick=${() => {
+        actions.update(item.id, { feedback });
+        actions.toast('Feedback saved');
+      }}>Save feedback</button>
+    </div>
+  </section>`;
+}
+
 function ViewBody({ item, actions, today, onEdit }) {
   const notesHtml = useMemo(() => renderMarkdown(item.notes), [item.notes]);
   const onNotesClick = (e) => {
@@ -95,15 +134,21 @@ function ViewBody({ item, actions, today, onEdit }) {
       html`<div><dt>Tags</dt><dd class="tags">${item.tags.map((t) => html`<button type="button" class="tag" key=${t} onClick=${() => actions.searchTag(t)}>#${t}</button>`)}</dd></div>`}
       ${item.url &&
       html`<div><dt>Link</dt><dd><${ExternalLink} url=${item.url} className="link">${shortUrl(item.url)} <${Icon} name="external" size=${13} /></${ExternalLink}></dd></div>`}
+      ${item.decision && html`<div><dt>Review</dt><dd><${DecisionBadge} decision=${item.decision} /></dd></div>`}
     </dl>
 
     ${item.url &&
     item.type === 'doc' &&
+    !item.files.length &&
     html`<${ExternalLink} url=${item.url} className="btn primary open-doc"><${Icon} name="external" />Open document</${ExternalLink}>`}
 
     ${item.notes
       ? html`<div class="markdown" onClick=${onNotesClick} dangerouslySetInnerHTML=${{ __html: notesHtml }} />`
-      : html`<p class="muted no-notes">No ${item.type === 'doc' ? 'content' : 'notes'} yet. <button type="button" class="btn link" onClick=${onEdit}>Add some</button></p>`}
+      : !item.files.length &&
+        html`<p class="muted no-notes">No ${item.type === 'doc' ? 'content' : 'notes'} yet. <button type="button" class="btn link" onClick=${onEdit}>Add some</button></p>`}
+
+    ${item.files.length > 0 && html`<${FilesPanel} item=${item} />`}
+    ${isReviewable(item) && html`<${ReviewPanel} item=${item} actions=${actions} />`}
 
     <p class="timestamps">
       Created ${formatDateTime(item.createdAt)} · Updated ${formatDateTime(item.updatedAt)}

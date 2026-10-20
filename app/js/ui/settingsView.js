@@ -216,6 +216,27 @@ function SyncCard({ sync, actions }) {
   </${Card}>`;
 }
 
+const CONNECTOR_GUIDE = 'https://github.com/divaor/tracking_app/blob/HEAD/mcp/README.md';
+
+function ConnectorCard() {
+  return html`<${Card} title="Claude connector" icon="claude" id="connector">
+    <p>
+      Let Claude work with your tracker from any chat or Claude Code session: “send this proposal to my tracker”, “send the artifact to my
+      tracker”, “update tasks on my tracker”, “check my tracker for feedback”.
+    </p>
+    <ol class="connector-steps">
+      <li>Deploy the connector once: a small free Cloudflare Worker that reads and writes your data repository.</li>
+      <li>In Claude, open <strong>Customize → Connectors → Add custom connector</strong> and paste the connector’s URL.</li>
+      <li>It then works in Claude on the web, desktop and phone, and in Claude Code when you are signed in with the same account.</li>
+    </ol>
+    <a class="btn sm" href=${CONNECTOR_GUIDE} target="_blank" rel="noopener noreferrer"><${Icon} name="external" size=${15} />Step-by-step setup guide</a>
+    <p class="muted small connector-note">
+      Proposals and artifacts Claude sends show up under Docs with their files. Open one to read it, then approve, request changes or reject
+      and leave feedback; Claude can read your decision back.
+    </p>
+  </${Card}>`;
+}
+
 function DataCard({ actions, items }) {
   const fileRef = useRef(null);
   const all = store.all();
@@ -269,6 +290,7 @@ function AppsCard({ installPrompt, onInstall }) {
 export function SettingsView({ sync, actions, items, installPrompt, onInstall, theme }) {
   return html`<div class="settings">
     <${SyncCard} sync=${sync} actions=${actions} />
+    <${ConnectorCard} />
     <${Card} title="Appearance" icon="eye">
       <${Segmented} label="Theme" value=${theme} onChange=${(t) => saveSettings({ theme: t })}
         options=${[{ id: 'system', label: 'System' }, { id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }]} />

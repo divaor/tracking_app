@@ -46,7 +46,17 @@ function describeError(status, data, headers) {
   }
 }
 
-export function createGitHubClient({ token, owner, repo, fetchImpl = globalThis.fetch.bind(globalThis), apiBase = 'https://api.github.com' }) {
+// `cacheMode` and `userAgent` differ by runtime: browsers need no-store (see
+// below) and refuse a custom User-Agent; servers need a User-Agent for GitHub.
+export function createGitHubClient({
+  token,
+  owner,
+  repo,
+  fetchImpl = globalThis.fetch.bind(globalThis),
+  apiBase = 'https://api.github.com',
+  cacheMode = 'no-store',
+  userAgent = '',
+}) {
   const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
 
   async function request(method, path, { body, query } = {}) {
@@ -58,11 +68,14 @@ export function createGitHubClient({ token, owner, repo, fetchImpl = globalThis.
       'X-GitHub-Api-Version': '2022-11-28',
     };
     if (body) headers['Content-Type'] = 'application/json';
+    if (userAgent) headers['User-Agent'] = userAgent;
+    // no-store: the API sends Cache-Control: max-age=60, and a cached read
+    // would hand back a stale sha and make every write conflict.
+    const init = { method, headers, body: body ? JSON.stringify(body) : undefined };
+    if (cacheMode) init.cache = cacheMode;
     let res;
     try {
-      // no-store: the API sends Cache-Control: max-age=60, and a cached read
-      // would hand back a stale sha and make every write conflict.
-      res = await fetchImpl(url.toString(), { method, headers, cache: 'no-store', body: body ? JSON.stringify(body) : undefined });
+      res = await fetchImpl(url.toString(), init);
     } catch {
       throw new GitHubError('Could not reach GitHub. Check your internet connection.', 0);
     }

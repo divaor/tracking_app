@@ -12,7 +12,8 @@ It runs as an **Electron desktop app** on your computers and as an **installable
   - **Tasks**
   - **Ideas**
   - **Claude work**: Claude Code sessions, PRs, chats, artifacts
-  - **Docs**: Claude docs, READMEs, articles, specs
+  - **Docs**: proposals, artifacts, Claude docs, READMEs, specs, reports, articles
+- **Claude connector**: say "send this proposal to my tracker" or "update tasks on my tracker" in any Claude chat or Claude Code session. Proposals and artifacts arrive as files you can read in the app, then approve, request changes or reject with feedback Claude can read back. See [4. Claude connector](#4-claude-connector).
 - **Overview**: due soon, in progress, up next, your reading list and recently completed items.
 - **Board**: drag cards between columns. On phones you swipe between columns instead.
 - **Lists**: filter by category and status, sort by priority, due date and more. Search with plain text or `#tags`.
@@ -26,10 +27,11 @@ It runs as an **Electron desktop app** on your computers and as an **installable
 ```
   Work PC  (Electron) ─┐
   Home PC  (Electron) ─┼──▶  GitHub API  ──▶  private repo  ──  tracker.json
-  Phone    (web app)  ─┘
+  Phone    (web app)  ─┤                                    └─  files/…  (proposals, artifacts)
+  Claude   (connector)─┘
 ```
 
-The app code (this repo) and your data are kept apart. Each device merges its local copy with `tracker.json` item by item: the most recent edit wins, and deletions sync too.
+The app code (this repo) and your data are kept apart. Each device merges its local copy with `tracker.json` item by item: the most recent edit wins, and deletions sync too. The Claude connector writes to the same repo, through the same merge rules.
 
 ---
 
@@ -91,6 +93,20 @@ The phone runs the same app as a web app hosted on GitHub Pages.
 > - Host the `app/` folder on any static host, such as Cloudflare Pages, Netlify or Vercel.
 >
 > The site never contains your data. It only talks to `api.github.com` using the token stored on your phone.
+
+## 4. Claude connector
+
+The connector lets Claude work with your tracker from any chat (web, desktop, phone) and from Claude Code. Some things you can say:
+
+- "Send this proposal to my tracker"
+- "Send the artifact to my tracker"
+- "Update tasks on my tracker: the sync work is done, add a task for docs"
+- "Log this session as Claude work on my tracker"
+- "Check my tracker for feedback on the proposal and revise it"
+
+Documents Claude sends are saved as files in your data repo, under `files/…`, and show up under **Docs**. Open one in the app to read it; HTML artifacts get a safe preview. Then **Approve**, **Request changes** or **Reject** it and leave feedback, which Claude can read back.
+
+To set it up, deploy the small server in [`mcp/`](mcp/README.md) to Cloudflare Workers (free). Then add its URL in Claude under **Customize → Connectors → Add custom connector**. You can deploy from your computer, or from the **Actions** tab with the *Deploy Claude connector* workflow. Full guide: **[mcp/README.md](mcp/README.md)**.
 
 ---
 
@@ -172,6 +188,7 @@ The web app is plain ES modules with no build step:
 These libraries are copied into `app/vendor/` by `npm run vendor`. GitHub Pages and Electron serve `app/` as-is.
 
 ```
+mcp/                  Claude connector (MCP server: Cloudflare Worker, HTTP or stdio)
 app/                  the web app (also loaded by Electron)
   js/model.js         item model, merge, quick-add parser, checklists
   js/sync.js          one pull → merge → push round
@@ -183,7 +200,7 @@ app/                  the web app (also loaded by Electron)
 electron/             main process + preload (window, app:// protocol, keychain)
 scripts/              vendor copy, icon rendering, local web server
 test/                 unit tests
-.github/workflows/    CI, GitHub Pages deploy, desktop release builds
+.github/workflows/    CI, GitHub Pages deploy, desktop release builds, connector deploy
 ```
 
 ## Security notes
