@@ -151,7 +151,7 @@ function ViewBody({ item, actions, today, onEdit }) {
       : !item.files.length &&
         html`<p class="muted no-notes">No ${item.type === 'doc' ? 'content' : 'notes'} yet. <button type="button" class="btn link" onClick=${onEdit}>Add some</button></p>`}
 
-    ${item.files.length > 0 && html`<${FilesPanel} item=${item} />`}
+    ${item.files.length > 0 && html`<${FilesPanel} item=${item} actions=${actions} />`}
     ${isReviewable(item) && html`<${ReviewPanel} item=${item} actions=${actions} />`}
 
     <p class="timestamps">

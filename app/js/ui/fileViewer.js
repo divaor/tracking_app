@@ -1,8 +1,9 @@
-import { html, useEffect, useState } from '../../vendor/preact-htm.js';
+import { html, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { encodeBase64 } from '../github.js';
-import { loadFileText } from '../files.js';
+import { loadFileText, saveFileText } from '../files.js';
 import { renderMarkdown } from '../markdown.js';
-import { fileKind, formatBytes } from '../model.js';
+import { fileKind, formatBytes, toggleChecklistItem } from '../model.js';
+import { store } from '../store.js';
 import { Icon } from './icons.js';
 import { Segmented } from './components.js';
 
@@ -19,16 +20,33 @@ function download(name, text, kind) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function FileView({ file }) {
+const byteLength = (text) => new TextEncoder().encode(text).length;
+
+function saveError(file, err) {
+  if (err?.status === 409 || err?.status === 422) return `“${file.name}” was changed elsewhere (by Claude or another device). Sync, then tick it again.`;
+  return `Couldn’t save “${file.name}”: ${err?.message || 'no connection'}`;
+}
+
+function FileView({ file, onSaved, onError }) {
   const kind = fileKind(file.name);
   const [state, setState] = useState({ status: 'loading' });
   const [mode, setMode] = useState(kind === 'text' ? 'source' : 'preview');
+  // Ticked checklists are written back to the file: `saved` is the text and
+  // sha last stored in the repo, `wanted` what the reader shows. One save at a
+  // time, always of the latest text, so quick ticks coalesce.
+  const sync = useRef({ sha: '', saved: null, wanted: null, busy: false });
 
   useEffect(() => {
+    const s = sync.current;
+    if (file.sha && file.sha === s.sha) return; // our own save; the text is already shown
     let cancelled = false;
     setState({ status: 'loading' });
     loadFileText(file).then(
-      (text) => !cancelled && setState({ status: 'ready', text }),
+      (text) => {
+        if (cancelled) return;
+        Object.assign(s, { sha: file.sha, saved: text, wanted: text });
+        setState({ status: 'ready', text });
+      },
       (err) => !cancelled && setState({ status: 'error', error: err.message }),
     );
     return () => {
@@ -36,11 +54,43 @@ function FileView({ file }) {
     };
   }, [file.path, file.sha]);
 
+  const save = async () => {
+    const s = sync.current;
+    if (s.busy) return;
+    s.busy = true;
+    try {
+      while (s.wanted !== s.saved) {
+        const text = s.wanted;
+        const sha = await saveFileText({ ...file, sha: s.sha }, text);
+        Object.assign(s, { sha, saved: text });
+        onSaved(sha, byteLength(text));
+      }
+    } catch (err) {
+      s.wanted = s.saved;
+      setState({ status: 'ready', text: s.saved });
+      onError(saveError(file, err));
+    } finally {
+      s.busy = false;
+    }
+  };
+
+  const onMarkdownClick = (e) => {
+    const box = e.target.closest?.('input.md-check');
+    if (!box) return;
+    e.preventDefault();
+    const s = sync.current;
+    const text = toggleChecklistItem(s.wanted, [...e.currentTarget.querySelectorAll('input.md-check')].indexOf(box));
+    if (text === s.wanted) return;
+    s.wanted = text;
+    setState({ status: 'ready', text });
+    save();
+  };
+
   let body;
   if (state.status === 'loading') body = html`<p class="muted file-message">Loading ${file.name}…</p>`;
   else if (state.status === 'error') body = html`<p class="notice error"><${Icon} name="alert" size=${16} />${state.error}</p>`;
   else if (mode === 'source') body = html`<pre class="file-source"><code>${state.text}</code></pre>`;
-  else if (kind === 'markdown') body = html`<div class="markdown file-markdown" dangerouslySetInnerHTML=${{ __html: renderMarkdown(state.text) }} />`;
+  else if (kind === 'markdown') body = html`<div class="markdown file-markdown" onClick=${onMarkdownClick} dangerouslySetInnerHTML=${{ __html: renderMarkdown(state.text) }} />`;
   else if (kind === 'svg') body = html`<div class="file-image"><img alt=${file.name} src=${`data:image/svg+xml;base64,${encodeBase64(state.text)}`} /></div>`;
   // Sandboxed with no permissions: the artifact's scripts, forms and links stay inert.
   else body = html`<iframe class="file-frame" sandbox="" srcdoc=${state.text} title=${file.name} referrerpolicy="no-referrer" />`;
@@ -60,9 +110,14 @@ function FileView({ file }) {
   </div>`;
 }
 
-export function FilesPanel({ item }) {
+export function FilesPanel({ item, actions }) {
   const [open, setOpen] = useState(() => item.files[0]?.path ?? null);
   const current = item.files.find((f) => f.path === open);
+  // Records a file's new version on the item, so other devices load it too.
+  const onSaved = (path, sha, size) => {
+    const latest = store.get(item.id);
+    if (latest) store.update(item.id, { files: latest.files.map((f) => (f.path === path ? { ...f, sha, size } : f)) });
+  };
   return html`<section class="files-panel">
     <h3><${Icon} name="paperclip" size=${16} />Files</h3>
     <div class="file-list" role="tablist">
@@ -73,6 +128,7 @@ export function FilesPanel({ item }) {
         </button>`,
       )}
     </div>
-    ${current && html`<${FileView} key=${`${current.path}@${current.sha}`} file=${current} />`}
+    ${current && html`<${FileView} key=${current.path} file=${current}
+      onSaved=${(sha, size) => onSaved(current.path, sha, size)} onError=${(message) => actions.toast(message, { kind: 'error' })} />`}
   </section>`;
 }

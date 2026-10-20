@@ -1766,8 +1766,9 @@ button.project-chip:hover {
   border-top: 1px solid var(--border);
 }
 
-.files-panel h3,
-.review-panel h3 {
+/* Direct children only: Markdown headings inside a file stay headings. */
+.files-panel > h3,
+.review-panel > h3 {
   display: flex;
   align-items: center;
   gap: 7px;

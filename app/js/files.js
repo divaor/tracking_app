@@ -19,3 +19,21 @@ export async function loadFileText(file) {
   kvSet(`file:${result.sha}`, result.text).catch(() => {});
   return result.text;
 }
+
+// Writes an edited file back (ticked checklists) and returns its new sha.
+// Sending the sha it was loaded at means a version changed elsewhere in the
+// meantime is never overwritten: GitHub answers 409 or 422 instead.
+export async function saveFileText(file, text) {
+  const settings = getSettings();
+  const token = await getToken();
+  if (!isSyncConfigured(settings) || !token) throw new Error('Set up GitHub sync in Settings to save changes to attached files.');
+  const client = createGitHubClient({ token, owner: settings.owner, repo: settings.repo });
+  const { sha } = await client.putFile(file.path, {
+    text,
+    sha: file.sha,
+    branch: settings.branch || undefined,
+    message: `Tracker: update ${file.name} (from ${settings.device || 'unknown device'})`,
+  });
+  kvSet(`file:${sha}`, text).catch(() => {});
+  return sha;
+}
