@@ -43,7 +43,18 @@ test('initialize, tools/list and prompts follow the MCP shape', async () => {
   assert.deepEqual((await rpc('ping')).result, {});
 
   const { tools } = (await rpc('tools/list')).result;
-  assert.deepEqual(tools.map((t) => t.name).sort(), ['add_items', 'delete_items', 'get_item', 'get_overview', 'list_items', 'read_file', 'send_document', 'update_items']);
+  assert.deepEqual(tools.map((t) => t.name).sort(), [
+    'add_items',
+    'delete_items',
+    'get_item',
+    'get_overview',
+    'list_items',
+    'list_projects',
+    'read_file',
+    'save_project',
+    'send_document',
+    'update_items',
+  ]);
   for (const tool of tools) {
     assert.equal(tool.inputSchema.type, 'object', tool.name);
     assert.equal(typeof tool.annotations.readOnlyHint, 'boolean', tool.name);
@@ -304,4 +315,45 @@ test('stdio server works end to end against a GitHub API over HTTP', async () =>
     child.kill();
     api.close();
   }
+});
+
+test('projects and tags: Claude files work under a project and tags repos', async () => {
+  const { call, rpc, items, github } = setup();
+  assert.deepEqual((await call('list_projects')).data, { projects: [], tags: [] });
+
+  const created = await call('save_project', { name: 'Platform', area: 'work', description: 'Backend platform' });
+  assert.deepEqual(created.data.project, { name: 'Platform', area: 'work', description: 'Backend platform' });
+  assert.equal((await call('save_project', { name: 'x', area: 'hobby' })).isError, true);
+
+  await call('add_items', { items: [{ title: 'Add rate limiting', project: 'platform', tags: ['api-gateway'] }] });
+  const sent = await call('send_document', { title: 'Auth redesign', kind: 'proposal', content: '# Auth', project: 'PLATFORM', tags: ['api', 'web'] });
+  assert.equal(sent.data.item.project, 'Platform', 'project spelling normalized');
+  await call('add_items', { items: [{ title: 'Plant tomatoes', project: 'Garden' }] });
+  await call('save_project', { name: 'garden', area: 'personal' });
+
+  const listed = await call('list_projects');
+  assert.deepEqual(listed.data.projects.map((p) => [p.name, p.area, p.open]), [['Platform', 'work', 2], ['Garden', 'personal', 1]]);
+  assert.deepEqual(listed.data.tags.map((t) => t.tag).sort(), ['api', 'api-gateway', 'web']);
+
+  assert.equal((await call('list_items', { area: 'work' })).data.total, 2);
+  assert.equal((await call('list_items', { area: 'personal' })).data.total, 1);
+  assert.equal((await call('list_items', { project: 'garden' })).data.total, 1);
+  assert.equal((await call('list_items', { projects: ['Garden', 'Platform'] })).data.total, 3);
+  assert.equal((await call('list_items', { tag: 'web' })).data.items[0].title, 'Auth redesign');
+
+  const updated = await call('update_items', { updates: [{ id: 'Plant tomatoes', project: 'platform', add_tags: ['infra'] }] });
+  assert.equal(updated.data.updated[0].project, 'Platform');
+
+  const renamed = await call('save_project', { name: 'platform', rename_to: 'Core Platform' });
+  assert.equal(renamed.data.itemsMoved, 3);
+  assert.ok(items().every((i) => i.project === 'Core Platform'));
+  const doc = JSON.parse(github.read('tracker.json'));
+  assert.deepEqual(doc.projects.filter((p) => !p.deleted).map((p) => [p.name, p.area]).sort(), [['Core Platform', 'work'], ['Garden', 'personal']]);
+
+  await call('save_project', { name: 'core platform', delete: true });
+  assert.ok(items().every((i) => i.project === ''));
+
+  const prompt = await rpc('prompts/get', { name: 'use_project', arguments: { project: 'Platform', area: 'work' } });
+  assert.match(prompt.result.messages[0].content.text, /project "Platform"/);
+  assert.match(prompt.result.messages[0].content.text, /tag each item with the repositories/);
 });

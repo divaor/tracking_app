@@ -1,7 +1,11 @@
-import { html, useState } from '../../vendor/preact-htm.js';
-import { checklistProgress, decisionLabel, isOverdue, kindLabel, nextStatus, statusLabel, TYPES, typeInfo } from '../model.js';
+import { createContext, html, useContext, useState } from '../../vendor/preact-htm.js';
+import { checklistProgress, decisionLabel, isOverdue, kindLabel, nextStatus, projectKey, statusLabel, TYPES, typeInfo } from '../model.js';
 import { formatDue, timeAgo } from '../format.js';
 import { Icon, StatusIcon } from './icons.js';
+import { ProjectChip } from './projects.js';
+
+// Project colors and the "show this project" action, provided by the app.
+export const ProjectsContext = createContext({ byKey: new Map(), showProject: () => {} });
 
 export function TypeBadge({ type, kind }) {
   return html`<span class="badge type-${type}"><${Icon} name=${type} size=${13} />${kindLabel(type, kind) || typeInfo(type).label}</span>`;
@@ -29,13 +33,17 @@ export function DecisionBadge({ decision }) {
   return html`<span class="decision decision-${decision}"><${Icon} name=${DECISION_ICON[decision]} size=${12} />${decisionLabel(decision)}</span>`;
 }
 
-export function ItemMeta({ item, today, maxTags = 3 }) {
+export function ItemMeta({ item, today, maxTags = 6 }) {
+  const { byKey, showProject } = useContext(ProjectsContext);
   const progress = checklistProgress(item.notes);
   const parts = [];
+  if (item.project) {
+    const project = byKey.get(projectKey(item.project)) ?? { name: item.project };
+    parts.push(html`<${ProjectChip} project=${project} small onClick=${() => showProject(projectKey(item.project))} />`);
+  }
   if (item.due) {
     parts.push(html`<span class="meta due ${isOverdue(item, today) ? 'overdue' : ''}"><${Icon} name="calendar" size=${13} />${formatDue(item.due, today)}</span>`);
   }
-  if (item.project) parts.push(html`<span class="meta"><${Icon} name="folder" size=${13} />${item.project}</span>`);
   if (progress.total) {
     parts.push(html`<span class="meta ${progress.done === progress.total ? 'complete' : ''}"><${Icon} name="checklist" size=${13} />${progress.done}/${progress.total}</span>`);
   }
@@ -71,7 +79,7 @@ export function ItemCard({ item, onOpen, onStatus, today, draggable = false, sho
       ${showType && html`<${TypeBadge} type=${item.type} kind=${item.kind} />`}
       <${DecisionBadge} decision=${item.decision} />
       <${PriorityMark} priority=${item.priority} />
-      <${ItemMeta} item=${item} today=${today} maxTags=${2} />
+      <${ItemMeta} item=${item} today=${today} maxTags=${4} />
     </div>
   </article>`;
 }
@@ -142,7 +150,7 @@ export function QuickAdd({ type, onAdd, placeholder, showTypes = false, onTypeCh
         aria-label="Quick add" enterkeyhint="done" autocomplete="off" />
       <button class="btn primary sm" type="submit" disabled=${!value.trim()}>Add</button>
     </div>
-    <div class="quick-hint">Shortcuts: <code>#tag</code> <code>!high</code> <code>@tomorrow</code> or paste a link</div>
+    <div class="quick-hint">Shortcuts: <code>+project</code> <code>#tag</code> <code>!high</code> <code>@tomorrow</code> or paste a link</div>
   </form>`;
 }
 

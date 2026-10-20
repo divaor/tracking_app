@@ -1,10 +1,13 @@
-import { html, useEffect, useMemo, useRef, useState } from '../../vendor/preact-htm.js';
+import { html, useContext, useEffect, useMemo, useRef, useState } from '../../vendor/preact-htm.js';
 import {
+  areaLabel,
   cleanTags,
   DECISIONS,
   decisionLabel,
   KINDS,
   PRIORITIES,
+  projectKey,
+  resolveProjectName,
   STATUSES,
   statusLabel,
   titleFromMarkdown,
@@ -15,7 +18,8 @@ import {
 import { formatDateTime, formatDue } from '../format.js';
 import { renderMarkdown } from '../markdown.js';
 import { Icon } from './icons.js';
-import { DecisionBadge, PriorityMark, Segmented, TypeBadge } from './components.js';
+import { DecisionBadge, PriorityMark, ProjectsContext, Segmented, TypeBadge } from './components.js';
+import { ProjectChip, TagInput } from './projects.js';
 import { FilesPanel } from './fileViewer.js';
 
 const NOTES_PLACEHOLDER = {
@@ -33,7 +37,7 @@ function toDraft(source = {}) {
     priority: source.priority ?? 'normal',
     kind: source.kind ?? '',
     project: source.project ?? '',
-    tagsText: (source.tags ?? []).join(', '),
+    tags: [...(source.tags ?? [])],
     url: source.url ?? '',
     due: source.due ?? '',
     notes: source.notes ?? '',
@@ -47,10 +51,10 @@ function normalizeUrl(url) {
 }
 
 function fromDraft(draft) {
-  const { tagsText, ...fields } = draft;
+  const fields = { ...draft };
   const url = normalizeUrl(fields.url);
   const title = fields.title.trim() || titleFromMarkdown(fields.notes) || (url ? titleFromUrl(url) : '');
-  return { ...fields, title, url, tags: cleanTags(tagsText) };
+  return { ...fields, title, url, tags: cleanTags(draft.tags) };
 }
 
 const sameFields = (a, b) => JSON.stringify(fromDraft(a)) === JSON.stringify(fromDraft(b));
@@ -129,7 +133,7 @@ function ViewBody({ item, actions, today, onEdit }) {
       ${item.priority !== 'normal' &&
       html`<div><dt>Priority</dt><dd>${item.priority === 'low' ? 'Low' : html`<${PriorityMark} priority=${item.priority} />`}</dd></div>`}
       ${item.due && html`<div><dt>Due</dt><dd>${formatDue(item.due, today)} <span class="muted">(${item.due})</span></dd></div>`}
-      ${item.project && html`<div><dt>Project</dt><dd>${item.project}</dd></div>`}
+      ${item.project && html`<div><dt>Project</dt><dd><${ProjectLink} name=${item.project} /></dd></div>`}
       ${item.tags.length > 0 &&
       html`<div><dt>Tags</dt><dd class="tags">${item.tags.map((t) => html`<button type="button" class="tag" key=${t} onClick=${() => actions.searchTag(t)}>#${t}</button>`)}</dd></div>`}
       ${item.url &&
@@ -157,7 +161,13 @@ function ViewBody({ item, actions, today, onEdit }) {
   </div>`;
 }
 
-function EditBody({ draft, setDraft, projects, onSubmit, titleRef, error }) {
+function ProjectLink({ name }) {
+  const { byKey, showProject } = useContext(ProjectsContext);
+  const project = byKey.get(projectKey(name)) ?? { name };
+  return html`<${ProjectChip} project=${project} onClick=${() => showProject(projectKey(name))} />${project.area && html` <span class="muted small">${areaLabel(project.area)}</span>`}`;
+}
+
+function EditBody({ draft, setDraft, projects, tagSuggestions, onSubmit, titleRef, error }) {
   const [tab, setTab] = useState('write');
   const fileRef = useRef(null);
   const set = (key) => (e) => setDraft({ ...draft, [key]: e.currentTarget.value });
@@ -216,7 +226,7 @@ function EditBody({ draft, setDraft, projects, onSubmit, titleRef, error }) {
         </select>
       </label>`}
       <label class=${kinds ? '' : 'span-2'}>
-        <span>${draft.type === 'claude' ? 'Project / repo' : 'Project'}</span>
+        <span>Project</span>
         <input value=${draft.project} onInput=${set('project')} list="project-options" placeholder="Optional" />
         <datalist id="project-options">${projects.map((p) => html`<option key=${p} value=${p} />`)}</datalist>
       </label>
@@ -225,10 +235,11 @@ function EditBody({ draft, setDraft, projects, onSubmit, titleRef, error }) {
         <input value=${draft.url} onInput=${set('url')} inputmode="url" autocomplete="off"
           placeholder=${draft.type === 'claude' ? 'https://claude.ai/code/… or a PR link' : 'https://…'} />
       </label>
-      <label class="span-2">
+      <div class="tags-field span-2">
         <span>Tags</span>
-        <input value=${draft.tagsText} onInput=${set('tagsText')} placeholder="work, research, …" />
-      </label>
+        <${TagInput} value=${draft.tags} onChange=${(tags) => setDraft({ ...draft, tags })} suggestions=${tagSuggestions}
+          placeholder="Type a tag and press Enter, e.g. a repo name" />
+      </div>
     </div>
 
     <div class="notes-head">
@@ -244,7 +255,7 @@ function EditBody({ draft, setDraft, projects, onSubmit, titleRef, error }) {
   </form>`;
 }
 
-export function ItemModal({ item, initial, actions, projects, today, onClose }) {
+export function ItemModal({ item, initial, actions, projects, tagSuggestions = [], today, onClose }) {
   const isNew = !item;
   const [mode, setMode] = useState(isNew ? 'edit' : 'view');
   const [draft, setDraft] = useState(() => toDraft(item ?? initial));
@@ -274,6 +285,7 @@ export function ItemModal({ item, initial, actions, projects, today, onClose }) 
   const save = (e) => {
     e?.preventDefault();
     const fields = fromDraft(draft);
+    fields.project = resolveProjectName(fields.project, projects);
     if (!fields.title) {
       setError('Give it a title (or a link or some notes).');
       titleRef.current?.focus();
@@ -331,7 +343,7 @@ export function ItemModal({ item, initial, actions, projects, today, onClose }) 
         ? html`<${EditBody} draft=${draft} setDraft=${(d) => {
             setDraft(d);
             if (error) setError('');
-          }} projects=${projects} onSubmit=${save} titleRef=${titleRef} error=${error} />`
+          }} projects=${projects} tagSuggestions=${tagSuggestions} onSubmit=${save} titleRef=${titleRef} error=${error} />`
         : html`<${ViewBody} item=${item} actions=${actions} today=${today} onEdit=${startEdit} />`}
       ${editing &&
       html`<footer class="modal-foot">

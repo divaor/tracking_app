@@ -46,12 +46,13 @@ async function run() {
       path: settings.path,
       branch: settings.branch,
       localItems: store.all(),
+      localProjects: store.allProjects(),
       device: settings.device || 'unknown device',
     });
     const before = store.all();
     // The first download on a device is not news; later changes are.
     const firstSync = !store.meta.lastSyncAt;
-    store.applySynced(result.items, counter, { sha: result.sha });
+    store.applySynced(result.items, counter, { sha: result.sha }, result.projects);
     if (!firstSync) notifyChanges(describeChanges(before, store.all(), { self: settings.device }));
     const at = new Date().toISOString();
     set({ phase: 'idle', error: null, lastSyncAt: at, lastPushAt: result.pushed ? at : state.lastPushAt });

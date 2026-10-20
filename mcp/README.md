@@ -8,6 +8,7 @@ This folder is an MCP server that lets Claude read and update your tracker. Once
 | "Send the artifact to my tracker" | Saves the artifact file (`.html`, `.md`, code…) with a short summary. |
 | "Update tasks on my tracker: the sync work is done, add a task to write docs" | Finds the existing items, marks them done and adds the new task, all in one commit. |
 | "Log this session as Claude work on my tracker" | Adds a *Claude work* item with the session or PR link. |
+| "For this conversation use project Platform and tag with the repos you touch" | Files everything it adds or sends from then on under **Platform**, tagged with each repository involved. It creates the project (asking whether it's work or personal) and new tags as needed. |
 | "What's on my tracker?" | Gives you an overview: counts, what's in progress, what's due soon and what's waiting for your review. |
 | "Check my tracker for feedback on the proposal and revise it" | Reads your decision and feedback, then sends a new version back into your review queue. |
 
@@ -168,8 +169,10 @@ It listens on `127.0.0.1:8787` by default. Put it behind HTTPS (a reverse proxy 
 
 Tools:
 
-- **`get_overview`**: counts, in progress, due soon, awaiting review, recent decisions.
-- **`list_items`**: search and filter by type, status, tag, project, kind or decision.
+- **`get_overview`**: counts, in progress, due soon, awaiting review, recent decisions, active projects.
+- **`list_projects`**: projects (area, counts) and tags in use, so Claude reuses the exact spellings.
+- **`save_project`**: create a project, set its area (work/personal), color or description, rename it (items move along) or delete it.
+- **`list_items`**: search and filter by type, status, tag, one or more projects, area, kind or decision.
 - **`get_item`**: full details, optionally including the attached files' contents.
 - **`read_file`**: reads an attached file, in pages for long files.
 - **`add_items`**: adds several items in one commit.
@@ -177,7 +180,7 @@ Tools:
 - **`delete_items`**: only used when you explicitly ask.
 - **`send_document`**: saves a proposal or artifact as a file and files it as a doc, or adds a new version to an existing doc.
 
-Prompts (slash commands in Claude Code): `send_proposal`, `update_tracker`, `check_feedback`.
+Prompts (slash commands in Claude Code): `use_project`, `send_proposal`, `update_tracker`, `check_feedback`.
 
 The server also sends Claude short instructions that explain these conventions, so you don't have to.
 

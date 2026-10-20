@@ -2,7 +2,9 @@ import { html, useEffect, useMemo, useRef, useState } from '../vendor/preact-htm
 import {
   filterItems,
   localDate,
+  matchesScope,
   parseQuickAdd,
+  projectList,
   statusLabel,
   STATUSES,
   tagCounts,
@@ -16,12 +18,13 @@ import { getSettings, isSyncConfigured, onSettings, saveSettings } from './setti
 import { getSyncState, onSyncState, syncNow } from './syncManager.js';
 import { setNotificationHandlers } from './notifier.js';
 import { Icon } from './ui/icons.js';
-import { SyncBadge, Toasts } from './ui/components.js';
+import { ProjectsContext, SyncBadge, Toasts } from './ui/components.js';
+import { ProjectsView, ScopeBar } from './ui/projects.js';
 import { BoardView, HomeView, ListView } from './ui/views.js';
 import { ItemModal } from './ui/itemModal.js';
 import { SettingsView } from './ui/settingsView.js';
 
-const VIEWS = ['home', 'board', 'list', 'settings'];
+const VIEWS = ['home', 'board', 'list', 'projects', 'settings'];
 
 function parseHash() {
   const [view, type, status] = location.hash.replace(/^#\/?/, '').split('/');
@@ -50,6 +53,8 @@ function viewTitle(route) {
     }
     case 'settings':
       return 'Settings';
+    case 'projects':
+      return 'Projects & tags';
     default:
       return 'Overview';
   }
@@ -66,7 +71,7 @@ function takeItemLink() {
 const isTyping = (el) => el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
 const TEXT_FILE = /\.(md|markdown|mdx|txt)$/i;
 
-function Sidebar({ route, items, onTag, sync, onSyncClick, onNew }) {
+function Sidebar({ route, items, projects, scope, onProject, onTag, sync, onSyncClick, onNew }) {
   const open = items.filter((i) => i.status !== 'done');
   const tags = tagCounts(items).slice(0, 12);
   const link = (target, label, icon, count, extraClass = '') => {
@@ -85,6 +90,13 @@ function Sidebar({ route, items, onTag, sync, onSyncClick, onNew }) {
       ${link({ view: 'list' }, 'All items', 'list', open.length)}
       <div class="nav-section">Categories</div>
       ${TYPES.map((t) => link({ view: categoryView, type: t.id }, t.plural, t.id, open.filter((i) => i.type === t.id).length, `type-${t.id}`))}
+      <div class="nav-section nav-section-row">Projects<a href="#/projects" class="nav-manage" title="Manage projects and tags">Manage</a></div>
+      ${projects.slice(0, 12).map((p) => {
+        const active = scope.length === 1 && scope[0] === `project:${p.key}`;
+        return html`<button type="button" key=${p.key} class="nav-link nav-project ${active ? 'active' : ''}" style=${{ '--pc': p.color }}
+          onClick=${() => onProject(p.key)}><span class="project-dot" /><span class="nav-label">${p.name}</span><span class="count">${p.open}</span></button>`;
+      })}
+      ${!projects.length && html`<a href="#/projects" class="nav-link muted-link"><${Icon} name="plus" size=${16} /><span>Add a project</span></a>`}
       ${tags.length > 0 &&
       html`<div class="nav-section">Tags</div>
         <div class="nav-tags">${tags.map((t) => html`<button type="button" class="tag" key=${t.tag} onClick=${() => onTag(t.tag)}>#${t.tag}<span>${t.count}</span></button>`)}</div>`}
@@ -115,6 +127,7 @@ let toastSeq = 0;
 export function App() {
   const [route, setRoute] = useState(parseHash);
   const [items, setItems] = useState(store.visible());
+  const [projectRecords, setProjectRecords] = useState(store.projects());
   const [sync, setSync] = useState(getSyncState());
   const [settings, setSettingsState] = useState(getSettings());
   const [query, setQuery] = useState('');
@@ -130,7 +143,14 @@ export function App() {
   const contentRef = useRef(null);
   const today = localDate();
 
-  useEffect(() => store.subscribe(() => setItems(store.visible())), []);
+  useEffect(
+    () =>
+      store.subscribe(() => {
+        setItems(store.visible());
+        setProjectRecords(store.projects());
+      }),
+    [],
+  );
   useEffect(() => onSyncState(() => setSync(getSyncState())), []);
   useEffect(() => onSettings((s) => setSettingsState(s)), []);
   useEffect(() => {
@@ -228,10 +248,19 @@ export function App() {
   };
   const defaultType = route.type === 'all' ? 'task' : route.type;
 
+  // Projects: the scope filter (per device) and the project list with colors.
+  const scope = settings.projectScope ?? [];
+  const setScope = (next) => saveSettings({ projectScope: next });
+  const projects = useMemo(() => projectList(items, projectRecords), [items, projectRecords]);
+  const byKey = useMemo(() => new Map(projects.map((p) => [p.key, p])), [projects]);
+  const scopedItems = useMemo(() => items.filter((i) => matchesScope(i, scope, byKey)), [items, scope, byKey]);
+  // Viewing a single project: new items go into it.
+  const defaultProject = scope.length === 1 && scope[0].startsWith('project:') ? (byKey.get(scope[0].slice(8))?.name ?? '') : '';
+
   const actions = {
     toast,
     open: (item) => openModal({ id: item.id }),
-    newItem: (draft = {}) => openModal({ draft: { type: defaultType, ...draft } }),
+    newItem: (draft = {}) => openModal({ draft: { type: defaultType, project: defaultProject, ...draft } }),
     create(fields) {
       const item = store.add(fields);
       toast(`Added ${typeInfo(item.type).label.toLowerCase()} “${item.title}”`, {
@@ -256,8 +285,13 @@ export function App() {
       if (prev) toast(`Deleted “${prev.title}”`, { action: { label: 'Undo', run: () => store.restore(prev) } });
     },
     quickAdd(text, defaults = {}) {
-      const fields = parseQuickAdd(text, today);
-      if (fields.title) actions.create({ ...defaults, ...fields });
+      const fields = parseQuickAdd(text, today, projects.map((p) => p.name));
+      if (fields.title) actions.create({ project: defaultProject, ...defaults, ...fields });
+    },
+    showProject(key) {
+      closeModal();
+      setScope([`project:${key}`]);
+      location.hash = hrefFor({ view: 'list' });
     },
     searchTag(tag) {
       closeModal();
@@ -373,8 +407,8 @@ export function App() {
     if (value && (route.view === 'home' || route.view === 'settings')) location.hash = hrefFor({ view: 'list' });
   };
 
-  const filtered = useMemo(() => filterItems(items, { query }), [items, query]);
-  const projects = useMemo(() => [...new Set(items.map((i) => i.project).filter(Boolean))].sort(), [items]);
+  const filtered = useMemo(() => filterItems(scopedItems, { query }), [scopedItems, query]);
+  const tagNames = useMemo(() => tagCounts(items).map((t) => t.tag), [items]);
 
   const modalItem = modal?.id ? items.find((i) => i.id === modal.id) : null;
   useEffect(() => {
@@ -388,6 +422,8 @@ export function App() {
     view = html`<${ListView} items=${filtered} type=${route.type} status=${route.status} query=${query}
       onType=${(type) => navigate({ type })} onStatus=${(status) => navigate({ status })}
       sort=${settings.sort} onSort=${(sort) => saveSettings({ sort })} actions=${actions} today=${today} />`;
+  } else if (route.view === 'projects') {
+    view = html`<${ProjectsView} items=${items} projects=${projects} actions=${actions} />`;
   } else if (route.view === 'settings') {
     view = html`<${SettingsView} sync=${sync} actions=${actions} items=${items} theme=${settings.theme}
       installPrompt=${installPrompt} onInstall=${async () => {
@@ -396,12 +432,13 @@ export function App() {
         setInstallPrompt(null);
       }} />`;
   } else {
-    view = html`<${HomeView} items=${items} today=${today} actions=${actions} hrefFor=${hrefFor} />`;
+    view = html`<${HomeView} items=${scopedItems} today=${today} actions=${actions} hrefFor=${hrefFor} />`;
   }
+  const scoped = ['home', 'board', 'list'].includes(route.view);
 
-  return html`<div class="app ${drawer ? 'drawer-open' : ''}">
-    <${Sidebar} route=${route} items=${items} sync=${sync} onSyncClick=${onSyncClick} onNew=${() => actions.newItem()}
-      onTag=${(tag) => actions.searchTag(tag)} />
+  return html`<${ProjectsContext.Provider} value=${{ byKey, showProject: actions.showProject }}><div class="app ${drawer ? 'drawer-open' : ''}">
+    <${Sidebar} route=${route} items=${scopedItems} projects=${projects} scope=${scope} onProject=${actions.showProject}
+      sync=${sync} onSyncClick=${onSyncClick} onNew=${() => actions.newItem()} onTag=${(tag) => actions.searchTag(tag)} />
     <div class="scrim" onClick=${() => setDrawer(false)} />
     <main class="main">
       <header class="topbar">
@@ -419,14 +456,17 @@ export function App() {
       html`<div class="search-banner">Showing matches for <strong>${query}</strong><button type="button" class="btn link" onClick=${() => setQuery('')}>Clear</button></div>`}
       ${!isSyncConfigured(settings) && items.length > 0 && route.view === 'home' &&
       html`<a class="sync-hint" href="#/settings"><${Icon} name="cloudOff" size=${16} />Items are only on this device. Set up GitHub sync to use them on your phone and other computers.</a>`}
-      <div class="content" ref=${contentRef}>${view}</div>
+      <div class="content" ref=${contentRef}>
+        ${scoped && html`<${ScopeBar} scope=${scope} projects=${projects} onChange=${setScope} />`}
+        ${view}
+      </div>
     </main>
     <${BottomNav} route=${route} onNew=${() => actions.newItem()} />
     ${modal && (modal.draft || modalItem) &&
     html`<${ItemModal} key=${modal.id ?? 'new'} item=${modalItem} initial=${modal.draft} actions=${actions}
-      projects=${projects} today=${today} onClose=${closeModal} />`}
+      projects=${projects.map((p) => p.name)} tagSuggestions=${tagNames} today=${today} onClose=${closeModal} />`}
     <${Toasts} toasts=${toasts} onDismiss=${dismissToast} />
     ${fileDrag &&
     html`<div class="drop-overlay"><div><${Icon} name="upload" size=${40} /><p>Drop Markdown files to add them to your reading list</p></div></div>`}
-  </div>`;
+  </div></${ProjectsContext.Provider}>`;
 }

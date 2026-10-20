@@ -209,16 +209,18 @@ function wins(a, b) {
   return JSON.stringify(a) > JSON.stringify(b);
 }
 
-export function mergeItems(...lists) {
-  const byId = new Map();
+function mergeBy(key, lists) {
+  const byKey = new Map();
   for (const list of lists) {
-    for (const item of list) {
-      const current = byId.get(item.id);
-      if (!current || wins(item, current)) byId.set(item.id, item);
+    for (const record of list) {
+      const current = byKey.get(record[key]);
+      if (!current || wins(record, current)) byKey.set(record[key], record);
     }
   }
-  return [...byId.values()];
+  return [...byKey.values()];
 }
+
+export const mergeItems = (...lists) => mergeBy('id', lists);
 
 const TOMBSTONE_DAYS = 180;
 
@@ -229,13 +231,21 @@ export function pruneTombstones(items, now = nowIso(), days = TOMBSTONE_DAYS) {
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-export function serializeDocument(items) {
+const DOCUMENT_KEYS = ['app', 'schema', 'updatedAt', 'projects', 'items'];
+
+/**
+ * The data file: items, the project list and any top-level fields written
+ * by newer versions (`extra`, kept as-is). Output is stable for clean diffs.
+ */
+export function serializeDocument(items, projects = [], extra = {}) {
   const sorted = items.map(normalizeItem).sort((a, b) => cmp(a.createdAt, b.createdAt) || cmp(a.id, b.id));
-  const updatedAt = sorted.reduce((max, i) => (i.updatedAt > max ? i.updatedAt : max), EPOCH);
-  return `${JSON.stringify({ app: 'tracker', schema: SCHEMA_VERSION, updatedAt, items: sorted }, null, 2)}\n`;
+  const sortedProjects = projects.map(normalizeProject).sort((a, b) => cmp(a.key, b.key));
+  const updatedAt = [...sorted, ...sortedProjects].reduce((max, i) => (i.updatedAt > max ? i.updatedAt : max), EPOCH);
+  const rest = Object.fromEntries(Object.entries(extra ?? {}).filter(([k]) => !DOCUMENT_KEYS.includes(k)));
+  return `${JSON.stringify({ app: 'tracker', schema: SCHEMA_VERSION, updatedAt, ...rest, projects: sortedProjects, items: sorted }, null, 2)}\n`;
 }
 
-export function parseDocument(source) {
+export function parseData(source) {
   let data;
   try {
     data = JSON.parse(source);
@@ -244,8 +254,15 @@ export function parseDocument(source) {
   }
   const list = Array.isArray(data) ? data : data?.items;
   if (!Array.isArray(list)) throw new Error('Data file has no "items" list');
-  return list.filter((x) => x && typeof x === 'object' && typeof x.id === 'string' && x.id).map(normalizeItem);
+  const projects = Array.isArray(data?.projects) ? data.projects : [];
+  return {
+    items: list.filter((x) => x && typeof x === 'object' && typeof x.id === 'string' && x.id).map(normalizeItem),
+    projects: projects.filter((p) => p && typeof p === 'object' && (p.key || p.name)).map(normalizeProject),
+    extra: Array.isArray(data) ? {} : Object.fromEntries(Object.entries(data).filter(([k]) => !DOCUMENT_KEYS.includes(k))),
+  };
 }
+
+export const parseDocument = (source) => parseData(source).items;
 
 export function diffCounts(before, after) {
   const prev = new Map(before.map((i) => [i.id, i]));
@@ -271,8 +288,10 @@ export function matchesQuery(item, query) {
   const haystack = [item.title, item.notes, item.feedback, item.project, item.url, kindLabel(item.type, item.kind), ...item.files.map((f) => f.name)]
     .join('\n')
     .toLowerCase();
+  const project = compactName(item.project);
   return terms.every((term) => {
     if (term.startsWith('#') && term.length > 1) return tags.some((t) => t.startsWith(term.slice(1)));
+    if (term.startsWith('+') && term.length > 1) return project.startsWith(compactName(term.slice(1)));
     return haystack.includes(term) || tags.some((t) => t.includes(term));
   });
 }
@@ -360,12 +379,17 @@ export function titleFromUrl(url) {
   }
 }
 
-// Parses "Write report #work !high @tomorrow https://…" into item fields.
-export function parseQuickAdd(input, today = localDate()) {
+// Parses "Write report +api #work !high @tomorrow https://…" into item
+// fields. `+name` picks the project, matching existing project names loosely.
+export function parseQuickAdd(input, today = localDate(), projectNames = []) {
   let rest = ` ${text(input)} `;
   const fields = {};
   rest = rest.replace(/\s(https?:\/\/\S+)/i, (_, url) => {
     fields.url = url;
+    return ' ';
+  });
+  rest = rest.replace(/\s\+([\p{L}\p{N}_\-./]+)/u, (_, name) => {
+    fields.project = projectNames.find((p) => compactName(p) === compactName(name)) ?? name;
     return ' ';
   });
   const tags = [];
@@ -439,6 +463,171 @@ export function toggleChecklistItem(markdown, target) {
 export function titleFromMarkdown(markdown, fallback = '') {
   const m = /^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/m.exec(text(markdown));
   return m ? m[1].trim() : fallback;
+}
+
+// ---- Projects --------------------------------------------------------------
+
+// Projects group items (one project per item); each can belong to an area so
+// work and personal things can be filtered apart. Items reference a project
+// by name, matched case-insensitively.
+export const AREAS = [
+  { id: 'work', label: 'Work' },
+  { id: 'personal', label: 'Personal' },
+];
+const AREA_IDS = AREAS.map((a) => a.id);
+export const areaLabel = (id) => AREAS.find((a) => a.id === id)?.label ?? '';
+
+export const PROJECT_COLORS = ['#4f46e5', '#2f6fd6', '#0e8a8a', '#23845f', '#7a8a1f', '#b7791f', '#c2603c', '#c23b6b', '#8b4fd6', '#5f6b7a'];
+
+export const cleanProjectName = (name) => text(name).trim().replace(/\s+/g, ' ');
+export const projectKey = (name) => cleanProjectName(name).toLowerCase();
+// Loose form used to match "+api-platform" with "API Platform".
+export const compactName = (name) => text(name).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+export function defaultProjectColor(key) {
+  let hash = 0;
+  for (const ch of text(key)) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+  return PROJECT_COLORS[hash % PROJECT_COLORS.length];
+}
+
+const PROJECT_KEYS = ['key', 'name', 'area', 'color', 'description', 'createdAt', 'updatedAt', 'updatedBy', 'deleted'];
+
+export function normalizeProject(raw) {
+  const r = raw && typeof raw === 'object' ? raw : {};
+  const name = cleanProjectName(r.name) || cleanProjectName(r.key);
+  const key = projectKey(r.key || name);
+  const createdAt = isoOr(r.createdAt, EPOCH);
+  const updatedAt = isoOr(r.updatedAt, createdAt);
+  const updatedBy = text(r.updatedBy).trim();
+  if (r.deleted) return { key, name, deleted: true, createdAt, updatedAt, updatedBy };
+  const project = {
+    key,
+    name,
+    area: AREA_IDS.includes(r.area) ? r.area : '',
+    color: /^#[0-9a-f]{6}$/i.test(text(r.color)) ? r.color.toLowerCase() : '',
+    description: text(r.description),
+    createdAt,
+    updatedAt,
+    updatedBy,
+  };
+  for (const [k, v] of Object.entries(r)) if (!PROJECT_KEYS.includes(k)) project[k] = v;
+  return project;
+}
+
+export const mergeProjects = (...lists) => mergeBy('key', lists);
+
+/** Creates or updates the project record for `name`. */
+export function upsertProjectRecord(projects, name, patch = {}, now = nowIso(), updatedBy = '') {
+  const key = projectKey(name);
+  const current = projects.find((p) => p.key === key);
+  const base = current && !current.deleted ? current : { createdAt: now, area: '', color: '', description: '' };
+  const next = normalizeProject({
+    ...base,
+    ...patch,
+    key,
+    // Keep the existing spelling unless a new one is given explicitly.
+    name: cleanProjectName(patch.name ?? (current && !current.deleted ? current.name : name)),
+    deleted: false,
+    updatedAt: bumpTime(current?.updatedAt ?? '', now),
+    updatedBy,
+  });
+  return current ? projects.map((p) => (p.key === key ? next : p)) : [...projects, next];
+}
+
+export function deleteProjectRecord(projects, name, now = nowIso(), updatedBy = '') {
+  const key = projectKey(name);
+  const current = projects.find((p) => p.key === key);
+  const dead = { key, name: current?.name ?? cleanProjectName(name), deleted: true, createdAt: current?.createdAt ?? now, updatedAt: bumpTime(current?.updatedAt ?? '', now), updatedBy };
+  return current ? projects.map((p) => (p.key === key ? dead : p)) : [...projects, dead];
+}
+
+/**
+ * Every project in use or registered, with counts: registry entries plus
+ * project names found on items. Sorted by area (work, personal, none), then name.
+ */
+export function projectList(items, projects = []) {
+  const byKey = new Map();
+  for (const p of projects) if (!p.deleted) byKey.set(p.key, { ...p, open: 0, total: 0, registered: true });
+  for (const item of items) {
+    if (item.deleted || !item.project) continue;
+    const key = projectKey(item.project);
+    if (!byKey.has(key)) byKey.set(key, { key, name: cleanProjectName(item.project), area: '', color: '', description: '', open: 0, total: 0, registered: false });
+    const entry = byKey.get(key);
+    entry.total++;
+    if (item.status !== 'done') entry.open++;
+  }
+  const areaRank = (a) => (a === 'work' ? 0 : a === 'personal' ? 1 : 2);
+  return [...byKey.values()]
+    .map((p) => ({ ...p, color: p.color || defaultProjectColor(p.key) }))
+    .sort((a, b) => areaRank(a.area) - areaRank(b.area) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+/**
+ * Renames a project (merging into another when the new name exists) and moves
+ * its items along. Returns the new { items, projects }.
+ */
+export function renameProjectIn({ items, projects }, from, to, now = nowIso(), updatedBy = '') {
+  const fromKey = projectKey(from);
+  const toKey = projectKey(to);
+  if (!toKey) return { items, projects };
+  if (fromKey === toKey) return { items, projects: upsertProjectRecord(projects, from, { name: to }, now, updatedBy) };
+  const old = projects.find((p) => p.key === fromKey && !p.deleted);
+  const target = projects.find((p) => p.key === toKey && !p.deleted);
+  const carried = target ? {} : { area: old?.area ?? '', color: old?.color ?? '', description: old?.description ?? '' };
+  const nextProjects = deleteProjectRecord(upsertProjectRecord(projects, to, carried, now, updatedBy), from, now, updatedBy);
+  const name = nextProjects.find((p) => p.key === toKey).name;
+  return {
+    items: items.map((i) => (!i.deleted && projectKey(i.project) === fromKey ? applyPatch(i, { project: name, updatedBy }, now) : i)),
+    projects: nextProjects,
+  };
+}
+
+/** Deletes a project; its items stay, without a project. */
+export function deleteProjectIn({ items, projects }, name, now = nowIso(), updatedBy = '') {
+  const key = projectKey(name);
+  return {
+    items: items.map((i) => (!i.deleted && projectKey(i.project) === key ? applyPatch(i, { project: '', updatedBy }, now) : i)),
+    projects: deleteProjectRecord(projects, name, now, updatedBy),
+  };
+}
+
+/** Canonical spelling for a project name: an existing project's, else as typed. */
+export function resolveProjectName(name, known) {
+  const key = projectKey(name);
+  if (!key) return '';
+  for (const p of known) {
+    const candidate = typeof p === 'string' ? p : p.name;
+    if (projectKey(candidate) === key) return cleanProjectName(candidate);
+  }
+  return cleanProjectName(name);
+}
+
+/**
+ * Project scope: a list of selections, any of which may match.
+ * 'area:work' | 'area:personal' | 'project:<key>' | 'none' (no project).
+ * An empty scope matches everything.
+ */
+export function matchesScope(item, scope, projectsByKey = new Map()) {
+  if (!scope?.length) return true;
+  const key = projectKey(item.project);
+  return scope.some((s) => {
+    if (s === 'none') return !key;
+    if (s.startsWith('area:')) return Boolean(key) && projectsByKey.get(key)?.area === s.slice(5);
+    if (s.startsWith('project:')) return s.slice(8) === key;
+    return false;
+  });
+}
+
+// ---- Tags ----------------------------------------------------------------
+
+/** Items with `from` renamed to `to` (merging into an existing tag), or removed when `to` is empty. */
+export function retagItems(items, from, to, now = nowIso(), updatedBy = '') {
+  const fromKey = text(from).toLowerCase();
+  return items.map((item) => {
+    if (item.deleted || !item.tags.some((t) => t.toLowerCase() === fromKey)) return item;
+    const tags = cleanTags(item.tags.map((t) => (t.toLowerCase() === fromKey ? to : t)).filter(Boolean));
+    return applyPatch(item, { tags, updatedBy }, now);
+  });
 }
 
 // ---- Files ---------------------------------------------------------------

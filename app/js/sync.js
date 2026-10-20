@@ -1,5 +1,5 @@
 // One sync round against the data file in GitHub: pull, merge, push.
-import { diffCounts, mergeItems, nowIso, parseDocument, pruneTombstones, serializeDocument } from './model.js';
+import { diffCounts, mergeItems, mergeProjects, nowIso, parseData, pruneTombstones, serializeDocument } from './model.js';
 
 function commitMessage(device, counts, created) {
   if (created) return `Tracker: create data file (from ${device})`;
@@ -17,16 +17,18 @@ const isWriteConflict = (err) => err?.status === 409 || err?.status === 422;
  * it differs. Retries when another device wrote in between (sha mismatch).
  * Never overwrites a remote file it cannot parse.
  */
-export async function syncOnce({ client, path, branch, localItems, device = 'unknown device', now = nowIso, maxAttempts = 4 }) {
+export async function syncOnce({ client, path, branch, localItems, localProjects = [], device = 'unknown device', now = nowIso, maxAttempts = 4 }) {
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const remote = await client.getFile(path, branch || undefined);
-    const remoteItems = remote ? parseDocument(remote.text) : [];
+    const data = remote ? parseData(remote.text) : { items: [], projects: [], extra: {} };
+    const remoteItems = data.items;
     const merged = pruneTombstones(mergeItems(remoteItems, localItems), now());
-    const textOut = serializeDocument(merged);
+    const projects = pruneTombstones(mergeProjects(data.projects, localProjects), now());
+    const textOut = serializeDocument(merged, projects, data.extra);
 
-    if (remote && textOut === serializeDocument(remoteItems)) {
-      return { items: merged, sha: remote.sha, pushed: false, counts: { added: 0, updated: 0, deleted: 0 } };
+    if (remote && textOut === serializeDocument(remoteItems, data.projects, data.extra)) {
+      return { items: merged, projects, sha: remote.sha, pushed: false, counts: { added: 0, updated: 0, deleted: 0 } };
     }
 
     if (!remote && branch) await client.ensureBranch(branch);
@@ -38,7 +40,7 @@ export async function syncOnce({ client, path, branch, localItems, device = 'unk
         branch: branch || undefined,
         message: commitMessage(device, counts, !remote),
       });
-      return { items: merged, sha: res.sha, pushed: true, counts };
+      return { items: merged, projects, sha: res.sha, pushed: true, counts };
     } catch (err) {
       if (!isWriteConflict(err) || attempt === maxAttempts) throw err;
       lastError = err;

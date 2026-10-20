@@ -5,25 +5,34 @@ import { describeChanges } from '../app/js/changes.js';
 import {
   addDays,
   applyPatch,
+  AREAS,
   CLAUDE_AUTHOR,
+  cleanProjectName,
   cleanTags,
   createItem,
   DECISIONS,
+  deleteProjectIn,
   formatBytes,
   KINDS,
   kindLabel,
   normalizeItem,
   nowIso,
-  parseDocument,
+  parseData,
   PRIORITIES,
+  projectKey,
+  projectList,
+  renameProjectIn,
+  resolveProjectName,
   safeFileName,
   serializeDocument,
   slugify,
   sortItems,
   STATUSES,
   statusLabel,
+  tagCounts,
   tombstone,
   TYPE_IDS,
+  upsertProjectRecord,
 } from '../app/js/model.js';
 
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
@@ -84,32 +93,37 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
 
   async function load() {
     const file = await client.getFile(path, ref);
-    return { sha: file?.sha, items: file ? parseDocument(file.text) : [] };
+    return { sha: file?.sha, ...(file ? parseData(file.text) : { items: [], projects: [], extra: {} }) };
   }
 
-  // Applies `change` to the latest data and commits it. `change` returns the
-  // new item list, or null when there is nothing to write; it may run again
-  // if another device wrote in between, so it must not have side effects.
+  // Applies `change` to the latest data and commits it. `change(items, data)`
+  // returns the new item list, or { items, projects }, or null when there is
+  // nothing to write. It may run again if another device wrote in between,
+  // so it must not have side effects.
   async function commit(change, message) {
     for (let attempt = 1; ; attempt++) {
-      const { sha, items } = await load();
-      const next = change(items);
-      if (!next) return items;
-      if (!sha && branch) await client.ensureBranch(branch);
+      const data = await load();
+      const result = change(data.items, data);
+      if (!result) return data.items;
+      const next = Array.isArray(result) ? { items: result, projects: data.projects } : { items: result.items ?? data.items, projects: result.projects ?? data.projects };
+      if (!data.sha && branch) await client.ensureBranch(branch);
       try {
-        await client.putFile(path, { text: serializeDocument(next), sha, branch: ref, message });
+        await client.putFile(path, { text: serializeDocument(next.items, next.projects, data.extra), sha: data.sha, branch: ref, message });
       } catch (err) {
         if (!isConflict(err) || attempt >= MAX_ATTEMPTS) throw err;
         continue;
       }
       try {
-        onChange(describeChanges(items, next));
+        onChange(describeChanges(data.items, next.items));
       } catch {
         // notifications are best effort
       }
-      return next;
+      return next.items;
     }
   }
+
+  // Existing project spelling for `name` (projects are matched case-insensitively).
+  const canonical = (name, data) => (name ? resolveProjectName(name, projectList(data.items, data.projects)) : name);
 
   async function writeFile(filePath, content, message) {
     const existing = await client.getFile(filePath, ref);
@@ -143,7 +157,8 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
 
   return {
     async overview() {
-      const items = live((await load()).items);
+      const data = await load();
+      const items = live(data.items);
       const today = now().slice(0, 10);
       const counts = {};
       for (const t of TYPE_IDS) {
@@ -161,17 +176,79 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
         recentDecisions: sortItems(items.filter((i) => i.decision), 'updated')
           .slice(0, 10)
           .map((i) => ({ ...summarize(i), feedback: i.feedback || undefined })),
+        projects: projectList(data.items, data.projects)
+          .filter((p) => p.open)
+          .slice(0, 20)
+          .map((p) => ({ name: p.name, area: p.area || undefined, open: p.open })),
       };
     },
 
-    async list({ type, status = 'open', query = '', tag, project, kind, decision, limit = 50 } = {}) {
+    async listProjects() {
+      const data = await load();
+      return {
+        projects: projectList(data.items, data.projects).map((p) => ({
+          name: p.name,
+          area: p.area || undefined,
+          description: p.description || undefined,
+          open: p.open,
+          total: p.total,
+        })),
+        tags: tagCounts(data.items).map((t) => ({ tag: t.tag, count: t.count })),
+      };
+    },
+
+    // Creates or updates a project; can also rename (moving its items) or delete it.
+    async saveProject({ name, area, color, description, rename_to: renameTo, delete: remove = false } = {}) {
+      const clean = cleanProjectName(name);
+      if (!clean) throw new TrackerError('A project name is required.');
+      if (has({ area }, 'area') && area !== '' && !AREAS.some((a) => a.id === area)) throw new TrackerError(`area must be one of ${AREAS.map((a) => a.id).join(', ')} or ""`);
+      if (has({ color }, 'color') && color !== '' && !/^#[0-9a-f]{6}$/i.test(color)) throw new TrackerError('color must look like #4f46e5');
+      const at = now();
+      let summary = null;
+      let moved = 0;
+      await commit(
+        (items, data) => {
+          const known = projectList(data.items, data.projects).find((p) => p.key === projectKey(clean));
+          const affected = items.filter((i) => !i.deleted && projectKey(i.project) === projectKey(clean)).length;
+          if (remove) {
+            if (!known) throw new TrackerError(`No project named “${clean}”.`);
+            moved = affected;
+            summary = { name: known.name, deleted: true };
+            return deleteProjectIn(data, known.name, at, CLAUDE_AUTHOR);
+          }
+          let next = data;
+          let current = known?.name ?? clean;
+          if (renameTo && cleanProjectName(renameTo)) {
+            next = renameProjectIn(next, current, cleanProjectName(renameTo), at, CLAUDE_AUTHOR);
+            current = cleanProjectName(renameTo);
+            moved = affected;
+          }
+          const patch = {};
+          if (has({ area }, 'area')) patch.area = area;
+          if (has({ color }, 'color')) patch.color = color;
+          if (has({ description }, 'description')) patch.description = String(description);
+          const projects = upsertProjectRecord(next.projects, current, patch, at, CLAUDE_AUTHOR);
+          const saved = projects.find((p) => p.key === projectKey(current));
+          summary = { name: saved.name, area: saved.area || undefined, description: saved.description || undefined };
+          return { items: next.items, projects };
+        },
+        `Tracker: ${remove ? 'delete' : renameTo ? 'rename' : 'save'} project “${clean}” (via ${device})`,
+      );
+      return { project: summary, itemsMoved: moved || undefined };
+    },
+
+    async list({ type, status = 'open', query = '', tag, project, projects, area, kind, decision, limit = 50 } = {}) {
       const terms = String(query).toLowerCase().split(/\s+/).filter(Boolean);
-      const matches = live((await load()).items).filter(
+      const data = await load();
+      const areas = new Map(projectList(data.items, data.projects).map((p) => [p.key, p.area]));
+      const wanted = [project, projects].flat().filter(Boolean).map(projectKey);
+      const matches = live(data.items).filter(
         (i) =>
           (!type || type === 'all' || i.type === type) &&
           (status === 'all' || (status === 'open' ? i.status !== 'done' : i.status === status)) &&
           (!tag || i.tags.some((t) => t.toLowerCase() === String(tag).replace(/^#/, '').toLowerCase())) &&
-          (!project || i.project.toLowerCase() === String(project).toLowerCase()) &&
+          (!wanted.length || wanted.includes(projectKey(i.project))) &&
+          (!area || (area === 'none' ? !i.project || !areas.get(projectKey(i.project)) : areas.get(projectKey(i.project)) === area)) &&
           (!kind || i.kind === kind) &&
           (!decision || (decision === 'none' ? !i.decision : i.decision === decision)) &&
           terms.every((term) => [i.title, i.notes, i.feedback, i.project, i.url, ...i.tags, ...i.files.map((f) => f.name)].join('\n').toLowerCase().includes(term)),
@@ -228,21 +305,26 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
         return createItem({ type: 'task', ...fields, updatedBy: CLAUDE_AUTHOR }, at);
       });
       const label = created.length === 1 ? `“${created[0].title}”` : `${created.length} items`;
-      await commit((items) => [...items, ...created], `Tracker: add ${label} (via ${device})`);
-      return { added: created.map(withLink) };
+      let saved = created;
+      await commit((items, data) => {
+        saved = created.map((c) => (c.project ? { ...c, project: canonical(c.project, data) } : c));
+        return [...items, ...saved];
+      }, `Tracker: add ${label} (via ${device})`);
+      return { added: saved.map(withLink) };
     },
 
     async updateItems(updates) {
       if (!Array.isArray(updates) || !updates.length) throw new TrackerError('Provide at least one update.');
       const at = now();
       let changed = [];
-      const next = await commit((items) => {
+      const next = await commit((items, data) => {
         changed = [];
         const patches = new Map();
         for (const u of updates) {
           const item = resolve(items, u.id);
           const patch = pickFields(u);
           checkFields(patch, item.type);
+          if (has(patch, 'project')) patch.project = canonical(patch.project, data);
           let tags = patch.tags ?? item.tags;
           if (u.add_tags) tags = cleanTags([...tags, ...cleanTags(u.add_tags)]);
           if (u.remove_tags) {
@@ -305,13 +387,17 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       if (has(input, 'tags')) fields.tags = cleanTags(input.tags);
 
       if (!target) {
-        const item = normalizeItem({ ...draft, ...fields, kind, notes: input.summary ?? '', files: [file] });
-        await commit((items) => [...items, item], `Tracker: add ${kindLabel('doc', kind).toLowerCase() || 'document'} “${title}” (via ${device})`);
+        let item = normalizeItem({ ...draft, ...fields, kind, notes: input.summary ?? '', files: [file] });
+        await commit((items, data) => {
+          item = { ...item, project: canonical(item.project, data) };
+          return [...items, item];
+        }, `Tracker: add ${kindLabel('doc', kind).toLowerCase() || 'document'} “${title}” (via ${device})`);
         return { created: true, item: withLink(item), file: { path: filePath, size: formatBytes(size) } };
       }
 
       let saved = null;
-      await commit((items) => {
+      await commit((items, data) => {
+        if (has(fields, 'project')) fields.project = canonical(fields.project, data);
         const current = resolve(items, target.id);
         const notes = input.summary ? [current.notes, `**Update ${at.slice(0, 10)}:** ${input.summary}`].filter((s) => s.trim()).join('\n\n') : current.notes;
         saved = applyPatch(

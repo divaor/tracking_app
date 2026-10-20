@@ -1405,6 +1405,359 @@ button.tag:hover {
   border-radius: var(--radius-sm);
 }
 
+/* ---- Projects & tags ---------------------------------------------------------- */
+.project-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--pc, var(--text-3));
+}
+
+.project-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 1px 9px 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--pc) 35%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pc) 10%, transparent);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 22px;
+  white-space: nowrap;
+}
+
+.project-chip.small {
+  padding: 0 7px 0 6px;
+  font-size: 12px;
+  line-height: 19px;
+}
+
+button.project-chip {
+  cursor: pointer;
+}
+
+button.project-chip:hover {
+  background: color-mix(in srgb, var(--pc) 18%, transparent);
+}
+
+.scope-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -6px 0 16px;
+}
+
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 3px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scope-chip:hover,
+.scope-chip.open {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.scope-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.scope-chip.chosen {
+  --accent: var(--pc);
+  padding-right: 4px;
+  background: color-mix(in srgb, var(--pc) 12%, var(--surface));
+}
+
+.chip-x {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-3);
+}
+
+.chip-x:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.scope-more {
+  position: relative;
+}
+
+.project-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  width: min(320px, calc(100vw - 32px));
+  max-height: min(420px, 70vh);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.picker-body {
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.picker-heading {
+  padding: 8px 8px 4px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.picker-row:hover {
+  background: var(--surface-2);
+}
+
+.picker-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-empty {
+  padding: 8px;
+}
+
+.picker-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.nav-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.nav-manage {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.nav-project {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+.nav-link.nav-project .project-dot {
+  flex: none;
+  margin: 0 4px 0 5px;
+}
+
+.nav-link.nav-project .nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muted-link {
+  color: var(--text-3);
+}
+
+.tags-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.tags-field > span {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-height: 40px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.tag-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.tag-input input {
+  flex: 1;
+  min-width: 120px;
+  min-height: 28px !important;
+  padding: 2px 4px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.tag-chip {
+  padding-right: 2px;
+  font-size: 13px;
+  line-height: 24px;
+}
+
+.projects-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 820px;
+}
+
+.new-project {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 6px;
+}
+
+.new-project input {
+  flex: 1 1 220px;
+}
+
+.new-project select {
+  width: auto;
+}
+
+.project-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 18px 0 6px;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.project-row,
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-top: 1px solid var(--border);
+}
+
+.project-main {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.project-name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+}
+
+.project-name:hover {
+  color: var(--accent);
+}
+
+.area-select {
+  width: auto !important;
+  min-height: 34px !important;
+  font-size: 14px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.rename-input {
+  min-height: 34px !important;
+}
+
+.swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--pc);
+  box-shadow: 0 0 0 1px var(--border-strong);
+  cursor: pointer;
+}
+
+.swatch.big {
+  width: 26px;
+  height: 26px;
+}
+
+.swatch.active {
+  box-shadow: 0 0 0 2px var(--text);
+}
+
+.color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tag-list .tag-row:first-child {
+  border-top: 0;
+}
+
 /* ---- Files & review ---------------------------------------------------------- */
 .files-panel,
 .review-panel {
@@ -2163,6 +2516,35 @@ span.decision {
 
   .sort {
     margin-left: 0;
+  }
+
+  .scope-bar {
+    flex-wrap: nowrap;
+    margin: -4px -16px 14px;
+    padding: 0 16px 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .scope-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scope-chip {
+    flex-shrink: 0;
+  }
+
+  .scope-more {
+    position: static;
+  }
+
+  .project-picker {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    bottom: calc(var(--bottom-nav) + 12px + env(safe-area-inset-bottom));
+    left: 12px;
+    width: auto;
   }
 
   .modal-backdrop {

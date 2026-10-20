@@ -1,6 +1,6 @@
 // Offline support: precache the app shell, then serve network-first so updates
 // show up immediately when online. GitHub API calls are never intercepted.
-const CACHE = 'tracker-v1.2.0';
+const CACHE = 'tracker-v1.3.0';
 const ASSETS = [
   './',
   'index.html',
@@ -35,6 +35,7 @@ const ASSETS = [
   'js/ui/icons.js',
   'js/ui/itemModal.js',
   'js/ui/notificationsCard.js',
+  'js/ui/projects.js',
   'js/ui/settingsView.js',
   'js/ui/views.js',
   'vendor/marked.js',

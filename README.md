@@ -14,6 +14,7 @@ It runs as an **Electron desktop app** on your computers and as an **installable
   - **Claude work**: Claude Code sessions, PRs, chats, artifacts
   - **Docs**: proposals, artifacts, Claude docs, READMEs, specs, reports, articles
 - **Claude connector**: say "send this proposal to my tracker" or "update tasks on my tracker" in any Claude chat or Claude Code session. Proposals and artifacts arrive as files you can read in the app, then approve, request changes or reject with feedback Claude can read back. See [4. Claude connector](#4-claude-connector).
+- **Projects and tags**: put each item in a project, mark projects as **Work** or **Personal**, and filter every view by area or by any mix of projects. Tags (for example the repos a proposal touches) show on every card. Manage both on the **Projects & tags** page.
 - **Overview**: due soon, in progress, up next, your reading list and recently completed items.
 - **Board**: drag cards between columns. On phones you swipe between columns instead.
 - **Lists**: filter by category and status, sort by priority, due date and more. Search with plain text or `#tags`.
@@ -128,8 +129,17 @@ Full guide: **[mcp/README.md](mcp/README.md)**.
 
 ## Using it
 
+### Projects and tags
+
+- **Filter by project:** the bar above every view filters by **All**, **Work**, **Personal**, or any mix of projects (**Projects ▾**). Your choice is remembered on each device. When you're looking at a single project, new items go into it.
+- **Assign a project:** pick or type a project in the item editor (existing names are matched case-insensitively), or type `+project` in quick add.
+- **Tag items:** add tags as chips in the editor (with suggestions from tags you already use), or type `#tag` in quick add.
+- **Manage them:** the **Projects & tags** page (sidebar → Projects → *Manage*) creates projects and sets their area and color. It also renames or deletes projects (their items move along) and renames or merges tags.
+- **From Claude:** say *"for this conversation use project Platform and tag with the repos you touch"*. Claude then files everything it adds or sends under that project and tags each item with the repositories involved, creating projects and tags as needed.
+
 | Quick add syntax                   | Effect                       |
 | ---------------------------------- | ---------------------------- |
+| `+platform`                        | puts it in the project Platform (loose match) |
 | `#work`                            | adds the tag `work`          |
 | `!high`, `!low`, `!urgent`         | sets the priority            |
 | `!` / `!!`                         | high / urgent priority       |
@@ -150,6 +160,7 @@ Some other things you can do:
 - Click the round status icon on any card to move the item to the next status.
 - Drag **Markdown files** onto the window to add them to your reading list.
 - Click a **tag** in the sidebar or on an item to see everything with that tag.
+- Search with `#tag` or `+project`. Click a project chip on any item to show that project.
 
 ## Data format
 
@@ -160,6 +171,9 @@ Some other things you can do:
   "app": "tracker",
   "schema": 1,
   "updatedAt": "2026-10-20T09:15:00.000Z",
+  "projects": [
+    { "key": "platform", "name": "Platform", "area": "work", "color": "#4f46e5", "description": "", "createdAt": "…", "updatedAt": "…", "updatedBy": "Work PC" }
+  ],
   "items": [
     {
       "id": "mgx1k2-4f9c0a7b1e2d3c4f",

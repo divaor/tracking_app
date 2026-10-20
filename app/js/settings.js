@@ -22,6 +22,8 @@ export const DEFAULT_SETTINGS = {
   autoSync: true,
   theme: 'system',
   sort: 'smart',
+  // Project filter for the main views (see matchesScope in model.js).
+  projectScope: [],
   // Claude connector address, used for push notifications.
   connectorUrl: '',
   // Push notifications turned on for this device (web/PWA only).

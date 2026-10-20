@@ -1,6 +1,6 @@
 import { html, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { createGitHubClient, decodeBase64, encodeBase64 } from '../github.js';
-import { localDate, parseDocument, serializeDocument } from '../model.js';
+import { localDate, parseData, serializeDocument } from '../model.js';
 import { getSettings, getToken, isSyncConfigured, saveSettings, setToken } from '../settings.js';
 import { store } from '../store.js';
 import { syncNow } from '../syncManager.js';
@@ -91,7 +91,7 @@ function SyncCard({ sync, actions }) {
       const path = clean.path || 'tracker.json';
       const file = await client.getFile(path, clean.branch || undefined);
       const lines = [`Connected to ${info.full_name} (${info.private ? 'private' : 'public'} repository).`];
-      if (file) lines.push(`Found ${path} with ${parseDocument(file.text).filter((i) => !i.deleted).length} items.`);
+      if (file) lines.push(`Found ${path} with ${parseData(file.text).items.filter((i) => !i.deleted).length} items.`);
       else lines.push(`${path} does not exist yet — it will be created on the first sync.`);
       if (!info.private) lines.push('Warning: this repository is public, so anyone can read your tracker data. Use a private repository.');
       if (info.permissions && !info.permissions.push) lines.push('Warning: you do not have write access to this repository.');
@@ -249,7 +249,7 @@ function DataCard({ actions, items }) {
     e.currentTarget.value = '';
     if (!file) return;
     try {
-      const added = store.importItems(parseDocument(await file.text()));
+      const added = store.importData(parseData(await file.text()));
       actions.toast(`Import complete${added > 0 ? ` — ${added} new items` : ''}`);
     } catch (err) {
       actions.toast(err.message, { kind: 'error' });
@@ -265,7 +265,7 @@ function DataCard({ actions, items }) {
   return html`<${Card} title="Your data" icon="folder">
     <p class="muted">${items.length} items on this device${all.length > items.length ? ` (plus ${all.length - items.length} deletions waiting to sync)` : ''}.</p>
     <div class="form-actions">
-      <button type="button" class="btn" onClick=${() => download(`tracker-backup-${localDate()}.json`, serializeDocument(all))}><${Icon} name="download" size=${16} />Export backup</button>
+      <button type="button" class="btn" onClick=${() => download(`tracker-backup-${localDate()}.json`, serializeDocument(all, store.allProjects()))}><${Icon} name="download" size=${16} />Export backup</button>
       <button type="button" class="btn" onClick=${() => fileRef.current?.click()}><${Icon} name="upload" size=${16} />Import backup</button>
       <input ref=${fileRef} type="file" hidden accept=".json,application/json" onChange=${importFile} />
       <button type="button" class="btn ghost danger" onClick=${clear}><${Icon} name="trash" size=${16} />Clear local copy</button>

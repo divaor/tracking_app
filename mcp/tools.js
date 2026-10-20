@@ -2,7 +2,7 @@
 // wording here is what lets Claude act on requests like "send this proposal
 // to my tracker" from any chat or Claude Code session.
 import { APP_VERSION } from '../app/js/version.js';
-import { DECISIONS, KINDS, PRIORITIES, STATUSES, TYPE_IDS } from '../app/js/model.js';
+import { AREAS, DECISIONS, KINDS, PRIORITIES, STATUSES, TYPE_IDS } from '../app/js/model.js';
 
 export const SERVER_INFO = { name: 'tracker', title: 'Tracker', version: APP_VERSION };
 
@@ -13,6 +13,7 @@ Model
 - Status: pending → in_progress → done (docs show as To read → Reading → Read).
 - Docs can carry files (proposal.md, report.html, …) stored in the repo; the user reads them in the app.
 - The user reviews docs by setting decision (approved | changes | rejected) and writing feedback.
+- Each item belongs to at most one project. Projects can be in area work or personal; the user filters by them. Tags are free-form labels; use them for the repositories an item touches.
 
 How to handle requests
 - "Send (this) proposal / plan / design to my tracker" → send_document with kind "proposal", the COMPLETE proposal as Markdown in content, and a 2–4 sentence summary. Do not send a shortened version.
@@ -22,15 +23,20 @@ How to handle requests
 - "Log / track this Claude work" → add_items with type "claude", kind (code, chat, pr, artifact) and url = the session, PR or artifact link.
 - "What's on my tracker?" → get_overview. "Any feedback on my proposal?" → list_items with decision, or get_item; then read decision and feedback.
 
+Projects and tags
+- "For this conversation use project X (and tag with the repos you touch)" → remember it: pass project "X" on every add_items and send_document (and update_items when filing items), and add the names of the repositories involved as tags (in Claude Code: the git repository you are working in; a proposal spanning several repos gets one tag per repo).
+- Call list_projects before your first write to reuse the exact existing project and tag spellings. If the project does not exist, create it with save_project (area work or personal; ask if unclear). New tags are created simply by using them.
+- Without such an instruction, set project only when it is obvious (e.g. an existing project named after the repo).
+
 Conventions
-- Set project to the repository or project name and url to the most relevant link (Claude session, PR, artifact) when you know them.
+- Set url to the most relevant link (Claude session, PR, artifact) when you know it.
 - Keep titles short and specific; put details in notes (Markdown, checklists with "- [ ]").
-- Due dates are YYYY-MM-DD. Use tags sparingly and reuse existing ones.
+- Due dates are YYYY-MM-DD. Reuse existing tags instead of near-duplicates.
 - Never delete items unless the user explicitly asks. After a write, tell the user what changed and include the item link if one is returned.`;
 
 const str = (description) => ({ type: 'string', description });
 const enumOf = (values, description) => ({ type: 'string', enum: values, description });
-const tagsSchema = { type: 'array', items: { type: 'string' }, description: 'Tags without "#", e.g. ["work"].' };
+const tagsSchema = { type: 'array', items: { type: 'string' }, description: 'Tags without "#", e.g. ["tracking_app", "api"]. Use repository names for the repos an item touches; reuse spellings from list_projects.' };
 const kindIds = (type) => KINDS[type].map((k) => k.id);
 
 const ITEM_FIELDS = {
@@ -39,7 +45,7 @@ const ITEM_FIELDS = {
   status: enumOf(STATUSES, 'Default: pending.'),
   priority: enumOf(PRIORITIES.map((p) => p.id), 'Default: normal.'),
   kind: str(`Optional subtype. For claude: ${kindIds('claude').join(', ')}. For doc: ${kindIds('doc').join(', ')}.`),
-  project: str('Repository or project name.'),
+  project: str('Project name. Reuse an existing project (see list_projects); matching is case-insensitive. A new name creates the project.'),
   tags: tagsSchema,
   url: str('Most relevant link: Claude session, PR, artifact or source.'),
   due: str('Due date as YYYY-MM-DD.'),
@@ -61,6 +67,33 @@ export function createTools(getTracker) {
       run: run((t) => t.overview()),
     },
     {
+      name: 'list_projects',
+      title: 'List projects and tags',
+      description: 'All projects (with area work/personal and open/total item counts) and all tags in use (with counts). Call before filing items so you reuse existing spellings.',
+      inputSchema: { type: 'object', properties: {} },
+      annotations: readOnly,
+      run: run((t) => t.listProjects()),
+    },
+    {
+      name: 'save_project',
+      title: 'Create or update a project',
+      description: 'Create a project or change its area (work/personal), color or description. Can also rename a project (its items move along, merging into an existing project of that name) or delete it (only when the user asks; its items stay, without a project).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: str('Project name (existing projects match case-insensitively).'),
+          area: enumOf([...AREAS.map((a) => a.id), ''], 'work or personal; "" for none.'),
+          description: str('Optional one-line description.'),
+          color: str('Optional color as #rrggbb.'),
+          rename_to: str('New name for the project.'),
+          delete: { type: 'boolean', description: 'Delete the project. Only when the user explicitly asks.' },
+        },
+        required: ['name'],
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+      run: run((t, a) => t.saveProject(a)),
+    },
+    {
       name: 'list_items',
       title: 'List tracker items',
       description: 'Find items on the tracker. By default returns open items (pending + in progress). Use before adding or updating so you work with existing items and their ids.',
@@ -71,7 +104,9 @@ export function createTools(getTracker) {
           status: enumOf(['open', 'all', ...STATUSES], 'open = pending or in_progress (default).'),
           query: str('Words to search for in title, notes, feedback, project, url, tags and file names.'),
           tag: str('Only items with this tag.'),
-          project: str('Only items for this project.'),
+          project: str('Only items in this project (case-insensitive).'),
+          projects: { type: 'array', items: { type: 'string' }, description: 'Only items in any of these projects.' },
+          area: enumOf([...AREAS.map((a) => a.id), 'none'], 'Only items whose project is in this area (none = no project or no area).'),
           kind: str('Only items of this kind, e.g. proposal.'),
           decision: enumOf([...DECISIONS.map((d) => d.id), 'none'], 'Only docs with this review decision (none = not reviewed yet).'),
           limit: { type: 'integer', minimum: 1, maximum: 200, description: 'Default 50.' },
@@ -198,6 +233,17 @@ export function createTools(getTracker) {
 }
 
 export const PROMPTS = [
+  {
+    name: 'use_project',
+    title: 'Use a project on my tracker',
+    description: 'File everything from this conversation under one project and tag it with the repos involved.',
+    arguments: [
+      { name: 'project', description: 'Project name.', required: true },
+      { name: 'area', description: 'work or personal (used if the project is new).', required: false },
+    ],
+    text: ({ project, area }) =>
+      `For the rest of this conversation, put everything you add to or send to my tracker (tasks, Claude work, proposals, artifacts) in the project "${project}", and tag each item with the repositories it touches (one tag per repo name). First call list_projects to reuse existing spellings; if "${project}" does not exist, create it with save_project${area ? ` in area ${area}` : ' (ask me whether it is work or personal)'}. Confirm in one line.`,
+  },
   {
     name: 'send_proposal',
     title: 'Send proposal to my tracker',
