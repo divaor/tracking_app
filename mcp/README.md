@@ -113,11 +113,7 @@ The connector is its own OAuth 2.1 authorization server, following the MCP autho
 - **No database:** clients, codes and tokens are signed with a key derived from `MCP_SECRET`, so nothing has to be stored.
 - **Revoking access:** change `MCP_SECRET`. That signs out every client, and phones need to turn notifications on again.
 
-**Optional hardening:** single-use codes and refresh-token reuse detection. Create a KV namespace and bind it as `OAUTH_KV` (see the commented lines in `wrangler.toml`):
-
-```sh
-npx wrangler@4 kv namespace create OAUTH_KV -c mcp/wrangler.toml
-```
+**Hardening:** `wrangler.toml` binds a KV namespace as `OAUTH_KV`, which makes codes single-use and detects refresh-token reuse. Wrangler creates it (`tracker-mcp-oauth-kv`) on the first deploy and reuses it after that. Remove the `[[kv_namespaces]]` lines to run without it.
 
 ## Other ways to connect
 

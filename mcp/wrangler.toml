@@ -22,9 +22,8 @@ TRACKER_DEVICE = "Claude"
 # Where the web app is published; used for item links in replies.
 TRACKER_APP_URL = "https://divaor.github.io/tracking_app/"
 
-# Optional: single-use OAuth codes and refresh-token reuse detection.
-# Create it with `npx wrangler@4 kv namespace create OAUTH_KV -c mcp/wrangler.toml`
-# and paste the id it prints:
-# [[kv_namespaces]]
-# binding = "OAUTH_KV"
-# id = "<namespace id>"
+# Single-use OAuth codes and refresh-token reuse detection. Wrangler creates
+# the namespace (tracker-mcp-oauth-kv) on the first deploy and reuses it after
+# that, so no id is needed. Remove these lines to run without it.
+[[kv_namespaces]]
+binding = "OAUTH_KV"
