@@ -189,7 +189,7 @@ export function createOAuth({ secret, issuer, redirectHosts = [], store = null }
     return new Response(null, { status: 302, headers: { Location: url.toString(), 'Cache-Control': 'no-store' } });
   }
 
-  function page(title, inner, status = 200) {
+  function page(title, inner, status = 200, formAction = "form-action 'self'") {
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)} · Tracker</title><style>
 :root{color-scheme:light dark;--bg:#f6f5f1;--card:#fff;--text:#1d1c19;--muted:#6b675f;--border:#e2dfd7;--accent:#4f46e5}
@@ -204,8 +204,16 @@ button.primary{background:var(--accent);border-color:var(--accent);color:#fff}.e
 <body><main><div class="brand"><span class="dot"></span>Tracker</div><h1>${escapeHtml(title)}</h1>${inner}</main></body></html>`;
     return new Response(html, {
       status,
-      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'" },
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; ${formAction ? `${formAction}; ` : ''}frame-ancestors 'none'` },
     });
+  }
+
+  // Browsers also apply form-action to the redirect that follows the form
+  // post, so the consent page must allow the app's return address. CSP cannot
+  // name IPv6 hosts; for those the directive is left out.
+  function consentFormAction(redirectUri) {
+    const url = new URL(redirectUri);
+    return url.hostname.startsWith('[') ? '' : `form-action 'self' ${url.origin}`;
   }
 
   function consentPage(params, client, redirectUri, error = '') {
@@ -222,6 +230,7 @@ ${error ? `<p class="error">${escapeHtml(error)}</p>` : ''}
 <div class="row"><button type="submit" name="action" value="deny">Cancel</button><button class="primary" type="submit" name="action" value="allow">Allow</button></div></form>
 <p style="margin-top:16px;font-size:13px">The password is the <code>MCP_SECRET</code> you set when you deployed the connector.</p>`,
       error ? 401 : 200,
+      consentFormAction(redirectUri),
     );
   }
 

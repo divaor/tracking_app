@@ -127,6 +127,21 @@ test('consent page escapes client input and checks the password', async () => {
   assert.equal((await s.request(`/authorize?client_id=forged.sig&redirect_uri=${CLAUDE_CALLBACK}`)).status, 400);
 });
 
+// Browsers apply form-action to the redirect after the consent form posts, so
+// with only 'self' the jump back to Claude is blocked and "Allow" does nothing.
+test('consent page lets the form redirect back to the app', async () => {
+  const s = setup();
+  const csp = async (redirect) => {
+    const { body: client } = await register(s, redirect);
+    const params = new URLSearchParams({ response_type: 'code', client_id: client.client_id, redirect_uri: redirect, code_challenge: pkce().challenge, code_challenge_method: 'S256' });
+    return (await s.request(`/authorize?${params}`)).headers.get('content-security-policy');
+  };
+  assert.match(await csp(CLAUDE_CALLBACK), /form-action 'self' https:\/\/claude\.ai;/);
+  assert.match(await csp('http://localhost:33418/callback'), /form-action 'self' http:\/\/localhost:33418;/);
+  assert.doesNotMatch(await csp('http://[::1]:33418/callback'), /form-action/, 'CSP cannot name IPv6 hosts');
+  assert.match(await csp('http://[::1]:33418/callback'), /frame-ancestors 'none'/);
+});
+
 test('full authorization code flow with PKCE, then MCP with the access token', async () => {
   const s = setup();
   const flow = await authorizeAndExchange(s);
