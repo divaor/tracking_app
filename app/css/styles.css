@@ -1588,6 +1588,19 @@ span.decision {
   margin-top: 4px;
 }
 
+#notifications .field.checkbox {
+  padding-top: 0;
+  margin: 10px 0;
+}
+
+#notifications .field {
+  margin: 12px 0;
+}
+
+.notify-options {
+  margin: 6px 0 4px;
+}
+
 .connector-note {
   margin-top: 10px !important;
 }

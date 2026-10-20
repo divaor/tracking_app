@@ -20,9 +20,18 @@ Personal tracker for tasks, ideas, Claude work and documents. Electron on deskto
   - Entry points: `worker.js` (Cloudflare), `http.js`, `stdio.js`.
   - Documents go to `files/<date>-<slug>-<id6>/<name>` in the data repo; items reference them in `files`. The user's review lives in `decision` and `feedback`.
   - Tool results must stay small (`MAX_READ_CHARS`); `read_file` pages through long files.
+  - `router.js` serves HTTP: `/mcp`, OAuth (`oauth.js`: discovery metadata, DCR, `/authorize` with the connector password, `/token` with PKCE + refresh), and `/push/*`.
+    - OAuth state is HMAC-signed with a key derived from `MCP_SECRET`; an optional `OAUTH_KV` store adds single-use codes and refresh-reuse detection.
+- Notifications:
+  - Every write stamps `updatedBy` (device name; the connector writes `Claude`). `app/js/changes.js` turns before/after item lists into events.
+  - The connector pushes them (`mcp/notify.js` + `mcp/push.js`: VAPID keys derived from `MCP_SECRET`, RFC 8291 encryption) to subscriptions in `devices.json` next to the data file (`app/js/devices.js`).
+  - The app registers itself there (`app/js/push.js`); `sw.js` shows pushes. The desktop app polls every minute and shows native notifications (`app/js/notifier.js`); the tray/background mode lives in `electron/main.cjs`.
+  - Headless Chromium cannot show notifications; run notification browser tests headed under `xvfb-run`.
 
 ## When changing things
 
 - Adding or removing a file under `app/` → update `ASSETS` in `app/sw.js`. `test/app.test.js` enforces this.
 - Bumping the version → update `package.json`, `app/js/version.js` and the `CACHE` name in `app/sw.js`. The tests check that they match.
-- The CSP in `app/index.html` allows only same-origin scripts and `https://api.github.com` for fetches. Inline styles are allowed so HTML artifacts render in the sandboxed preview frame (which inherits the CSP); do not add inline scripts.
+- The CSP in `app/index.html` allows only same-origin scripts. Fetches may go to any https origin (the GitHub API and the user's own connector).
+  - Inline styles are allowed so HTML artifacts render in the sandboxed preview frame, which inherits the CSP.
+  - Do not add inline scripts.

@@ -1,6 +1,6 @@
 // Offline support: precache the app shell, then serve network-first so updates
 // show up immediately when online. GitHub API calls are never intercepted.
-const CACHE = 'tracker-v1.1.0';
+const CACHE = 'tracker-v1.2.0';
 const ASSETS = [
   './',
   'index.html',
@@ -13,6 +13,8 @@ const ASSETS = [
   'icons/icon-maskable-512.png',
   'icons/apple-touch-icon.png',
   'js/app.js',
+  'js/changes.js',
+  'js/devices.js',
   'js/files.js',
   'js/format.js',
   'js/github.js',
@@ -20,6 +22,8 @@ const ASSETS = [
   'js/main.js',
   'js/markdown.js',
   'js/model.js',
+  'js/notifier.js',
+  'js/push.js',
   'js/settings.js',
   'js/store.js',
   'js/sync.js',
@@ -30,6 +34,7 @@ const ASSETS = [
   'js/ui/fileViewer.js',
   'js/ui/icons.js',
   'js/ui/itemModal.js',
+  'js/ui/notificationsCard.js',
   'js/ui/settingsView.js',
   'js/ui/views.js',
   'vendor/marked.js',
@@ -75,5 +80,48 @@ self.addEventListener('fetch', (event) => {
         if (request.mode === 'navigate') return caches.match('index.html');
         return Response.error();
       }),
+  );
+});
+
+// ---- Push notifications (sent by the Claude connector) ----------------------
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data?.json() ?? {};
+  } catch {
+    data = { title: 'Tracker', body: event.data?.text() ?? '' };
+  }
+  const url = new URL(data.itemId ? `#/item/${encodeURIComponent(data.itemId)}` : '#/', self.registration.scope).href;
+  event.waitUntil(
+    (async () => {
+      // Every push must show a notification (Safari revokes permission otherwise).
+      await self.registration.showNotification(data.title || 'Tracker', {
+        body: data.body || '',
+        tag: data.tag || 'tracker',
+        icon: 'icons/icon-192.png',
+        data: { url },
+      });
+      // Let open windows pull the change right away.
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of windows) client.postMessage({ type: 'tracker:changed' });
+    })(),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || self.registration.scope;
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const open = windows.find((c) => c.url.startsWith(self.registration.scope));
+      if (open) {
+        await open.focus();
+        open.postMessage({ type: 'tracker:open', url });
+        return;
+      }
+      await self.clients.openWindow(url);
+    })(),
   );
 });

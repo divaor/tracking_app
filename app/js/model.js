@@ -68,8 +68,11 @@ export function kindLabel(type, kind) {
 const EPOCH = '1970-01-01T00:00:00.000Z';
 const KNOWN_KEYS = [
   'id', 'type', 'title', 'status', 'priority', 'kind', 'project', 'tags', 'url', 'due', 'notes',
-  'files', 'decision', 'feedback', 'createdAt', 'updatedAt', 'startedAt', 'completedAt', 'deleted',
+  'files', 'decision', 'feedback', 'createdAt', 'updatedAt', 'updatedBy', 'startedAt', 'completedAt', 'deleted',
 ];
+
+// `updatedBy` value the Claude connector writes; the app writes its device name.
+export const CLAUDE_AUTHOR = 'Claude';
 
 export const nowIso = () => new Date().toISOString();
 
@@ -140,7 +143,8 @@ export function normalizeItem(raw) {
   const type = TYPE_IDS.includes(r.type) ? r.type : 'task';
   const createdAt = isoOr(r.createdAt, EPOCH);
   const updatedAt = isoOr(r.updatedAt, createdAt);
-  if (r.deleted) return { id, type, deleted: true, createdAt, updatedAt };
+  const updatedBy = text(r.updatedBy).trim();
+  if (r.deleted) return { id, type, deleted: true, createdAt, updatedAt, updatedBy };
 
   const item = {
     id,
@@ -159,6 +163,7 @@ export function normalizeItem(raw) {
     feedback: text(r.feedback),
     createdAt,
     updatedAt,
+    updatedBy,
     startedAt: isoOr(r.startedAt, ''),
     completedAt: isoOr(r.completedAt, ''),
   };
@@ -187,8 +192,8 @@ export function applyPatch(item, patch, now = nowIso()) {
   return next;
 }
 
-export function tombstone(item, now = nowIso()) {
-  return { id: item.id, type: item.type, deleted: true, createdAt: item.createdAt, updatedAt: bumpTime(item.updatedAt, now) };
+export function tombstone(item, now = nowIso(), updatedBy = '') {
+  return { id: item.id, type: item.type, deleted: true, createdAt: item.createdAt, updatedAt: bumpTime(item.updatedAt, now), updatedBy };
 }
 
 // Brings back a deleted item (undo) with a timestamp newer than its tombstone.

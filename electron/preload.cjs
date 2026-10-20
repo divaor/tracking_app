@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('desktop', {
     get: (key) => ipcRenderer.invoke('secret:get', key),
     set: (key, value) => ipcRenderer.invoke('secret:set', key, value),
   },
+  showWindow: () => ipcRenderer.invoke('window:show'),
+  getRunInBackground: () => ipcRenderer.invoke('background:get'),
+  setRunInBackground: (value) => ipcRenderer.invoke('background:set', Boolean(value)),
   onCommand(callback) {
     const listener = (_event, command) => callback(command);
     ipcRenderer.on('command', listener);

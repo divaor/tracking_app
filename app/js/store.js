@@ -1,6 +1,7 @@
 // In-memory item store persisted to IndexedDB. Deleted items are kept as
 // tombstones so deletions sync to other devices.
 import { kvGet, kvSet } from './kv.js';
+import { getSettings } from './settings.js';
 import {
   applyPatch,
   createItem,
@@ -21,6 +22,8 @@ let visible = [];
 let meta = { dirty: false, lastSyncAt: null, sha: null };
 let changeCounter = 0;
 const listeners = new Set();
+// Edits made here are attributed to this device's name (see notifications).
+const author = () => getSettings().device || '';
 
 function save() {
   kvSet(ITEMS_KEY, items).catch((err) => console.error('Saving items failed', err));
@@ -64,27 +67,27 @@ export const store = {
   get: (id) => visible.find((i) => i.id === id),
 
   add(fields) {
-    const item = createItem(fields);
+    const item = createItem({ ...fields, updatedBy: author() });
     commitLocal([...items, item]);
     return item;
   },
 
   update(id, patch) {
     let updated = null;
-    commitLocal(items.map((i) => (i.id === id && !i.deleted ? (updated = applyPatch(i, patch)) : i)));
+    commitLocal(items.map((i) => (i.id === id && !i.deleted ? (updated = applyPatch(i, { ...patch, updatedBy: author() })) : i)));
     return updated;
   },
 
   remove(id) {
     const previous = store.get(id);
     if (!previous) return null;
-    commitLocal(items.map((i) => (i.id === id ? tombstone(i) : i)));
+    commitLocal(items.map((i) => (i.id === id ? tombstone(i, undefined, author()) : i)));
     return previous;
   },
 
   restore(previous) {
     const current = items.find((i) => i.id === previous.id);
-    const revived = reviveItem(previous, current);
+    const revived = { ...reviveItem(previous, current), updatedBy: author() };
     commitLocal(current ? items.map((i) => (i.id === previous.id ? revived : i)) : [...items, revived]);
   },
 

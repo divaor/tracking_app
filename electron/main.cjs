@@ -1,7 +1,8 @@
 // Electron main process: serves the web app from app:// (a secure, standard
 // origin so IndexedDB and ES modules work), keeps the GitHub token encrypted
-// with the OS keychain, and opens outside links in the default browser.
-const { app, BrowserWindow, Menu, ipcMain, net, protocol, safeStorage, screen, shell } = require('electron');
+// with the OS keychain, opens outside links in the default browser, and can
+// keep running in the system tray so notifications keep arriving.
+const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, net, protocol, safeStorage, screen, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -19,7 +20,12 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 }
 
+// Windows only shows notifications for apps with an AppUserModelID.
+if (process.platform === 'win32') app.setAppUserModelId('com.divaor.tracker');
+
 let mainWindow = null;
+let tray = null;
+let quitting = false;
 
 // ---- Small JSON files in the user data folder ------------------------------
 
@@ -81,6 +87,21 @@ ipcMain.handle('secret:set', (event, key, value) => {
   return true;
 });
 
+ipcMain.handle('window:show', (event) => {
+  if (!fromApp(event)) throw new Error('Not allowed');
+  showWindow();
+});
+
+ipcMain.handle('background:get', (event) => {
+  if (!fromApp(event)) throw new Error('Not allowed');
+  return runInBackground();
+});
+
+ipcMain.handle('background:set', (event, value) => {
+  if (!fromApp(event)) throw new Error('Not allowed');
+  return setRunInBackground(value);
+});
+
 // ---- Window -------------------------------------------------------------
 
 function isSafeExternal(url) {
@@ -104,11 +125,63 @@ function restoreBounds() {
   return visible ? { ...saved.bounds, maximized: saved.maximized } : defaults;
 }
 
+function showWindow() {
+  if (!mainWindow) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
 function send(command) {
   if (!mainWindow) return;
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.focus();
+  showWindow();
   mainWindow.webContents.send('command', command);
+}
+
+// ---- Background mode (system tray) -------------------------------------------
+
+const runInBackground = () => readJson('prefs.json', {}).runInBackground !== false;
+
+function setRunInBackground(value) {
+  writeJson('prefs.json', { ...readJson('prefs.json', {}), runInBackground: Boolean(value) });
+  updateTray();
+  return runInBackground();
+}
+
+function updateTray() {
+  if (!runInBackground()) {
+    tray?.destroy();
+    tray = null;
+    return;
+  }
+  if (tray) return;
+  try {
+    const icon = nativeImage.createFromPath(path.join(APP_DIR, 'icons', 'icon-192.png')).resize({ width: 18, height: 18 });
+    tray = new Tray(icon);
+  } catch (err) {
+    console.warn('System tray is not available', err);
+    tray = null;
+    return;
+  }
+  tray.setToolTip('Tracker');
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Open Tracker', click: showWindow },
+      { label: 'Sync Now', click: () => mainWindow?.webContents.send('command', 'sync') },
+      { type: 'separator' },
+      {
+        label: 'Quit Tracker',
+        click: () => {
+          quitting = true;
+          app.quit();
+        },
+      },
+    ]),
+  );
+  tray.on('click', showWindow);
 }
 
 function createWindow() {
@@ -128,6 +201,8 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       spellcheck: true,
+      // Keep the sync timer running while hidden, for notifications.
+      backgroundThrottling: false,
     },
   });
   if (maximized) mainWindow.maximize();
@@ -144,8 +219,17 @@ function createWindow() {
     if (isSafeExternal(url)) shell.openExternal(url);
   });
 
-  mainWindow.on('close', () => {
+  mainWindow.on('close', (event) => {
     writeJson('window-state.json', { bounds: mainWindow.getNormalBounds(), maximized: mainWindow.isMaximized() });
+    if (quitting || !runInBackground() || !tray) return;
+    // Hide instead of quitting so syncing and notifications continue.
+    event.preventDefault();
+    mainWindow.hide();
+    const prefs = readJson('prefs.json', {});
+    if (!prefs.toldAboutTray && Notification.isSupported()) {
+      new Notification({ title: 'Tracker is still running', body: 'It keeps syncing in the background. Quit it from the tray icon.' }).show();
+      writeJson('prefs.json', { ...prefs, toldAboutTray: true });
+    }
   });
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -167,7 +251,16 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Settings', accelerator: 'CmdOrCtrl+,', click: () => send('settings') },
         { type: 'separator' },
-        isMac ? { role: 'close' } : { role: 'quit' },
+        isMac
+          ? { role: 'close' }
+          : {
+              label: 'Quit',
+              accelerator: 'CmdOrCtrl+Q',
+              click: () => {
+                quitting = true;
+                app.quit();
+              },
+            },
       ],
     },
     { role: 'editMenu' },
@@ -193,11 +286,7 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-app.on('second-instance', () => {
-  if (!mainWindow) return;
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.focus();
-});
+app.on('second-instance', showWindow);
 
 app.whenReady().then(() => {
   protocol.handle('app', (request) => {
@@ -210,10 +299,13 @@ app.whenReady().then(() => {
 
   buildMenu();
   createWindow();
+  updateTray();
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+  app.on('activate', showWindow);
+});
+
+app.on('before-quit', () => {
+  quitting = true;
 });
 
 app.on('window-all-closed', () => {

@@ -22,6 +22,12 @@ export const DEFAULT_SETTINGS = {
   autoSync: true,
   theme: 'system',
   sort: 'smart',
+  // Claude connector address, used for push notifications.
+  connectorUrl: '',
+  // Push notifications turned on for this device (web/PWA only).
+  push: false,
+  // Which changes to be told about (see notifier.js).
+  notify: { desktop: true, documents: true, items: true, devices: false },
 };
 
 let settings = { ...DEFAULT_SETTINGS };

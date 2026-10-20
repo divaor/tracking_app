@@ -8,6 +8,7 @@ import { formatDateTime, timeAgo } from '../format.js';
 import { APP_VERSION } from '../version.js';
 import { Icon } from './icons.js';
 import { Segmented, SyncBadge } from './components.js';
+import { NotificationsCard } from './notificationsCard.js';
 
 const SETUP_PREFIX = 'tracker-setup:';
 const SYNC_FIELDS = ['owner', 'repo', 'branch', 'path', 'device', 'autoSync'];
@@ -110,6 +111,7 @@ function SyncCard({ sync, actions }) {
 
   const copySetup = async () => {
     const payload = pick(clean, ['owner', 'repo', 'branch', 'path']);
+    if (getSettings().connectorUrl) payload.connectorUrl = getSettings().connectorUrl;
     if (includeToken) payload.token = token.trim();
     const code = SETUP_PREFIX + encodeBase64(JSON.stringify(payload));
     try {
@@ -126,6 +128,7 @@ function SyncCard({ sync, actions }) {
       const data = JSON.parse(decodeBase64(setupCode.trim().replace(SETUP_PREFIX, '')));
       setForm({ ...form, ...pick(data, ['owner', 'repo', 'branch', 'path']) });
       if (data.token) setTokenValue(data.token);
+      if (typeof data.connectorUrl === 'string') saveSettings({ connectorUrl: data.connectorUrl });
       setSetupCode('');
       actions.toast('Setup code applied — review and press Save');
     } catch {
@@ -226,7 +229,8 @@ function ConnectorCard() {
     </p>
     <ol class="connector-steps">
       <li>Deploy the connector once: a small free Cloudflare Worker that reads and writes your data repository.</li>
-      <li>In Claude, open <strong>Customize → Connectors → Add custom connector</strong> and paste the connector’s URL.</li>
+      <li>In Claude, open <strong>Customize → Connectors → Add custom connector</strong> and paste its address ending in <code>/mcp</code>.</li>
+      <li>Claude opens a sign-in page: enter your connector password and press <strong>Allow</strong>.</li>
       <li>It then works in Claude on the web, desktop and phone, and in Claude Code when you are signed in with the same account.</li>
     </ol>
     <a class="btn sm" href=${CONNECTOR_GUIDE} target="_blank" rel="noopener noreferrer"><${Icon} name="external" size=${15} />Step-by-step setup guide</a>
@@ -291,6 +295,7 @@ export function SettingsView({ sync, actions, items, installPrompt, onInstall, t
   return html`<div class="settings">
     <${SyncCard} sync=${sync} actions=${actions} />
     <${ConnectorCard} />
+    <${NotificationsCard} actions=${actions} />
     <${Card} title="Appearance" icon="eye">
       <${Segmented} label="Theme" value=${theme} onChange=${(t) => saveSettings({ theme: t })}
         options=${[{ id: 'system', label: 'System' }, { id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }]} />

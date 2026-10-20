@@ -1,9 +1,11 @@
 // Tracker operations used by the MCP tools. Reads and writes the same data
 // file as the app (through the shared model), plus attached files stored in
 // the data repo. Every write is a commit; conflicting writes are retried.
+import { describeChanges } from '../app/js/changes.js';
 import {
   addDays,
   applyPatch,
+  CLAUDE_AUTHOR,
   cleanTags,
   createItem,
   DECISIONS,
@@ -74,7 +76,9 @@ export function summarize(item) {
   return out;
 }
 
-export function createTracker({ client, path = 'tracker.json', branch = '', filesDir = 'files', device = 'Claude', appUrl = '', now = nowIso }) {
+// `onChange` receives notification events (see app/js/changes.js) after each
+// successful write; the server uses it to send push notifications.
+export function createTracker({ client, path = 'tracker.json', branch = '', filesDir = 'files', device = 'Claude', appUrl = '', now = nowIso, onChange = () => {} }) {
   const ref = branch || undefined;
   const dir = filesDir.replace(/^\/+|\/+$/g, '') || 'files';
 
@@ -94,10 +98,16 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       if (!sha && branch) await client.ensureBranch(branch);
       try {
         await client.putFile(path, { text: serializeDocument(next), sha, branch: ref, message });
-        return next;
       } catch (err) {
         if (!isConflict(err) || attempt >= MAX_ATTEMPTS) throw err;
+        continue;
       }
+      try {
+        onChange(describeChanges(items, next));
+      } catch {
+        // notifications are best effort
+      }
+      return next;
     }
   }
 
@@ -215,7 +225,7 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
         const fields = pickFields(input);
         checkFields(fields, fields.type ?? 'task');
         if (!String(fields.title ?? '').trim()) throw new TrackerError(`Item ${n + 1} needs a title.`);
-        return createItem({ type: 'task', ...fields }, at);
+        return createItem({ type: 'task', ...fields, updatedBy: CLAUDE_AUTHOR }, at);
       });
       const label = created.length === 1 ? `“${created[0].title}”` : `${created.length} items`;
       await commit((items) => [...items, ...created], `Tracker: add ${label} (via ${device})`);
@@ -242,7 +252,7 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
           if (u.add_tags || u.remove_tags) patch.tags = tags;
           if (u.append_notes) patch.notes = [patch.notes ?? item.notes, String(u.append_notes)].filter((s) => s.trim()).join('\n\n');
           if (has(patch, 'type') && patch.type !== item.type && !has(patch, 'kind')) patch.kind = '';
-          patches.set(item.id, { ...(patches.get(item.id) ?? {}), ...patch });
+          patches.set(item.id, { ...(patches.get(item.id) ?? {}), ...patch, updatedBy: CLAUDE_AUTHOR });
         }
         const out = items.map((i) => {
           if (!patches.has(i.id) || i.deleted) return i;
@@ -262,7 +272,7 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       await commit((items) => {
         const targets = new Set(ids.map((id) => resolve(items, id).id));
         removed = items.filter((i) => targets.has(i.id));
-        return items.map((i) => (targets.has(i.id) ? tombstone(i, at) : i));
+        return items.map((i) => (targets.has(i.id) ? tombstone(i, at, CLAUDE_AUTHOR) : i));
       }, `Tracker: delete ${ids.length === 1 ? 'an item' : `${ids.length} items`} (via ${device})`);
       return { deleted: removed.map((i) => ({ id: i.id, title: i.title })) };
     },
@@ -285,7 +295,7 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
 
       const fallbackName = kind === 'proposal' || kind === 'artifact' ? `${kind}.md` : `${slugify(title)}.md`;
       const filename = safeFileName(input.filename, fallbackName);
-      const draft = target ? null : createItem({ type: 'doc', title }, at);
+      const draft = target ? null : createItem({ type: 'doc', title, updatedBy: CLAUDE_AUTHOR }, at);
       const folder = target?.files[0]?.path.split('/').slice(0, -1).join('/') || `${dir}/${at.slice(0, 10)}-${slugify(title)}-${draft.id.slice(-6)}`;
       const filePath = `${folder}/${filename}`;
 
@@ -306,7 +316,7 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
         const notes = input.summary ? [current.notes, `**Update ${at.slice(0, 10)}:** ${input.summary}`].filter((s) => s.trim()).join('\n\n') : current.notes;
         saved = applyPatch(
           current,
-          { ...fields, notes, files: [...current.files.filter((f) => f.path !== filePath), file], status: 'pending', decision: '' },
+          { ...fields, notes, files: [...current.files.filter((f) => f.path !== filePath), file], status: 'pending', decision: '', updatedBy: CLAUDE_AUTHOR },
           at,
         );
         return items.map((i) => (i.id === current.id ? saved : i));

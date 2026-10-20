@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseDocument } from '../app/js/model.js';
-import { handleHttp } from '../mcp/protocol.js';
 import { createServerFromEnv } from '../mcp/server.js';
 import { MAX_READ_CHARS } from '../mcp/tracker.js';
 import { createFakeGitHub } from './helpers/fake-github.js';
@@ -18,7 +17,7 @@ const ENV = {
 
 function setup(env = {}) {
   const github = createFakeGitHub();
-  const { handle, config } = createServerFromEnv({ ...ENV, ...env }, { fetchImpl: github.fetch });
+  const { handle, config, http } = createServerFromEnv({ ...ENV, ...env }, { fetchImpl: github.fetch, defer: (p) => p });
   let id = 0;
   const rpc = (method, params) => handle({ jsonrpc: '2.0', id: ++id, method, params });
   const call = async (name, args = {}) => {
@@ -27,7 +26,7 @@ function setup(env = {}) {
     return { isError: Boolean(res.result.isError), text, data: res.result.isError ? null : JSON.parse(text) };
   };
   const items = () => parseDocument(github.read('tracker.json') ?? '{"items":[]}').filter((i) => !i.deleted);
-  return { github, handle, config, rpc, call, items };
+  return { github, handle, config, http, rpc, call, items };
 }
 
 test('initialize, tools/list and prompts follow the MCP shape', async () => {
@@ -233,10 +232,9 @@ test('server-side GitHub requests send a User-Agent and no browser cache mode', 
 });
 
 test('HTTP transport: secret path or bearer token, JSON responses, 202 for notifications', async () => {
-  const { handle, config } = setup();
-  const opts = { handle, secret: config.secret };
+  const { http, config } = setup();
   const post = (path, body, headers = {}) =>
-    handleHttp(new Request(`https://mcp.example${path}`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...headers }, body: JSON.stringify(body) }), opts);
+    http(new Request(`https://mcp.example${path}`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...headers }, body: JSON.stringify(body) }));
   const init = { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } };
 
   const viaPath = await post(`/mcp/${config.secret}`, init);
@@ -245,8 +243,12 @@ test('HTTP transport: secret path or bearer token, JSON responses, 202 for notif
   assert.equal((await viaPath.json()).result.serverInfo.name, 'tracker');
 
   assert.equal((await post('/mcp', init, { authorization: `Bearer ${config.secret}` })).status, 200);
-  assert.equal((await post('/mcp', init)).status, 401);
-  assert.equal((await post('/mcp', init, { authorization: 'Bearer wrong' })).status, 401);
+  const challenge = await post('/mcp', init);
+  assert.equal(challenge.status, 401);
+  assert.match(challenge.headers.get('www-authenticate'), /^Bearer resource_metadata="https:\/\/mcp\.example\/\.well-known\/oauth-protected-resource\/mcp"/);
+  const wrong = await post('/mcp', init, { authorization: 'Bearer wrong' });
+  assert.equal(wrong.status, 401);
+  assert.match(wrong.headers.get('www-authenticate'), /error="invalid_token"/);
   assert.equal((await post('/mcp/wrong-secret-of-some-length', init)).status, 404);
   assert.equal((await post('/mcp/%E0%A4%A', init)).status, 404);
   assert.equal((await post('/other', init)).status, 404);
@@ -258,11 +260,11 @@ test('HTTP transport: secret path or bearer token, JSON responses, 202 for notif
   assert.equal((await post(`/mcp/${config.secret}`, init, { origin: 'https://evil.example' })).status, 403);
   assert.equal((await post(`/mcp/${config.secret}`, init, { origin: 'https://claude.ai' })).status, 200);
 
-  const get = await handleHttp(new Request(`https://mcp.example/mcp/${config.secret}`), opts);
+  const get = await http(new Request(`https://mcp.example/mcp/${config.secret}`));
   assert.equal(get.status, 405);
-  const bad = await handleHttp(new Request(`https://mcp.example/mcp/${config.secret}`, { method: 'POST', body: '{nope' }), opts);
+  const bad = await http(new Request(`https://mcp.example/mcp/${config.secret}`, { method: 'POST', body: '{nope' }));
   assert.equal((await bad.json()).error.code, -32700);
-  const unconfigured = await handleHttp(new Request(`https://mcp.example/mcp/x`, { method: 'POST', body: '{}' }), { handle, secret: '' });
+  const unconfigured = await setup({ MCP_SECRET: '' }).http(new Request(`https://mcp.example/mcp/x`, { method: 'POST', body: '{}' }));
   assert.equal(unconfigured.status, 500);
 });
 

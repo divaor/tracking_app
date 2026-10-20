@@ -19,6 +19,7 @@ It runs as an **Electron desktop app** on your computers and as an **installable
 - **Lists**: filter by category and status, sort by priority, due date and more. Search with plain text or `#tags`.
 - **Markdown notes and documents**: paste a doc or import a `.md` file, or drop files onto the window. Checklists (`- [ ] step`) can be ticked right in the reader.
 - **Quick add**: `Write report #work !high @tomorrow` sets a tag, the priority and a due date. Pasting a link fills the Link field.
+- **Notifications**: your phone gets a push notification when Claude sends a document to review, stores a file or changes your tasks, even when the app is closed. The desktop app shows native notifications and can keep running in the system tray.
 - **Offline first**: every device keeps a full local copy and syncs automatically when online. Every change is a commit in your data repo, so its history is also your backup.
 - **Also**: light and dark theme, keyboard shortcuts, export and import backups.
 
@@ -106,7 +107,22 @@ The connector lets Claude work with your tracker from any chat (web, desktop, ph
 
 Documents Claude sends are saved as files in your data repo, under `files/…`, and show up under **Docs**. Open one in the app to read it; HTML artifacts get a safe preview. Then **Approve**, **Request changes** or **Reject** it and leave feedback, which Claude can read back.
 
-To set it up, deploy the small server in [`mcp/`](mcp/README.md) to Cloudflare Workers (free). Then add its URL in Claude under **Customize → Connectors → Add custom connector**. You can deploy from your computer, or from the **Actions** tab with the *Deploy Claude connector* workflow. Full guide: **[mcp/README.md](mcp/README.md)**.
+To set it up:
+
+1. Deploy the small server in [`mcp/`](mcp/README.md) to Cloudflare Workers (free). You can deploy from your computer, or from the **Actions** tab with the *Deploy Claude connector* workflow.
+2. In Claude, add `https://<your-worker>/mcp` under **Customize → Connectors → Add custom connector**.
+3. Claude opens a sign-in page (OAuth): enter your connector password and press **Allow**.
+
+Full guide: **[mcp/README.md](mcp/README.md)**.
+
+## 5. Notifications
+
+- **Phone (installed web app):** go to **Settings → Notifications**, enter your connector's address and tap **Turn on notifications**.
+  - You'll get a push notification when Claude sends a proposal or artifact to review (or a new version), stores a file, or adds, updates, completes or deletes items.
+  - Tap a notification to open that item.
+  - On iPhone this needs iOS 16.4+, with the app added to the Home Screen and opened from its icon.
+- **Desktop app:** native notifications are on by default. It checks for changes every minute, and closing the window keeps it running in the system tray. You can turn that off in Settings.
+- **Choose what you hear about:** documents to review, changes Claude makes to tasks and items, and (desktop) changes from your other devices.
 
 ---
 
@@ -188,7 +204,7 @@ The web app is plain ES modules with no build step:
 These libraries are copied into `app/vendor/` by `npm run vendor`. GitHub Pages and Electron serve `app/` as-is.
 
 ```
-mcp/                  Claude connector (MCP server: Cloudflare Worker, HTTP or stdio)
+mcp/                  Claude connector (MCP server with OAuth and push: Cloudflare Worker, HTTP or stdio)
 app/                  the web app (also loaded by Electron)
   js/model.js         item model, merge, quick-add parser, checklists
   js/sync.js          one pull → merge → push round

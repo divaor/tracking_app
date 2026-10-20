@@ -151,7 +151,7 @@ function ViewBody({ item, actions, today, onEdit }) {
     ${isReviewable(item) && html`<${ReviewPanel} item=${item} actions=${actions} />`}
 
     <p class="timestamps">
-      Created ${formatDateTime(item.createdAt)} · Updated ${formatDateTime(item.updatedAt)}
+      Created ${formatDateTime(item.createdAt)} · Updated ${formatDateTime(item.updatedAt)}${item.updatedBy ? ` by ${item.updatedBy}` : ''}
       ${item.completedAt && html` · ${statusLabel('done', item.type)} ${formatDateTime(item.completedAt)}`}
     </p>
   </div>`;

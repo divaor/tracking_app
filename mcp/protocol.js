@@ -1,6 +1,5 @@
-// Minimal MCP server: JSON-RPC dispatch for tools and prompts, plus a
-// stateless Streamable HTTP handler built on web-standard Request/Response so
-// it runs on Cloudflare Workers and Node alike.
+// Minimal MCP server: JSON-RPC dispatch for tools and prompts. Transports
+// (HTTP in router.js, stdio in stdio.js) feed messages to `handle`.
 
 export const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 
@@ -60,65 +59,4 @@ export function createMcpServer({ info, instructions, tools, prompts = [] }) {
         return fail(id, -32601, `Method not found: ${method}`);
     }
   };
-}
-
-function safeEqual(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-const json = (body, status = 200, headers = {}) =>
-  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });
-const plain = (body, status, headers = {}) => new Response(body, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8', ...headers } });
-
-const TRUSTED_ORIGIN = /^https:\/\/([a-z0-9-]+\.)*(claude\.ai|claude\.com|anthropic\.com)$|^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
-
-// Browsers send Origin; MCP clients usually do not. Requests from other web
-// pages are refused (the MCP spec requires checking Origin when present).
-function originAllowed(origin, extra) {
-  return !origin || TRUSTED_ORIGIN.test(origin) || extra.includes(origin);
-}
-
-/**
- * Serves MCP over Streamable HTTP at `/mcp/<secret>` (for connectors that can
- * only take a URL) or at `/mcp` with `Authorization: Bearer <secret>`.
- */
-export async function handleHttp(request, { handle, secret, allowedOrigins = [] }) {
-  const url = new URL(request.url);
-  const path = url.pathname.replace(/\/+$/, '') || '/';
-
-  if (!originAllowed(request.headers.get('origin'), allowedOrigins)) return plain('Forbidden origin\n', 403);
-
-  if (path === '/' && request.method === 'GET') return plain('Tracker MCP server. Connect your MCP client to /mcp/<secret>.\n', 200);
-  if (path !== '/mcp' && !path.startsWith('/mcp/')) return plain('Not found\n', 404);
-  if (!secret || secret.length < 16) return plain('MCP_SECRET is not configured (use at least 16 characters).\n', 500);
-
-  if (path === '/mcp') {
-    const auth = request.headers.get('authorization') ?? '';
-    const token = auth.replace(/^Bearer\s+/i, '');
-    if (!auth || !safeEqual(token, secret)) return plain('Unauthorized\n', 401);
-  } else {
-    let given = '';
-    try {
-      given = decodeURIComponent(path.slice('/mcp/'.length));
-    } catch {
-      // malformed escape: treat as a wrong secret
-    }
-    if (!safeEqual(given, secret)) return plain('Not found\n', 404);
-  }
-
-  if (request.method !== 'POST') return plain('Method not allowed\n', 405, { Allow: 'POST' });
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return json(fail(null, -32700, 'Parse error'), 400);
-  }
-  const messages = Array.isArray(body) ? body : [body];
-  const responses = (await Promise.all(messages.map(handle))).filter(Boolean);
-  if (!responses.length) return new Response(null, { status: 202 });
-  return json(Array.isArray(body) ? responses : responses[0]);
 }

@@ -2,7 +2,7 @@
 #   npx wrangler@4 deploy -c mcp/wrangler.toml
 # Secrets (never put them in this file):
 #   npx wrangler@4 secret put GITHUB_TOKEN -c mcp/wrangler.toml
-#   npx wrangler@4 secret put MCP_SECRET -c mcp/wrangler.toml
+#   npx wrangler@4 secret put MCP_SECRET -c mcp/wrangler.toml   # the connector password
 name = "tracker-mcp"
 main = "worker.js"
 compatibility_date = "2025-09-01"
@@ -17,3 +17,10 @@ TRACKER_FILES_DIR = "files"
 TRACKER_DEVICE = "Claude"
 # Where the web app is published; used for item links in replies.
 TRACKER_APP_URL = "https://divaor.github.io/tracking_app/"
+
+# Optional: single-use OAuth codes and refresh-token reuse detection.
+# Create it with `npx wrangler@4 kv namespace create OAUTH_KV -c mcp/wrangler.toml`
+# and paste the id it prints:
+# [[kv_namespaces]]
+# binding = "OAUTH_KV"
+# id = "<namespace id>"

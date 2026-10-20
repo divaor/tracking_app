@@ -14,6 +14,7 @@ import {
 import { store } from './store.js';
 import { getSettings, isSyncConfigured, onSettings, saveSettings } from './settings.js';
 import { getSyncState, onSyncState, syncNow } from './syncManager.js';
+import { setNotificationHandlers } from './notifier.js';
 import { Icon } from './ui/icons.js';
 import { SyncBadge, Toasts } from './ui/components.js';
 import { BoardView, HomeView, ListView } from './ui/views.js';
@@ -198,12 +199,29 @@ export function App() {
     };
   }, [items, linkedItem]);
 
+  // Notifications: toasts for changes that arrive while the app is open, and
+  // messages from the service worker when a push arrives or is tapped.
+  useEffect(() => {
+    setNotificationHandlers({ toast: (message, opts) => toastRef.current(message, opts), open: (id) => setLinkedItem(id) });
+    const onMessage = (e) => {
+      if (e.data?.type === 'tracker:changed') syncNow();
+      if (e.data?.type === 'tracker:open') {
+        const hash = new URL(e.data.url).hash;
+        if (hash) location.hash = hash;
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
+  }, []);
+
   const dismissToast = (id) => setToasts((list) => list.filter((t) => t.id !== id));
   const toast = (message, opts = {}) => {
     const id = ++toastSeq;
     setToasts((list) => [...list.slice(-2), { id, message, ...opts }]);
     setTimeout(() => dismissToast(id), opts.duration ?? 4500);
   };
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
 
   const navigate = (patch) => {
     location.hash = hrefFor({ ...route, ...patch });

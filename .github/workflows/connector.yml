@@ -44,4 +44,4 @@ jobs:
         run: |
           printf '%s' "$TRACKER_GITHUB_TOKEN" | npx --yes wrangler@4 secret put GITHUB_TOKEN -c mcp/wrangler.toml
           printf '%s' "$MCP_SECRET" | npx --yes wrangler@4 secret put MCP_SECRET -c mcp/wrangler.toml
-          echo "Connector URL: https://tracker-mcp.<your-workers-subdomain>.workers.dev/mcp/<MCP_SECRET>" >> "$GITHUB_STEP_SUMMARY"
+          echo "Add https://tracker-mcp.<your-workers-subdomain>.workers.dev/mcp to Claude (Customize → Connectors) and sign in with your MCP_SECRET." >> "$GITHUB_STEP_SUMMARY"

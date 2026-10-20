@@ -1,13 +1,18 @@
 // Decides when to sync: on start, shortly after local edits, every few
 // minutes while visible, when the network comes back and when the app is
 // backgrounded with unsynced changes.
+import { describeChanges } from './changes.js';
 import { createGitHubClient } from './github.js';
+import { notifyChanges } from './notifier.js';
 import { syncOnce } from './sync.js';
 import { getSettings, getToken, isSyncConfigured } from './settings.js';
 import { store } from './store.js';
 
 const EDIT_DELAY = 4000;
 const INTERVAL = 5 * 60 * 1000;
+// The desktop app checks every minute, also in the background, so it can
+// notify about changes from Claude and other devices.
+const DESKTOP_INTERVAL = 60 * 1000;
 const FOCUS_MIN_GAP = 60 * 1000;
 
 let state = { phase: 'idle', error: null, lastSyncAt: null, lastPushAt: null };
@@ -43,7 +48,11 @@ async function run() {
       localItems: store.all(),
       device: settings.device || 'unknown device',
     });
+    const before = store.all();
+    // The first download on a device is not news; later changes are.
+    const firstSync = !store.meta.lastSyncAt;
     store.applySynced(result.items, counter, { sha: result.sha });
+    if (!firstSync) notifyChanges(describeChanges(before, store.all(), { self: settings.device }));
     const at = new Date().toISOString();
     set({ phase: 'idle', error: null, lastSyncAt: at, lastPushAt: result.pushed ? at : state.lastPushAt });
   } catch (err) {
@@ -89,9 +98,13 @@ export function startSync() {
     }
   });
   const sinceLast = () => Date.now() - Date.parse(getSyncState().lastSyncAt ?? 0);
-  setInterval(() => {
-    if (getSettings().autoSync && document.visibilityState === 'visible') syncNow();
-  }, INTERVAL);
+  const desktop = Boolean(window.desktop);
+  setInterval(
+    () => {
+      if (getSettings().autoSync && (desktop || document.visibilityState === 'visible')) syncNow();
+    },
+    desktop ? DESKTOP_INTERVAL : INTERVAL,
+  );
   window.addEventListener('online', () => getSettings().autoSync && syncNow());
   window.addEventListener('offline', () => set({ phase: 'offline' }));
   document.addEventListener('visibilitychange', () => {

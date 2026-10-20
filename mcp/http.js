@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // Self-hosted HTTP MCP server (any machine with Node 20+). Put it behind HTTPS
-// (a tunnel or reverse proxy) to use it as a Claude custom connector.
+// (a tunnel or reverse proxy) to use it as a Claude custom connector, and set
+// MCP_PUBLIC_URL to its public https origin so OAuth links are right.
 //   MCP_SECRET=… GITHUB_TOKEN=… TRACKER_REPO=owner/repo node mcp/http.js
 import { createServer } from 'node:http';
 import { Readable } from 'node:stream';
-import { handleHttp } from './protocol.js';
+import { memoryStore } from './oauth.js';
 import { configProblems, createServerFromEnv } from './server.js';
 
-const { config, handle } = createServerFromEnv(process.env);
+const { config, http } = createServerFromEnv(process.env, { oauthStore: memoryStore() });
 const port = Number(process.env.PORT) || 8787;
 const host = process.env.HOST || '127.0.0.1';
 
@@ -22,11 +23,11 @@ createServer(async (req, res) => {
       body: req.method === 'GET' || req.method === 'HEAD' ? undefined : Readable.toWeb(req),
       duplex: 'half',
     });
-    const response = await handleHttp(request, { handle, secret: config.secret, allowedOrigins: config.allowedOrigins });
+    const response = await http(request);
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(Buffer.from(await response.arrayBuffer()));
   } catch (err) {
     console.error(err);
     res.writeHead(500).end();
   }
-}).listen(port, host, () => console.log(`Tracker MCP server on http://${host}:${port}/mcp/<MCP_SECRET>`));
+}).listen(port, host, () => console.log(`Tracker MCP server on http://${host}:${port}/mcp`));
