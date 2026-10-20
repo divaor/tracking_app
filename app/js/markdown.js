@@ -16,7 +16,32 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   }
 });
 
+// Wide tables scroll sideways instead of squeezing their columns: each table
+// gets its own scroll box, and columns with long text get a minimum width.
+function layoutTables(root) {
+  for (const table of root.querySelectorAll('table')) {
+    const longest = [];
+    for (const row of table.rows) {
+      [...row.cells].forEach((cell, i) => (longest[i] = Math.max(longest[i] ?? 0, cell.textContent.trim().length)));
+    }
+    for (const row of table.rows) {
+      [...row.cells].forEach((cell, i) => {
+        if (longest[i] > 40) cell.classList.add('md-wide');
+        else if (longest[i] > 15) cell.classList.add('md-mid');
+      });
+    }
+    const box = document.createElement('div');
+    box.className = 'md-table';
+    table.replaceWith(box);
+    box.append(table);
+  }
+}
+
 export function renderMarkdown(source) {
   if (!source) return '';
-  return DOMPurify.sanitize(marked.parse(source), { FORBID_TAGS: ['style', 'form', 'button', 'textarea', 'select'] });
+  // Template content is inert, so nothing in it runs or loads before sanitizing.
+  const template = document.createElement('template');
+  template.innerHTML = marked.parse(source);
+  layoutTables(template.content);
+  return DOMPurify.sanitize(template.innerHTML, { FORBID_TAGS: ['style', 'form', 'button', 'textarea', 'select'] });
 }

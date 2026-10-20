@@ -1987,7 +1987,7 @@ span.decision {
 .markdown ol,
 .markdown blockquote,
 .markdown pre,
-.markdown table {
+.markdown .md-table {
   margin: 0 0 0.9em;
 }
 
@@ -2036,10 +2036,35 @@ span.decision {
   color: var(--text-2);
 }
 
-.markdown table {
-  display: block;
+/* Tables scroll sideways in their box (see layoutTables in markdown.js).
+   Words stay whole, and columns with long text keep a readable width: on
+   wide screens just enough that most tables fit, on phones (where the table
+   scrolls anyway) enough to read comfortably. */
+.markdown .md-table {
   overflow-x: auto;
+}
+
+.markdown table {
   border-collapse: collapse;
+  overflow-wrap: normal;
+}
+
+.markdown .md-mid {
+  min-width: 8em;
+}
+
+.markdown .md-wide {
+  min-width: 12em;
+}
+
+@media (max-width: 860px) {
+  .markdown .md-mid {
+    min-width: 9em;
+  }
+
+  .markdown .md-wide {
+    min-width: 16em;
+  }
 }
 
 .markdown th,
