@@ -1,0 +1,47 @@
+# Deploys the Claude connector (mcp/) to Cloudflare Workers. Run it by hand
+# from the Actions tab after adding the secrets listed in mcp/README.md.
+name: Deploy Claude connector
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Check secrets
+        env:
+          TRACKER_GITHUB_TOKEN: ${{ secrets.TRACKER_GITHUB_TOKEN }}
+          MCP_SECRET: ${{ secrets.MCP_SECRET }}
+        run: |
+          missing=0
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID TRACKER_GITHUB_TOKEN MCP_SECRET; do
+            if [ -z "${!name}" ]; then echo "::error::Repository secret $name is not set (see mcp/README.md)"; missing=1; fi
+          done
+          if [ ${#MCP_SECRET} -lt 16 ]; then echo "::error::MCP_SECRET must be at least 16 characters"; missing=1; fi
+          exit $missing
+      - name: Deploy Worker
+        env:
+          TRACKER_REPO: ${{ vars.TRACKER_REPO }}
+        run: |
+          args=()
+          if [ -n "$TRACKER_REPO" ]; then args+=(--var "TRACKER_REPO:$TRACKER_REPO"); fi
+          npx --yes wrangler@4 deploy -c mcp/wrangler.toml "${args[@]}"
+      - name: Store secrets in the Worker
+        env:
+          TRACKER_GITHUB_TOKEN: ${{ secrets.TRACKER_GITHUB_TOKEN }}
+          MCP_SECRET: ${{ secrets.MCP_SECRET }}
+        run: |
+          printf '%s' "$TRACKER_GITHUB_TOKEN" | npx --yes wrangler@4 secret put GITHUB_TOKEN -c mcp/wrangler.toml
+          printf '%s' "$MCP_SECRET" | npx --yes wrangler@4 secret put MCP_SECRET -c mcp/wrangler.toml
+          echo "Add https://tracker-mcp.<your-workers-subdomain>.workers.dev/mcp to Claude (Customize → Connectors) and sign in with your MCP_SECRET." >> "$GITHUB_STEP_SUMMARY"

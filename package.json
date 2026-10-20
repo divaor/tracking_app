@@ -1,0 +1,74 @@
+{
+  "name": "tracking-app",
+  "productName": "Tracker",
+  "version": "1.3.0",
+  "description": "Keep track of tasks, ideas, Claude work and documents to read — on desktop (Electron) and mobile (PWA), synced through GitHub.",
+  "author": "divaor",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/divaor/tracking_app.git"
+  },
+  "scripts": {
+    "start": "electron .",
+    "web": "node scripts/serve.js",
+    "test": "node --test",
+    "vendor": "node scripts/vendor.js",
+    "mcp:stdio": "node mcp/stdio.js",
+    "mcp:http": "node mcp/http.js",
+    "mcp:deploy": "npx --yes wrangler@4 deploy -c mcp/wrangler.toml",
+    "dist": "electron-builder --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
+  },
+  "devDependencies": {
+    "dompurify": "^3.4.17",
+    "electron": "^44.9.1",
+    "electron-builder": "^26.15.3",
+    "htm": "^3.1.1",
+    "marked": "^18.1.1"
+  },
+  "build": {
+    "appId": "com.divaor.tracker",
+    "productName": "Tracker",
+    "files": [
+      "electron/**/*",
+      "app/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Office"
+    }
+  }
+}
