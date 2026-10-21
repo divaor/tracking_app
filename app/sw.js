@@ -15,6 +15,7 @@ const ASSETS = [
   'js/app.js',
   'js/changes.js',
   'js/devices.js',
+  'js/editorLinks.js',
   'js/files.js',
   'js/format.js',
   'js/github.js',

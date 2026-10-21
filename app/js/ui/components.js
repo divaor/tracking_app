@@ -1,6 +1,8 @@
-import { createContext, html, useContext, useState } from '../../vendor/preact-htm.js';
+import { createContext, html, useContext, useEffect, useState } from '../../vendor/preact-htm.js';
 import { checklistProgress, decisionLabel, isOverdue, kindLabel, nextStatus, projectKey, statusLabel, TYPES, typeInfo } from '../model.js';
 import { formatDue, timeAgo } from '../format.js';
+import { editorLink, parseEditorLink } from '../editorLinks.js';
+import { getSettings } from '../settings.js';
 import { Icon, StatusIcon } from './icons.js';
 import { ProjectChip } from './projects.js';
 
@@ -50,10 +52,30 @@ export function ItemMeta({ item, today, maxTags = 6 }) {
   if (item.files.length) {
     parts.push(html`<span class="meta" title=${item.files.map((f) => f.name).join(', ')}><${Icon} name="paperclip" size=${13} />${item.files.length}</span>`);
   }
-  if (item.url) parts.push(html`<span class="meta" title=${item.url}><${Icon} name="link" size=${13} /></span>`);
+  if (item.url) {
+    const inEditor = parseEditorLink(item.url, getSettings().editorUrl);
+    parts.push(html`<span class="meta" title=${inEditor ? 'Opens in Tracker Editor' : item.url}><${Icon} name=${inEditor ? 'code' : 'link'} size=${13} /></span>`);
+  }
   for (const tag of item.tags.slice(0, maxTags)) parts.push(html`<span class="tag">#${tag}</span>`);
   if (item.tags.length > maxTags) parts.push(html`<span class="tag">+${item.tags.length - maxTags}</span>`);
   return parts.length ? html`<div class="item-meta">${parts}</div>` : null;
+}
+
+// Whether Tracker Editor's desktop app is installed (asked once, desktop app only).
+let editorApp = null;
+const hasEditorApp = () => (editorApp ??= window.desktop?.hasEditorApp ? window.desktop.hasEditorApp().catch(() => false) : Promise.resolve(false));
+
+/** Opens a route in Tracker Editor: its desktop app when installed here, otherwise the web version. */
+export function EditorLink({ route, className = '', title, children }) {
+  const [desktop, setDesktop] = useState(false);
+  useEffect(() => {
+    let current = true;
+    hasEditorApp().then((installed) => current && setDesktop(installed));
+    return () => {
+      current = false;
+    };
+  }, []);
+  return html`<a class=${className} href=${editorLink(route, { editorUrl: getSettings().editorUrl, desktop })} target="_blank" rel="noopener noreferrer" title=${title}>${children}</a>`;
 }
 
 const openOnEnter = (fn) => (e) => {

@@ -27,6 +27,9 @@ Personal tracker for tasks, ideas, Claude work and documents. Electron on deskto
   - Items reference projects by name; `projectList` combines the records with names used on items. Rename and delete logic (`renameProjectIn`, `deleteProjectIn`) is shared by the app store and the connector.
   - The scope filter (`matchesScope`) lives in settings as `projectScope`.
   - `serializeDocument(items, projects, extra)` keeps unknown top-level fields, so older/newer versions do not drop each other's data. Always pass projects when writing.
+- Tracker Editor (github.com/divaor/tracker-editor) shares the data repo:
+  - `app/js/editorLinks.js` builds and recognizes its links (`#/file/<id>`, `#/repo/<path>`, `tracker-editor://`). Keep it in step with the editor's `parseRoute` and its `electron/main.cjs`.
+  - The address is the `editorUrl` setting (blank = default). The desktop app asks the main process (`editor:installed`) whether the editor's app handles `tracker-editor://`.
 - Notifications:
   - Every write stamps `updatedBy` (device name; the connector writes `Claude`). `app/js/changes.js` turns before/after item lists into events.
   - The connector pushes them (`mcp/notify.js` + `mcp/push.js`: VAPID keys derived from `MCP_SECRET`, RFC 8291 encryption) to subscriptions in `devices.json` next to the data file (`app/js/devices.js`).

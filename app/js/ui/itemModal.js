@@ -17,8 +17,10 @@ import {
 } from '../model.js';
 import { formatDateTime, formatDue } from '../format.js';
 import { renderMarkdown } from '../markdown.js';
+import { parseEditorLink } from '../editorLinks.js';
+import { getSettings } from '../settings.js';
 import { Icon } from './icons.js';
-import { DecisionBadge, PriorityMark, ProjectsContext, Segmented, TypeBadge } from './components.js';
+import { DecisionBadge, EditorLink, PriorityMark, ProjectsContext, Segmented, TypeBadge } from './components.js';
 import { ProjectChip, TagInput } from './projects.js';
 import { FilesPanel } from './fileViewer.js';
 
@@ -123,6 +125,7 @@ function ViewBody({ item, actions, today, onEdit }) {
     actions.update(item.id, { notes: toggleChecklistItem(item.notes, boxes.indexOf(box)) });
   };
   const statusOptions = STATUSES.map((s) => ({ id: s, label: statusLabel(s, item.type) }));
+  const editorRoute = parseEditorLink(item.url, getSettings().editorUrl);
 
   return html`<div class="modal-body view">
     <h2 class="item-title" id="modal-title">${item.title || 'Untitled'}</h2>
@@ -141,7 +144,10 @@ function ViewBody({ item, actions, today, onEdit }) {
       ${item.decision && html`<div><dt>Review</dt><dd><${DecisionBadge} decision=${item.decision} /></dd></div>`}
     </dl>
 
+    ${editorRoute &&
+    html`<${EditorLink} route=${editorRoute} className="btn primary open-doc"><${Icon} name="code" />Open in editor</${EditorLink}>`}
     ${item.url &&
+    !editorRoute &&
     item.type === 'doc' &&
     !item.files.length &&
     html`<${ExternalLink} url=${item.url} className="btn primary open-doc"><${Icon} name="external" />Open document</${ExternalLink}>`}

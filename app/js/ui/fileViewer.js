@@ -5,7 +5,7 @@ import { renderMarkdown } from '../markdown.js';
 import { fileKind, formatBytes, toggleChecklistItem } from '../model.js';
 import { store } from '../store.js';
 import { Icon } from './icons.js';
-import { Segmented } from './components.js';
+import { EditorLink, Segmented } from './components.js';
 
 const MIME = { markdown: 'text/markdown', html: 'text/html', svg: 'image/svg+xml', text: 'text/plain' };
 
@@ -102,6 +102,9 @@ function FileView({ file, onSaved, onError }) {
         options=${[{ id: 'preview', label: 'Preview', icon: 'eye' }, { id: 'source', label: 'Source', icon: 'doc' }]} />`}
       ${kind === 'html' && mode === 'preview' && html`<span class="muted small">Scripts are disabled in the preview.</span>`}
       <span class="spacer" />
+      <${EditorLink} route=${{ kind: 'repo', path: file.path }} className="btn ghost sm" title="Edit this file in Tracker Editor; your changes come back here">
+        <${Icon} name="code" size=${15} />Edit in editor
+      </${EditorLink}>
       <button type="button" class="btn ghost sm" disabled=${state.status !== 'ready'} onClick=${() => download(file.name, state.text, kind)}>
         <${Icon} name="download" size=${15} />Download
       </button>

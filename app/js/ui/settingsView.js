@@ -2,6 +2,7 @@ import { html, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { createGitHubClient, decodeBase64, encodeBase64 } from '../github.js';
 import { localDate, parseData, serializeDocument } from '../model.js';
 import { getSettings, getToken, isSyncConfigured, saveSettings, setToken } from '../settings.js';
+import { DEFAULT_EDITOR_URL } from '../editorLinks.js';
 import { store } from '../store.js';
 import { syncNow } from '../syncManager.js';
 import { formatDateTime, timeAgo } from '../format.js';
@@ -241,6 +242,31 @@ function ConnectorCard() {
   </${Card}>`;
 }
 
+function EditorCard() {
+  const [url, setUrl] = useState(getSettings().editorUrl);
+  const [installed, setInstalled] = useState(null);
+  useEffect(() => {
+    window.desktop?.hasEditorApp?.().then(setInstalled, () => setInstalled(false));
+  }, []);
+  return html`<${Card} title="Tracker Editor" icon="code" id="editor">
+    <p>
+      The companion text editor: many files open at once, synced to the same data repository, with projects and tags shared with the tracker.
+      Items sent from it get <strong>Open in editor</strong>, and attached files get <strong>Edit in editor</strong>.
+    </p>
+    <div class="field-grid">
+      <${Field} label="Editor address" hint="Blank = the default address" wide>
+        <input value=${url} onInput=${(e) => setUrl(e.currentTarget.value)} onBlur=${() => saveSettings({ editorUrl: url.trim() })}
+          placeholder=${DEFAULT_EDITOR_URL} inputmode="url" autocomplete="off" autocapitalize="off" spellcheck=${false} />
+      </${Field}>
+    </div>
+    <div class="form-actions">
+      <a class="btn sm" href=${url.trim() || DEFAULT_EDITOR_URL} target="_blank" rel="noopener noreferrer"><${Icon} name="external" size=${15} />Open the editor</a>
+    </div>
+    ${installed !== null &&
+    html`<p class="muted small">${installed ? 'Links open in the Tracker Editor app on this computer.' : 'Links open in the browser. Install the Tracker Editor desktop app to open them there instead.'}</p>`}
+  </${Card}>`;
+}
+
 function DataCard({ actions, items }) {
   const fileRef = useRef(null);
   const all = store.all();
@@ -295,6 +321,7 @@ export function SettingsView({ sync, actions, items, installPrompt, onInstall, t
   return html`<div class="settings">
     <${SyncCard} sync=${sync} actions=${actions} />
     <${ConnectorCard} />
+    <${EditorCard} />
     <${NotificationsCard} actions=${actions} />
     <${Card} title="Appearance" icon="eye">
       <${Segmented} label="Theme" value=${theme} onChange=${(t) => saveSettings({ theme: t })}

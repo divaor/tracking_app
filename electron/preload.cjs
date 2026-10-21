@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('desktop', {
   showWindow: () => ipcRenderer.invoke('window:show'),
   getRunInBackground: () => ipcRenderer.invoke('background:get'),
   setRunInBackground: (value) => ipcRenderer.invoke('background:set', Boolean(value)),
+  hasEditorApp: () => ipcRenderer.invoke('editor:installed'),
   onCommand(callback) {
     const listener = (_event, command) => callback(command);
     ipcRenderer.on('command', listener);

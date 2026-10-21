@@ -26,6 +26,8 @@ export const DEFAULT_SETTINGS = {
   projectScope: [],
   // Claude connector address, used for push notifications.
   connectorUrl: '',
+  // Tracker Editor's web address; blank = the default (editorLinks.js).
+  editorUrl: '',
   // Push notifications turned on for this device (web/PWA only).
   push: false,
   // Which changes to be told about (see notifier.js).

@@ -11,6 +11,8 @@ const APP_DIR = path.join(__dirname, '..', 'app');
 const APP_ORIGIN = 'app://tracker';
 const REPO_URL = 'https://github.com/divaor/tracking_app';
 const SECRET_KEYS = new Set(['github-token']);
+// Tracker Editor's desktop app opens tracker-editor:// links.
+const EDITOR_SCHEME = 'tracker-editor:';
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
@@ -102,11 +104,20 @@ ipcMain.handle('background:set', (event, value) => {
   return setRunInBackground(value);
 });
 
+ipcMain.handle('editor:installed', (event) => {
+  if (!fromApp(event)) throw new Error('Not allowed');
+  try {
+    return Boolean(app.getApplicationNameForProtocol(`${EDITOR_SCHEME}//`));
+  } catch {
+    return false;
+  }
+});
+
 // ---- Window -------------------------------------------------------------
 
 function isSafeExternal(url) {
   try {
-    return ['https:', 'http:', 'mailto:'].includes(new URL(url).protocol);
+    return ['https:', 'http:', 'mailto:', EDITOR_SCHEME].includes(new URL(url).protocol);
   } catch {
     return false;
   }

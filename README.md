@@ -20,6 +20,7 @@ It runs as an **Electron desktop app** on your computers and as an **installable
 - **Lists**: filter by category and status, sort by priority, due date and more. Search with plain text or `#tags`.
 - **Markdown notes and documents**: paste a doc or import a `.md` file, or drop files onto the window. Checklists (`- [ ] step`) can be ticked right in the reader.
 - **Quick add**: `Write report #work !high @tomorrow` sets a tag, the priority and a due date. Pasting a link fills the Link field.
+- **Tracker Editor**: the companion [text editor](https://github.com/divaor/tracker-editor) keeps many files open, synced to the same data repo with the same projects and tags. Items sent from it get **Open in editor**, and attached files get **Edit in editor**; your edits come back here. Set its address under **Settings → Tracker Editor**. The desktop app opens these links in the editor's desktop app when it is installed.
 - **Notifications**: your phone gets a push notification when Claude sends a document to review, stores a file or changes your tasks, even when the app is closed. The desktop app shows native notifications and can keep running in the system tray.
 - **Offline first**: every device keeps a full local copy and syncs automatically when online. Every change is a commit in your data repo, so its history is also your backup.
 - **Also**: light and dark theme, keyboard shortcuts, export and import backups.
