@@ -1,7 +1,7 @@
 {
   "name": "tracking-app",
   "productName": "Tracker",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Keep track of tasks, ideas, Claude work and documents to read — on desktop (Electron) and mobile (PWA), synced through GitHub.",
   "author": "divaor",
   "license": "UNLICENSED",
