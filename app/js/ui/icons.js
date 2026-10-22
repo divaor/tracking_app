@@ -46,6 +46,7 @@ const PATHS = {
   mic: () => html`<rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" />`,
   send: () => html`<path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" />`,
   stop: () => html`<rect x="6" y="6" width="12" height="12" rx="2" />`,
+  help: () => html`<circle cx="12" cy="12" r="9" /><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01" />`,
 };
 
 export function Icon({ name, size = 18, class: cls = '' }) {

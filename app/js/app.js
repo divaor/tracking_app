@@ -24,6 +24,8 @@ import { ProjectsContext, SyncBadge, Toasts } from './ui/components.js';
 import { ProjectsView, ScopeBar } from './ui/projects.js';
 import { BoardView, HomeView, ListView } from './ui/views.js';
 import { ItemModal } from './ui/itemModal.js';
+import { HelpDialog } from './ui/help.js';
+import { askForPlan } from './ui/assist.js';
 import { SettingsView } from './ui/settingsView.js';
 
 const VIEWS = ['home', 'board', 'list', 'projects', 'settings'];
@@ -73,7 +75,21 @@ function takeItemLink() {
 const isTyping = (el) => el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
 const TEXT_FILE = /\.(md|markdown|mdx|txt)$/i;
 
-function Sidebar({ route, items, projects, scope, onProject, onTag, sync, onSyncClick, onNew }) {
+/** Asks for files (the same kinds as a drop on the window) and hands them to `onFiles`. */
+function pickFiles(onFiles) {
+  const input = Object.assign(document.createElement('input'), { type: 'file', multiple: true, accept: '.md,.markdown,.mdx,.txt,text/*' });
+  input.addEventListener('change', () => input.files.length && onFiles([...input.files]));
+  input.click();
+}
+
+/** Scrolls to the element with this id once the view that has it is shown (up to a second). */
+function scrollToWhenShown(id, tries = 60) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  else if (tries > 0) requestAnimationFrame(() => scrollToWhenShown(id, tries - 1));
+}
+
+function Sidebar({ route, items, projects, scope, onProject, onTag, sync, onSyncClick, onNew, onHelp }) {
   const open = items.filter((i) => i.status !== 'done');
   const tags = tagCounts(items).slice(0, 12);
   const link = (target, label, icon, count, extraClass = '') => {
@@ -104,6 +120,7 @@ function Sidebar({ route, items, projects, scope, onProject, onTag, sync, onSync
         <div class="nav-tags">${tags.map((t) => html`<button type="button" class="tag" key=${t.tag} onClick=${() => onTag(t.tag)}>#${t.tag}<span>${t.count}</span></button>`)}</div>`}
       <div class="nav-section"></div>
       ${link({ view: 'settings' }, 'Settings', 'settings')}
+      <button type="button" class="nav-link" title="Commands, shortcuts and the guide (F1)" onClick=${onHelp}><${Icon} name="help" size=${18} /><span>Help</span><kbd class="nav-key">F1</kbd></button>
     </nav>
     <div class="sidebar-foot"><${SyncBadge} sync=${sync} onClick=${onSyncClick} /></div>
   </aside>`;
@@ -140,8 +157,13 @@ export function App() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [, setTick] = useState(0);
   const [linkedItem, setLinkedItem] = useState(takeItemLink);
+  const [help, setHelp] = useState(null); // { tab, query }
   const searchRef = useRef(null);
   const modalRef = useRef(null);
+  const helpRef = useRef(null);
+  // The modal and Help each get a history entry, so the phone's back button closes
+  // the one on top; `layers` is the order they were opened in.
+  const layers = useRef([]);
   const contentRef = useRef(null);
   const today = localDate();
 
@@ -179,23 +201,54 @@ export function App() {
     return () => window.removeEventListener('beforeinstallprompt', onPrompt);
   }, []);
 
-  // The modal gets its own history entry so the phone's back button closes it.
   const openModal = (next) => {
-    if (!modalRef.current) history.pushState({ trackerModal: true }, '');
+    if (!modalRef.current) history.pushState({ trackerModal: true }, ''), layers.current.push('modal');
     modalRef.current = next;
     setModal(next);
   };
-  const closeModal = () => {
-    if (!modalRef.current) return;
+  /** Steps back past the history entry of what just closed; `then` runs once that is done, so navigating in it is not undone by the step back. */
+  const stepBack = (isOurs, then) => {
+    if (!isOurs) return then?.();
+    if (then) {
+      let done = false;
+      const go = () => {
+        if (done) return;
+        done = true;
+        window.removeEventListener('popstate', go);
+        then();
+      };
+      window.addEventListener('popstate', go);
+      setTimeout(go, 500);
+    }
+    history.back();
+  };
+  const closeModal = (then) => {
+    if (!modalRef.current) return then?.();
     modalRef.current = null;
     setModal(null);
-    if (history.state?.trackerModal) history.back();
+    layers.current = layers.current.filter((l) => l !== 'modal');
+    stepBack(history.state?.trackerModal, then);
+  };
+  const openHelp = (tab = 'commands', query = '') => {
+    if (!helpRef.current) history.pushState({ trackerHelp: true }, ''), layers.current.push('help');
+    helpRef.current = { tab, query };
+    setHelp(helpRef.current);
+  };
+  const closeHelp = (then) => {
+    if (!helpRef.current) return then?.();
+    helpRef.current = null;
+    setHelp(null);
+    layers.current = layers.current.filter((l) => l !== 'help');
+    stepBack(history.state?.trackerHelp, then);
   };
   useEffect(() => {
+    const layerOf = (state) => (state?.trackerHelp ? 'help' : state?.trackerModal ? 'modal' : null);
     const onPop = () => {
-      if (modalRef.current) {
-        modalRef.current = null;
-        setModal(null);
+      // Whatever was opened after the entry we are back on closes.
+      const keep = layers.current.lastIndexOf(layerOf(history.state)) + 1;
+      for (const layer of layers.current.splice(keep)) {
+        if (layer === 'help') (helpRef.current = null), setHelp(null);
+        else (modalRef.current = null), setModal(null);
       }
     };
     window.addEventListener('popstate', onPop);
@@ -338,15 +391,61 @@ export function App() {
       toast('Saved as your feedback: edit it under Your review', { action: { label: 'Undo', run: () => store.update(item.id, { feedback: prev }) } });
     },
     showProject(key) {
-      closeModal();
       setScope([`project:${key}`]);
-      location.hash = hrefFor({ view: 'list' });
+      closeModal(() => (location.hash = hrefFor({ view: 'list' })));
     },
     searchTag(tag) {
-      closeModal();
       setQuery(`#${tag}`);
-      location.hash = hrefFor({ view: 'list' });
+      closeModal(() => (location.hash = hrefFor({ view: 'list' })));
     },
+  };
+  // What Help (commands.js) and the desktop menu can run.
+  const go = (target) => (location.hash = hrefFor(target));
+  const commands = {
+    'new-item': () => actions.newItem(),
+    'new-task': () => actions.newItem({ type: 'task' }),
+    'new-idea': () => actions.newItem({ type: 'idea' }),
+    'new-claude': () => actions.newItem({ type: 'claude' }),
+    'new-doc': () => actions.newItem({ type: 'doc' }),
+    'import-docs': () => pickFiles(importFiles),
+    'quick-add-window': () => window.desktop?.capture?.open?.(),
+    'quick-adds': () => actions.takeQuickAdds(),
+    sync: () => syncNow(),
+    'go-home': () => go({ view: 'home' }),
+    'go-board': () => go({ view: 'board' }),
+    'go-list': () => go({ view: 'list' }),
+    'go-tasks': () => go({ view: 'list', type: 'task' }),
+    'go-ideas': () => go({ view: 'list', type: 'idea' }),
+    'go-claude': () => go({ view: 'list', type: 'claude' }),
+    'go-docs': () => go({ view: 'list', type: 'doc' }),
+    'go-projects': () => go({ view: 'projects' }),
+    settings: () => go({ view: 'settings' }),
+    search: () => searchRef.current?.focus(),
+    'clear-search': () => setQuery(''),
+    'scope-all': () => setScope([]),
+    'scope-work': () => setScope(['area:work']),
+    'scope-personal': () => setScope(['area:personal']),
+    'plan-day': () => actions.plan('day'),
+    'plan-week': () => actions.plan('week'),
+    'model-settings': () => (go({ view: 'settings' }), scrollToWhenShown('model')),
+    help: () => openHelp('commands'),
+    'help-guide': () => openHelp('guide'),
+    theme: () => {
+      const next = { system: 'light', light: 'dark', dark: 'system' }[getSettings().theme] ?? 'system';
+      saveSettings({ theme: next });
+      toast(`Theme: ${next === 'system' ? 'as the system' : next}`);
+    },
+  };
+  actions.command = (id) => commands[id]?.();
+  actions.help = openHelp;
+  actions.plan = (kind) => {
+    if (!modelReady()) {
+      toast('Connect a model first: Settings → Model', { action: { label: 'Settings', run: () => commands['model-settings']() } });
+      return;
+    }
+    if (!scopedItems.length) return toast('Nothing to plan yet: add some items first');
+    go({ view: 'home' });
+    askForPlan(kind);
   };
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
@@ -421,7 +520,12 @@ export function App() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (modalRef.current) return;
+      if (e.key === 'F1' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        actionsRef.current.help();
+        return;
+      }
+      if (modalRef.current || helpRef.current) return;
       if (e.key === 'Escape' && e.target === searchRef.current) {
         setQuery('');
         e.target.blur();
@@ -434,6 +538,9 @@ export function App() {
       } else if (e.key === '/') {
         e.preventDefault();
         searchRef.current?.focus();
+      } else if (e.key === '?') {
+        e.preventDefault();
+        actionsRef.current.help();
       }
     };
     document.addEventListener('keydown', onKey);
@@ -443,11 +550,9 @@ export function App() {
   useEffect(
     () =>
       window.desktop?.onCommand?.((command) => {
-        if (command === 'new-item') actionsRef.current.newItem();
-        else if (command === 'sync') syncNow();
-        else if (command === 'settings') location.hash = '#/settings';
-        else if (command === 'search') searchRef.current?.focus();
-        else if (command === 'quick-adds') actionsRef.current.takeQuickAdds();
+        // The menu's New Item and Search do nothing over an open item or Help (as their keys).
+        if ((modalRef.current || helpRef.current) && ['new-item', 'search'].includes(command)) return;
+        actionsRef.current.command(command);
       }),
     [],
   );
@@ -492,7 +597,7 @@ export function App() {
 
   return html`<${ProjectsContext.Provider} value=${{ byKey, showProject: actions.showProject }}><div class="app ${drawer ? 'drawer-open' : ''}">
     <${Sidebar} route=${route} items=${scopedItems} projects=${projects} scope=${scope} onProject=${actions.showProject}
-      sync=${sync} onSyncClick=${onSyncClick} onNew=${() => actions.newItem()} onTag=${(tag) => actions.searchTag(tag)} />
+      sync=${sync} onSyncClick=${onSyncClick} onNew=${() => actions.newItem()} onTag=${(tag) => actions.searchTag(tag)} onHelp=${() => openHelp()} />
     <div class="scrim" onClick=${() => setDrawer(false)} />
     <main class="main">
       <header class="topbar">
@@ -518,7 +623,10 @@ export function App() {
     <${BottomNav} route=${route} onNew=${() => actions.newItem()} />
     ${modal && (modal.draft || modalItem) &&
     html`<${ItemModal} key=${modal.id ?? 'new'} item=${modalItem} initial=${modal.draft} actions=${actions}
-      projects=${projects.map((p) => p.name)} tagSuggestions=${tagNames} today=${today} onClose=${closeModal} />`}
+      projects=${projects.map((p) => p.name)} tagSuggestions=${tagNames} today=${today} onClose=${() => closeModal()} />`}
+    ${help &&
+    html`<${HelpDialog} tab=${help.tab} query=${help.query} onTab=${(tab) => setHelp((helpRef.current = { ...help, tab }))} onClose=${() => closeHelp()}
+      onRun=${modal ? null : (command) => closeHelp(() => actionsRef.current.command(command.id))} />`}
     <${Toasts} toasts=${toasts} onDismiss=${dismissToast} />
     ${fileDrag &&
     html`<div class="drop-overlay"><div><${Icon} name="upload" size=${40} /><p>Drop Markdown files to add them to your reading list</p></div></div>`}

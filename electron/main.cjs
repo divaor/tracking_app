@@ -530,7 +530,12 @@ function buildMenu() {
     { role: 'windowMenu' },
     {
       role: 'help',
-      submenu: [{ label: 'Project on GitHub', click: () => shell.openExternal(REPO_URL) }],
+      submenu: [
+        { label: 'Commands and Shortcuts', accelerator: 'F1', click: () => send('help') },
+        { label: 'Guide', click: () => send('help-guide') },
+        { type: 'separator' },
+        { label: 'Project on GitHub', click: () => shell.openExternal(REPO_URL) },
+      ],
     },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));

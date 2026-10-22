@@ -101,13 +101,36 @@ export function ItemAssistant({ item, actions }) {
   </section>`;
 }
 
+// A plan asked for from Help or the menu, taken by the Overview's card once it is shown.
+let wantedPlan = null;
+export function askForPlan(kind) {
+  wantedPlan = kind;
+  window.dispatchEvent(new Event('tracker:plan'));
+}
+
 /** Overview: the model's plan for today, or a review of the week, from your open (and lately done) items. */
 export function PlanCard({ items, today }) {
   const [state, setState] = useState(null); // { kind, text, status, error }
   const controller = useRef(null);
+  const card = useRef(null);
+  const runRef = useRef(null);
+  const ready = modelReady() && items.length > 0;
   useEffect(() => () => controller.current?.abort(), []);
-  if (!modelReady() || !items.length) return null;
-  const run = async (kind) => {
+  useEffect(() => {
+    if (!ready) return undefined;
+    const take = () => {
+      if (!wantedPlan) return;
+      const kind = wantedPlan;
+      wantedPlan = null;
+      runRef.current(kind);
+      card.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
+    take();
+    window.addEventListener('tracker:plan', take);
+    return () => window.removeEventListener('tracker:plan', take);
+  }, [ready]);
+  if (!ready) return null;
+  const run = (runRef.current = async (kind) => {
     controller.current?.abort();
     const signal = (controller.current = new AbortController()).signal;
     let out = '';
@@ -119,8 +142,8 @@ export function PlanCard({ items, today }) {
       if (err?.name === 'AbortError') return setState(null);
       setState({ kind, text: out, status: 'error', error: err.message });
     }
-  };
-  return html`<section class="plan-card" aria-label="Plan with the model">
+  });
+  return html`<section class="plan-card" aria-label="Plan with the model" ref=${card}>
     <div class="plan-head">
       <h2><${Icon} name="sparkle" size=${17} />${state?.kind === 'week' ? 'Your week' : 'Your day'}</h2>
       <span class="spacer" />

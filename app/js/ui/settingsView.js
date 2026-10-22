@@ -332,14 +332,19 @@ export function SettingsView({ sync, actions, items, installPrompt, onInstall, t
     </${Card}>
     <${DataCard} actions=${actions} items=${items} />
     <${AppsCard} installPrompt=${installPrompt} onInstall=${onInstall} />
-    <${Card} title="Keyboard shortcuts" icon="list">
+    <${Card} title="Help and keyboard shortcuts" icon="help" id="help">
       <dl class="shortcuts">
         <div><dt><kbd>N</kbd></dt><dd>New item</dd></div>
         <div><dt><kbd>/</kbd></dt><dd>Search</dd></div>
         <div><dt><kbd>E</kbd></dt><dd>Edit the open item</dd></div>
         <div><dt><kbd>Ctrl</kbd> <kbd>Enter</kbd></dt><dd>Save</dd></div>
         <div><dt><kbd>Esc</kbd></dt><dd>Close</dd></div>
+        <div><dt><kbd>F1</kbd> <kbd>?</kbd></dt><dd>Help</dd></div>
       </dl>
+      <div class="form-actions">
+        <button type="button" class="btn" onClick=${() => actions.help('commands')}><${Icon} name="list" size=${16} />All commands and shortcuts</button>
+        <button type="button" class="btn" onClick=${() => actions.help('guide')}><${Icon} name="doc" size=${16} />Guide</button>
+      </div>
     </${Card}>
     <p class="about muted">Tracker ${APP_VERSION} · ${environmentLabel()}${store.meta.lastSyncAt ? ` · last synced ${formatDateTime(store.meta.lastSyncAt)}` : ''}</p>
   </div>`;

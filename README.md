@@ -24,6 +24,7 @@ It runs as an **Electron desktop app** on your computers and as an **installable
 - **Tracker Editor**: the companion [text editor](https://github.com/divaor/tracker-editor) keeps many files open, synced to the same data repo with the same projects and tags. Items sent from it get **Open in editor**, and attached files get **Edit in editor**; your edits come back here. Set its address under **Settings → Tracker Editor**. The desktop app opens these links in the editor's desktop app when it is installed.
 - **Notifications**: your phone gets a push notification when Claude sends a document to review, stores a file or changes your tasks, even when the app is closed. The desktop app shows native notifications and can keep running in the system tray.
 - **Offline first**: every device keeps a full local copy and syncs automatically when online. Every change is a commit in your data repo, so its history is also your backup.
+- **Help** (`F1` or `?`): every command and shortcut in one searchable list, where a click runs it (print it as a cheat sheet), and the full guide ([`app/help/guide.md`](app/help/guide.md)).
 - **Also**: light and dark theme, keyboard shortcuts, export and import backups.
 
 ## How it fits together
@@ -178,6 +179,7 @@ With a model on:
 | `Esc`                      | Close                            |
 | `Ctrl/⌘ + Shift + S`       | Sync now (desktop)               |
 | `Ctrl/⌘ + Alt + T`         | Quick add from any app (desktop, when turned on) |
+| `F1` or `?`                | Help: every command and shortcut, and the guide |
 
 Some other things you can do:
 

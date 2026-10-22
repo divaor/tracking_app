@@ -2874,3 +2874,250 @@ span.decision {
   font-family: var(--mono);
   font-size: 12.5px;
 }
+
+/* ---- Help (ui/help.js): the cheat sheet and the guide -------------------------- */
+.nav-key {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+button.nav-link {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+.help-dialog.modal {
+  width: min(980px, 100%);
+  height: min(760px, calc(100dvh - 48px));
+}
+
+.help-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.help-commands,
+.help-guide {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.help-commands {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.help-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-search {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+}
+
+.help-search > .icon {
+  position: absolute;
+  left: 11px;
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.help-search input {
+  width: 100%;
+  padding-left: 34px !important;
+  padding-right: 34px !important;
+}
+
+.help-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.help-search .icon-btn {
+  position: absolute;
+  right: 5px;
+}
+
+.help-note {
+  margin: 0;
+}
+
+.help-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  columns: 2 360px;
+  column-gap: 28px;
+}
+
+.help-group {
+  break-inside: avoid-column;
+  margin-bottom: 14px;
+}
+
+.help-group h3 {
+  margin: 0 0 4px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.help-command {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  break-inside: avoid;
+}
+
+button.help-command {
+  cursor: pointer;
+}
+
+button.help-command:hover,
+button.help-command:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+
+.help-command.static {
+  color: var(--text-2);
+}
+
+.help-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.help-keys {
+  flex: none;
+  max-width: 55%;
+  color: var(--text-2);
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.help-keys kbd {
+  font-size: 11.5px;
+}
+
+.help-guide {
+  gap: 16px;
+}
+
+.help-toc {
+  display: flex;
+  flex: 0 0 230px;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.help-toc .help-search {
+  flex: none;
+  margin-bottom: 6px;
+}
+
+.help-toc-item {
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.help-toc-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.help-guide-body {
+  flex: 1;
+  min-width: 0;
+  padding-right: 6px;
+  overflow-y: auto;
+}
+
+@media (max-width: 860px) {
+  .help-backdrop {
+    padding: 0;
+  }
+
+  .help-dialog.modal {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    border-radius: 0;
+  }
+
+  .help-body {
+    padding: 4px 14px 14px;
+  }
+
+  .help-body .segmented {
+    align-self: flex-start;
+  }
+
+  .help-guide {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .help-toc {
+    flex: none;
+    max-height: 150px;
+  }
+
+  .help-tools .btn {
+    display: none;
+  }
+}
+
+/* Print: only the cheat sheet. */
+@media print {
+  body.printing-help * {
+    visibility: hidden;
+  }
+
+  body.printing-help .help-list,
+  body.printing-help .help-list * {
+    visibility: visible;
+  }
+
+  body.printing-help .help-list {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    overflow: visible;
+    columns: 2;
+  }
+}
