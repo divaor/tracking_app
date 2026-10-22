@@ -40,6 +40,7 @@ Personal tracker for tasks, ideas, Claude work and documents. Electron on deskto
 
 - Adding or removing a file under `app/` → update `ASSETS` in `app/sw.js`. `test/app.test.js` enforces this.
 - Bumping the version → update `package.json`, `app/js/version.js` and the `CACHE` name in `app/sw.js`. The tests check that they match.
+- The manifest `id` (`./`) resolves to the origin root, https://divaor.github.io/, which identifies the installed tracker app. Don't change it: a new id makes installed copies a different app. Other apps on divaor.github.io (Tracker Editor) need ids of their own.
 - The CSP in `app/index.html` allows only same-origin scripts. Fetches may go to any https origin (the GitHub API and the user's own connector).
   - Inline styles are allowed so HTML artifacts render in the sandboxed preview frame, which inherits the CSP.
   - Do not add inline scripts.
