@@ -15,6 +15,8 @@ import {
 } from './model.js';
 import { store } from './store.js';
 import { getSettings, isSyncConfigured, onSettings, saveSettings } from './settings.js';
+import { appendToNotes, refinement } from './assist.js';
+import { modelReady, readQuickAdd } from './assistant.js';
 import { getSyncState, onSyncState, syncNow } from './syncManager.js';
 import { setNotificationHandlers } from './notifier.js';
 import { Icon } from './ui/icons.js';
@@ -286,7 +288,54 @@ export function App() {
     },
     quickAdd(text, defaults = {}) {
       const fields = parseQuickAdd(text, today, projects.map((p) => p.name));
-      if (fields.title) actions.create({ project: defaultProject, ...defaults, ...fields });
+      if (!fields.title) return;
+      const explicit = { project: defaultProject, ...defaults, ...fields };
+      const item = actions.create(explicit);
+      // With the model on, it reads the line too and fills in what was said in words.
+      if (modelReady() && getSettings().smartAdd) actions.refineQuickAdd(item, text, explicit);
+    },
+    async refineQuickAdd(item, text, explicit) {
+      const tags = tagCounts(items).map((t) => t.tag);
+      let smart;
+      try {
+        smart = await readQuickAdd(text, { today, type: item.type, projects: projects.map((p) => p.name), tags });
+      } catch (err) {
+        toast(`The model could not read “${item.title}”: ${err.message}`, { kind: 'error' });
+        return;
+      }
+      // Left alone when it was edited or deleted meanwhile.
+      const now = store.get(item.id);
+      if (!now || now.updatedAt !== item.updatedAt) return;
+      const patch = refinement(explicit, smart);
+      if (!Object.keys(patch).length) return;
+      const before = Object.fromEntries(Object.keys(patch).map((k) => [k, now[k]]));
+      store.update(item.id, patch);
+      const said = [
+        patch.title && `“${patch.title}”`,
+        patch.due && `due ${patch.due}`,
+        patch.priority,
+        patch.project,
+        patch.tags?.map((t) => `#${t}`).join(' '),
+        patch.notes && 'notes',
+      ].filter(Boolean);
+      toast(`Filled in by the model: ${said.join(' · ')}`, { duration: 9000, action: { label: 'Undo', run: () => store.update(item.id, before) } });
+    },
+    /** Lines typed in the quick add window (desktop), waiting in the main process. */
+    async takeQuickAdds() {
+      const taken = (await window.desktop?.capture?.take?.().catch(() => [])) ?? [];
+      for (const q of taken) actions.quickAdd(q.text, { type: q.type });
+    },
+    /** An answer from the model added at the end of an item's notes. */
+    addToNotes(item, answer) {
+      const prev = store.get(item.id)?.notes ?? '';
+      store.update(item.id, { notes: appendToNotes(prev, answer) });
+      toast('Added to the notes', { action: { label: 'Undo', run: () => store.update(item.id, { notes: prev }) } });
+    },
+    /** A drafted review as the document's feedback (still yours to edit and save). */
+    useFeedback(item, text) {
+      const prev = store.get(item.id)?.feedback ?? '';
+      store.update(item.id, { feedback: text.trim() });
+      toast('Saved as your feedback: edit it under Your review', { action: { label: 'Undo', run: () => store.update(item.id, { feedback: prev }) } });
     },
     showProject(key) {
       closeModal();
@@ -398,9 +447,14 @@ export function App() {
         else if (command === 'sync') syncNow();
         else if (command === 'settings') location.hash = '#/settings';
         else if (command === 'search') searchRef.current?.focus();
+        else if (command === 'quick-adds') actionsRef.current.takeQuickAdds();
       }),
     [],
   );
+  // Lines typed in the quick add window while this one was closed or loading.
+  useEffect(() => {
+    actionsRef.current.takeQuickAdds();
+  }, []);
 
   const onSearch = (value) => {
     setQuery(value);

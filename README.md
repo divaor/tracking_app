@@ -19,7 +19,8 @@ It runs as an **Electron desktop app** on your computers and as an **installable
 - **Board**: drag cards between columns. On phones you swipe between columns instead.
 - **Lists**: filter by category and status, sort by priority, due date and more. Search with plain text or `#tags`.
 - **Markdown notes and documents**: paste a doc or import a `.md` file, or drop files onto the window. Checklists (`- [ ] step`) can be ticked right in the reader.
-- **Quick add**: `Write report #work !high @tomorrow` sets a tag, the priority and a due date. Pasting a link fills the Link field.
+- **Quick add**: `Write report #work !high @tomorrow` sets a tag, the priority and a due date. Pasting a link fills the Link field. On a phone, tap the microphone and say it. On the desktop, a shortcut opens a small quick add window from any app.
+- **A model of your own** (optional, as in Tracker Editor: Ollama or LM Studio on your computer, or a model service that answers later): quick add understands plain language ("call Ana tomorrow about the invoice, urgent" gets its due date, priority, project and tags), each item gets **Ask the model about this** (summarize, break into steps, draft your review of a document, questions, risks, translate, or any question), and the Overview can **plan your day** or **review your week**. See [6. Model](#6-model-optional).
 - **Tracker Editor**: the companion [text editor](https://github.com/divaor/tracker-editor) keeps many files open, synced to the same data repo with the same projects and tags. Items sent from it get **Open in editor**, and attached files get **Edit in editor**; your edits come back here. Set its address under **Settings → Tracker Editor**. The desktop app opens these links in the editor's desktop app when it is installed.
 - **Notifications**: your phone gets a push notification when Claude sends a document to review, stores a file or changes your tasks, even when the app is closed. The desktop app shows native notifications and can keep running in the system tray.
 - **Offline first**: every device keeps a full local copy and syncs automatically when online. Every change is a commit in your data repo, so its history is also your backup.
@@ -131,6 +132,24 @@ Full guide: **[mcp/README.md](mcp/README.md)**.
 
 ---
 
+## 6. Model (optional)
+
+Connect the same kind of model as [Tracker Editor](https://github.com/divaor/tracker-editor) in **Settings → Model**:
+
+- **A server on your computer** (Ollama, LM Studio or anything with an OpenAI-compatible API): press **Ollama**, then **Test and list models**, pick one and **Save and turn on**. Nothing leaves your machine. The desktop app makes the requests itself, so the server needs no setup; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS=https://divaor.github.io`).
+- **A service that answers later**: paste its connection profile (the same JSON as in Tracker Editor; **Start from the example** shows the shape), the model or agent name and the API key, which is kept in the keychain on the desktop. The desktop app can also receive answers by webhook (use a different port from Tracker Editor's).
+
+With a model on:
+
+- **Quick add in plain language** (Settings → Quick add): the item is added at once as you typed it, then the model fills in the due date, priority, project (only existing ones) and tags it understood, with **Undo**. What you type with `+ # ! @` and the type you picked stay as they are, and a plain title is never rewritten.
+- **Ask the model about this**, in every item: Summarize, Break into steps (tasks), Turn into a plan (ideas), **Draft my feedback** (documents, from their files too), Questions to ask, Risks and gaps, In English / In Spanish, or any question with follow-ups. **Add to the notes** puts an answer (a checklist of steps, say) in the item; **Use as my feedback** fills your review of a document.
+- **Plan my day** / **Review my week** on the Overview: what to do first today, or what got done, what is stuck and what to focus on next.
+
+## 7. Quick add from anywhere (desktop) and by voice (phone)
+
+- **Desktop**: in **Settings → Quick add**, turn on the shortcut (`Ctrl+Alt+T` by default; click the field and press the keys you want). It opens a small window over any app: pick Task, Idea, Claude work or Document, type the line and press `Enter`. It works with the window closed while Tracker runs in the tray, and also from the tray menu and **File → Quick Add…**.
+- **Phone**: the microphone in quick add fills it with what you say, after anything you typed. Pick the language in **Settings → Quick add**. It uses the browser's speech service (Google's on Android), so it needs a connection.
+
 ## Using it
 
 ### Projects and tags
@@ -158,6 +177,7 @@ Full guide: **[mcp/README.md](mcp/README.md)**.
 | `Ctrl/⌘ + Enter`           | Save                             |
 | `Esc`                      | Close                            |
 | `Ctrl/⌘ + Shift + S`       | Sync now (desktop)               |
+| `Ctrl/⌘ + Alt + T`         | Quick add from any app (desktop, when turned on) |
 
 Some other things you can do:
 
@@ -225,13 +245,17 @@ These libraries are copied into `app/vendor/` by `npm run vendor`. GitHub Pages 
 mcp/                  Claude connector (MCP server with OAuth and push: Cloudflare Worker, HTTP or stdio)
 app/                  the web app (also loaded by Electron)
   js/model.js         item model, merge, quick-add parser, checklists
+  js/assist.js        what the model is asked (quick add, items, plans) and how replies are checked
+  js/assistant.js     the model client from Settings
+  js/llm.js, asyncLlm.js, asyncConnection.js, localFetch.js   model clients, copied from Tracker Editor
   js/sync.js          one pull → merge → push round
   js/github.js        GitHub Contents API client
   js/syncManager.js   when to sync (after edits, interval, focus, online)
   js/store.js         local store (IndexedDB)
   js/ui/              views, item editor, settings
   sw.js               offline cache for the web app
-electron/             main process + preload (window, app:// protocol, keychain)
+  quick-add.html      the desktop quick add window
+electron/             main process + preload (window, app:// protocol, keychain, model requests, webhook receiver, quick add shortcut)
 scripts/              vendor copy, icon rendering, local web server
 test/                 unit tests
 .github/workflows/    CI, GitHub Pages deploy, desktop release builds, connector deploy
@@ -242,3 +266,5 @@ test/                 unit tests
 - **Token storage**: the desktop app encrypts the token with your operating system's keychain (Electron `safeStorage`). The web app keeps it in that browser's local storage. Use a fine-grained token limited to the data repo, with Contents read/write only.
 - **Markdown**: all Markdown is sanitized with DOMPurify, and the page runs under a strict Content Security Policy.
 - **Desktop app**: the Electron window is sandboxed with context isolation, and pages get no access to Node. Outside links open in your default browser.
+- **Model**: a local model keeps everything on your computer. A model service's API key and webhook secret are kept in the keychain (desktop) and never written to the settings or the data repo; with a webhook secret, events whose signature does not match are refused.
+- **Dictation** uses the browser's speech service, which sends the audio to its provider.

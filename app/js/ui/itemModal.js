@@ -23,6 +23,7 @@ import { Icon } from './icons.js';
 import { DecisionBadge, EditorLink, PriorityMark, ProjectsContext, Segmented, TypeBadge } from './components.js';
 import { ProjectChip, TagInput } from './projects.js';
 import { FilesPanel } from './fileViewer.js';
+import { ItemAssistant } from './assist.js';
 
 const NOTES_PLACEHOLDER = {
   task: 'Details, links, or a checklist:\n- [ ] first step\n- [ ] second step',
@@ -159,6 +160,7 @@ function ViewBody({ item, actions, today, onEdit }) {
 
     ${item.files.length > 0 && html`<${FilesPanel} item=${item} actions=${actions} />`}
     ${isReviewable(item) && html`<${ReviewPanel} item=${item} actions=${actions} />`}
+    <${ItemAssistant} item=${item} actions=${actions} />
 
     <p class="timestamps">
       Created ${formatDateTime(item.createdAt)} · Updated ${formatDateTime(item.updatedAt)}${item.updatedBy ? ` by ${item.updatedBy}` : ''}

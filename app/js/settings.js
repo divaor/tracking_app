@@ -1,5 +1,6 @@
 // User preferences (synchronous, localStorage) and the GitHub token (kept in
 // the OS keychain via Electron's safeStorage on desktop, localStorage on web).
+import { DEFAULT_LLM_URL } from './llm.js';
 
 const KEY = 'tracker.settings.v1';
 const TOKEN_KEY = 'tracker.token';
@@ -32,11 +33,29 @@ export const DEFAULT_SETTINGS = {
   push: false,
   // Which changes to be told about (see notifier.js).
   notify: { desktop: true, documents: true, items: true, devices: false },
+  // The model (as in Tracker Editor): a server with an OpenAI-compatible API
+  // (Ollama, LM Studio, …), or provider 'async': a service that answers later,
+  // described by `profile` (JSON; asyncLlm.js). Its API key and webhook secret
+  // are kept with getSecret. `webhook` (desktop app): receive its answers on this port.
+  llm: {
+    enabled: false,
+    provider: 'openai',
+    baseUrl: DEFAULT_LLM_URL,
+    chatModel: '',
+    apiKey: '',
+    profile: '',
+    webhook: { enabled: false, port: 8766, path: '/llm-webhook', publicUrl: '' },
+  },
+  // With the model on: quick add understands plain language ("call Ana tomorrow, urgent").
+  smartAdd: true,
+  // Dictation into quick add (phones): a BCP 47 language, '' = the device's.
+  dictationLang: '',
 };
 
 let settings = { ...DEFAULT_SETTINGS };
 try {
-  settings = { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') };
+  const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}');
+  settings = { ...DEFAULT_SETTINGS, ...saved, llm: { ...DEFAULT_SETTINGS.llm, ...saved.llm, webhook: { ...DEFAULT_SETTINGS.llm.webhook, ...saved.llm?.webhook } } };
 } catch {
   // keep defaults
 }
@@ -46,7 +65,7 @@ const listeners = new Set();
 export const getSettings = () => settings;
 
 export function saveSettings(patch) {
-  settings = { ...settings, ...patch };
+  settings = { ...settings, ...patch, llm: { ...settings.llm, ...patch.llm, webhook: { ...settings.llm.webhook, ...patch.llm?.webhook } } };
   try {
     localStorage.setItem(KEY, JSON.stringify(settings));
   } catch {
@@ -88,4 +107,32 @@ export async function setToken(value) {
   else if (token) localStorage.setItem(TOKEN_KEY, token);
   else localStorage.removeItem(TOKEN_KEY);
   tokenCache = token;
+}
+
+// Other secrets (the model service's API key and webhook secret), kept like the token.
+export const SECRET_NAMES = ['llm-api-key', 'llm-webhook-secret'];
+const secretCache = new Map();
+
+export async function getSecret(name) {
+  if (!SECRET_NAMES.includes(name)) throw new Error(`Unknown secret ${name}`);
+  if (secretCache.has(name)) return secretCache.get(name);
+  const secrets = globalThis.window?.desktop?.secrets;
+  let value = '';
+  try {
+    value = secrets ? ((await secrets.get(name)) ?? '') : (localStorage.getItem(`${TOKEN_KEY}:${name}`) ?? '');
+  } catch {
+    value = '';
+  }
+  secretCache.set(name, value);
+  return value;
+}
+
+export async function setSecret(name, value) {
+  if (!SECRET_NAMES.includes(name)) throw new Error(`Unknown secret ${name}`);
+  const v = String(value ?? '').trim();
+  const secrets = globalThis.window?.desktop?.secrets;
+  if (secrets) await secrets.set(name, v);
+  else if (v) localStorage.setItem(`${TOKEN_KEY}:${name}`, v);
+  else localStorage.removeItem(`${TOKEN_KEY}:${name}`);
+  secretCache.set(name, v);
 }

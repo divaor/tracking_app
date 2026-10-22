@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-src 'none'" />
+    <title>Quick add</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <script src="js/theme-boot.js"></script>
+    <script type="module" src="js/quickAddPage.js"></script>
+  </head>
+  <body class="quick-add-page">
+    <form class="quick-window" id="form">
+      <header class="quick-window-head">
+        <span class="quick-window-title">Add to Tracker</span>
+        <span class="muted small">Enter adds · Esc closes</span>
+      </header>
+      <div class="quick-types" role="group" aria-label="Type of item">
+        <button type="button" class="type-pick type-task" data-type="task">Task</button>
+        <button type="button" class="type-pick type-idea" data-type="idea">Idea</button>
+        <button type="button" class="type-pick type-claude" data-type="claude">Claude work</button>
+        <button type="button" class="type-pick type-doc" data-type="doc">Document</button>
+      </div>
+      <input id="text" aria-label="Quick add" autocomplete="off" spellcheck="true" />
+      <p class="quick-hint" id="hint"></p>
+    </form>
+  </body>
+</html>

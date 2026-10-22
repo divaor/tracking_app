@@ -39,12 +39,18 @@ Personal tracker for tasks, ideas, Claude work and documents. Electron on deskto
   - The connector pushes them (`mcp/notify.js` + `mcp/push.js`: VAPID keys derived from `MCP_SECRET`, RFC 8291 encryption) to subscriptions in `devices.json` next to the data file (`app/js/devices.js`).
   - The app registers itself there (`app/js/push.js`); `sw.js` shows pushes. The desktop app polls every minute and shows native notifications (`app/js/notifier.js`); the tray/background mode lives in `electron/main.cjs`.
   - Headless Chromium cannot show notifications; run notification browser tests headed under `xvfb-run`.
+- The model (as in Tracker Editor, optional):
+  - `llm.js`, `asyncLlm.js`, `asyncConnection.js` and `localFetch.js` are copies of the editor's; keep them in step (their tests too: `test/async-llm.test.js`). Settings `llm` has the same shape; its secrets (`llm-api-key`, `llm-webhook-secret`) go through `getSecret`/`setSecret` and `SECRET_KEYS` in `main.cjs`.
+  - `assist.js` (pure) holds the prompts and checks replies: `quickAddMessages`/`parseQuickAddReply`/`refinement` (only existing projects, real dates; the picked type and what was typed with + # ! @ stay; a plain title stays), `ITEM_ACTIONS` (`use`: answer, notes, feedback) and `planMessages`. `assistant.js` makes the calls.
+  - Quick add creates the item at once, then `actions.refineQuickAdd` patches it when the model answers (unless it was edited meanwhile), with Undo.
+  - Desktop: `llm:request`/`llm:abort` stream model requests through `net.fetch`, `webhook:listen` receives a service's answers (HMAC with the webhook secret).
+- Quick add from anywhere (desktop): a global shortcut (`prefs.json` `quickAdd`, IPC `quick:*`) opens `quick-add.html` with `quickAddPreload.cjs`. Lines go through `quick-adds.json` until the main window takes them (`quick:take`) and runs its quick add. Dictation in quick add (phones): `ui/dictation.js`.
 
 ## When changing things
 
 - Adding or removing a file under `app/` → update `ASSETS` in `app/sw.js`. `test/app.test.js` enforces this.
 - Bumping the version → update `package.json`, `app/js/version.js` and the `CACHE` name in `app/sw.js`. The tests check that they match.
 - The manifest `id` (`./`) resolves to the origin root, https://divaor.github.io/, which identifies the installed tracker app. Don't change it: a new id makes installed copies a different app. Other apps on divaor.github.io (Tracker Editor) need ids of their own.
-- The CSP in `app/index.html` allows only same-origin scripts. Fetches may go to any https origin (the GitHub API and the user's own connector).
+- The CSP in `app/index.html` allows only same-origin scripts. Fetches may go to any https origin (the GitHub API and the user's own connector) and to `localhost` (a model server).
   - Inline styles are allowed so HTML artifacts render in the sandboxed preview frame, which inherits the CSP.
   - Do not add inline scripts.

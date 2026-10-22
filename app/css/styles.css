@@ -800,6 +800,40 @@ button.tag:hover {
   right: 8px;
 }
 
+/* The microphone sits left of the Add button. */
+.quick-input .mic-btn {
+  position: absolute;
+  right: 68px;
+  width: 34px;
+  height: 34px;
+}
+
+.quick-input:has(.mic-btn) input {
+  padding-right: 110px !important;
+}
+
+.mic-btn.listening {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes mic-pulse {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--danger) 16%, transparent);
+  }
+}
+
+.quick-hint .icon {
+  vertical-align: -2px;
+  color: var(--accent);
+}
+
+.quick-hint.error-text,
+.error-text {
+  color: var(--danger);
+}
+
 .quick-hint {
   margin: 6px 4px 0;
   color: var(--text-3);
@@ -2628,6 +2662,11 @@ span.decision {
     display: none;
   }
 
+  /* Problems (the microphone) still show. */
+  .quick-hint.error-text {
+    display: block;
+  }
+
   /* 16px inputs stop iOS Safari from zooming in on focus. */
   input:not([type='checkbox']),
   select,
@@ -2661,4 +2700,177 @@ span.decision {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ---- Quick add window (desktop) ------------------------------------------------ */
+.quick-add-page {
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.quick-window {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px 8px;
+  border: 1px solid var(--border-strong);
+}
+
+.quick-window-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.quick-window-title {
+  font-weight: 600;
+}
+
+.quick-window .quick-types button {
+  -webkit-app-region: no-drag;
+}
+
+.quick-window input {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  font-size: 16px;
+}
+
+.quick-window .quick-hint {
+  display: block;
+  margin: 0;
+}
+
+/* ---- The model: item helper, plan card, settings ---------------------------------- */
+.assist-open {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.item-assist {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.item-assist h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.item-assist h3 .icon,
+.plan-card h2 .icon {
+  color: var(--accent);
+}
+
+.item-assist .spacer,
+.plan-head .spacer {
+  flex: 1;
+}
+
+.assist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.assist-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assist-question {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-weight: 550;
+}
+
+.assist-answer {
+  margin-top: 6px;
+}
+
+.assist-answer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.assist-ask {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.assist-ask input {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-card {
+  margin: 16px 0 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.plan-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 16px;
+}
+
+.plan-card > p {
+  margin: 8px 0 0;
+}
+
+.plan-text {
+  margin-top: 8px;
+}
+
+.settings-card h3.settings-sub {
+  margin: 18px 0 4px;
+  font-size: 14px;
+}
+
+.shortcut-field {
+  display: flex;
+  gap: 8px;
+}
+
+.shortcut-field input {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  font-family: var(--mono);
+}
+
+.profile-input {
+  font-family: var(--mono);
+  font-size: 12.5px;
 }

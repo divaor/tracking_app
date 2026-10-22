@@ -1,10 +1,12 @@
-import { createContext, html, useContext, useEffect, useState } from '../../vendor/preact-htm.js';
+import { createContext, html, useContext, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { checklistProgress, decisionLabel, isOverdue, kindLabel, nextStatus, projectKey, statusLabel, TYPES, typeInfo } from '../model.js';
 import { formatDue, timeAgo } from '../format.js';
 import { editorLink, parseEditorLink } from '../editorLinks.js';
 import { getSettings } from '../settings.js';
 import { Icon, StatusIcon } from './icons.js';
 import { ProjectChip } from './projects.js';
+import { MicButton } from './dictation.js';
+import { modelReady } from '../assistant.js';
 
 // Project colors and the "show this project" action, provided by the app.
 export const ProjectsContext = createContext({ byKey: new Map(), showProject: () => {} });
@@ -150,12 +152,16 @@ export function EmptyState({ icon = 'check', title, children }) {
 
 export function QuickAdd({ type, onAdd, placeholder, showTypes = false, onTypeChange }) {
   const [value, setValue] = useState('');
+  const [problem, setProblem] = useState('');
+  // Dictated text goes after what was typed before the microphone started.
+  const typed = useRef('');
   const submit = (e) => {
     e.preventDefault();
     if (!value.trim()) return;
     onAdd(value.trim());
     setValue('');
   };
+  const smart = modelReady() && getSettings().smartAdd;
   return html`<form class="quick-add" onSubmit=${submit}>
     ${showTypes &&
     html`<div class="quick-types" role="group" aria-label="Type of item">
@@ -168,11 +174,18 @@ export function QuickAdd({ type, onAdd, placeholder, showTypes = false, onTypeCh
     </div>`}
     <div class="quick-input">
       <${Icon} name="plus" size=${18} />
-      <input value=${value} onInput=${(e) => setValue(e.currentTarget.value)} placeholder=${placeholder}
+      <input value=${value} onInput=${(e) => ((typed.current = e.currentTarget.value), setValue(e.currentTarget.value))} placeholder=${placeholder}
         aria-label="Quick add" enterkeyhint="done" autocomplete="off" />
+      <${MicButton} onError=${setProblem} onText=${(text) => {
+        setProblem('');
+        setValue([typed.current.trim(), text].filter(Boolean).join(' '));
+      }} />
       <button class="btn primary sm" type="submit" disabled=${!value.trim()}>Add</button>
     </div>
-    <div class="quick-hint">Shortcuts: <code>+project</code> <code>#tag</code> <code>!high</code> <code>@tomorrow</code> or paste a link</div>
+    ${problem && html`<div class="quick-hint error-text" role="alert">${problem}</div>`}
+    <div class="quick-hint">${smart
+      ? html`<${Icon} name="sparkle" size=${13} /> Plain language works: <em>call Ana tomorrow about the invoice, urgent</em>. Or <code>+project</code> <code>#tag</code> <code>!high</code> <code>@tomorrow</code>`
+      : html`Shortcuts: <code>+project</code> <code>#tag</code> <code>!high</code> <code>@tomorrow</code> or paste a link`}</div>
   </form>`;
 }
 

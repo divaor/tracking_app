@@ -3,6 +3,7 @@ import { addDays, SORTS, sortItems, STATUSES, statusLabel, TYPES } from '../mode
 import { formatLongToday, greeting } from '../format.js';
 import { Icon, StatusIcon } from './icons.js';
 import { EmptyState, ItemCard, ItemRow, QuickAdd, Segmented, TypeFilter } from './components.js';
+import { PlanCard } from './assist.js';
 
 const DONE_LIMIT = 25;
 
@@ -64,6 +65,7 @@ export function HomeView({ items, today, actions, hrefFor }) {
       onAdd=${(value) => actions.quickAdd(value, { type: captureType })} />
 
     ${items.length === 0 && html`<${Welcome} actions=${actions} />`}
+    <${PlanCard} items=${items} today=${today} />
 
     <div class="stat-grid">
       ${TYPES.map((t) => {
