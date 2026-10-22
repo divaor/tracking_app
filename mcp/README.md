@@ -155,6 +155,7 @@ It listens on `127.0.0.1:8787` by default. Put it behind HTTPS (a reverse proxy 
 | `TRACKER_FILES_DIR` | no | Folder for documents. Default `files`. |
 | `TRACKER_DEVICE` | no | Name used in commit messages. Default `Claude`. |
 | `TRACKER_APP_URL` | no | Web app address, so replies include links that open the item, e.g. `https://you.github.io/tracking_app/`. |
+| `TRACKER_EDITOR_URL` | no | Tracker Editor address for links to editor files. Default `https://divaor.github.io/tracker-editor/`. |
 | `OAUTH_REDIRECT_HOSTS` | no | Extra hosts allowed as OAuth redirect targets (comma-separated; `*` allows any https host). |
 | `MCP_PUBLIC_URL` | no | Public origin when self-hosting behind a proxy. |
 | `VAPID_SUBJECT` | no | Contact URL or `mailto:` for push services. Default: `TRACKER_APP_URL`. |
@@ -175,6 +176,7 @@ Tools:
 - **`update_items`**: changes status, fields and tags, can append notes, and records review fields.
 - **`delete_items`**: only used when you explicitly ask.
 - **`send_document`**: saves a proposal or artifact as a file and files it as a doc, or adds a new version to an existing doc.
+- **`list_editor_files`**, **`search_editor_files`**, **`read_editor_file`**, **`save_editor_file`**: your Tracker Editor files (`editor/index.json` and `editor/files/<id>/<name>` in the data repo). Search covers the 60 most recently changed files. Saving creates a file or replaces its text, name, project or tags; the editor picks it up on its next sync. Files encrypted in the editor are never read or changed.
 
 Prompts (slash commands in Claude Code): `use_project`, `send_proposal`, `update_tracker`, `check_feedback`.
 
@@ -197,7 +199,7 @@ HTTP endpoints:
   - Redirect targets are limited to Claude and localhost unless you add more.
 - **Rotating** `MCP_SECRET` revokes every token at once.
 - **Push privacy:** notifications are end-to-end encrypted to each device (Web Push, RFC 8291). Push services only see when a notification was sent, not what it says.
-- **Limited reach.** The connector can only touch the data file, `devices.json` and the `files/` folder of the one repository its token allows. Scripts in HTML artifacts never run in the app's preview.
+- **Limited reach.** The connector can only touch the data file, `devices.json`, the `files/` folder and the editor's `editor/` folder of the one repository its token allows. Scripts in HTML artifacts never run in the app's preview.
 - **Easy to undo.** Claude is told never to delete without you asking, and every change is a revertible commit.
 
 ## Development
@@ -216,4 +218,5 @@ The server code has no dependencies and uses only web-standard APIs, so it runs 
 - `oauth.js`: the authorization server.
 - `tools.js`: tool and prompt definitions, plus the instructions Claude sees.
 - `tracker.js`: reads and writes the data repo, using the app's `model.js` and `github.js`.
+- `editor.js`: Tracker Editor files, in the editor's index format.
 - `notify.js` and `push.js`: push notifications (VAPID, encryption).

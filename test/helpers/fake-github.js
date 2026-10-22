@@ -58,6 +58,17 @@ export function createFakeGitHub({ owner = 'me', repo = 'data', defaultBranch = 
         commits.push({ path, message: body.message, branch: body.branch ?? defaultBranch });
         return reply(current ? 200 : 201, { content: { sha, path }, commit: { sha: `commit-${version}` } });
       }
+      if (method === 'DELETE') {
+        const body = JSON.parse(init.body);
+        const files = branches.get(body.branch ?? defaultBranch);
+        const current = files?.get(path);
+        if (!current) return reply(404, { message: 'Not Found' });
+        if (body.sha !== current.sha) return reply(409, { message: 'sha mismatch' });
+        files.delete(path);
+        version++;
+        commits.push({ path, message: body.message, branch: body.branch ?? defaultBranch, deleted: true });
+        return reply(200, { content: null, commit: { sha: `commit-${version}` } });
+      }
     }
     return reply(404, { message: 'Not Found' });
   }

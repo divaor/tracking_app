@@ -106,8 +106,11 @@ The connector lets Claude work with your tracker from any chat (web, desktop, ph
 - "Update tasks on my tracker: the sync work is done, add a task for docs"
 - "Log this session as Claude work on my tracker"
 - "Check my tracker for feedback on the proposal and revise it"
+- "Save this to my editor as deploy-notes.md", "Find the SQL I pasted about invoices in my editor files"
 
 Documents Claude sends are saved as files in your data repo, under `files/…`, and show up under **Docs**. Open one in the app to read it; HTML artifacts get a safe preview. Then **Approve**, **Request changes** or **Reject** it and leave feedback, which Claude can read back.
+
+Claude can also list, search, read and save your [Tracker Editor](https://github.com/divaor/tracker-editor) files, which live in the same repo under `editor/`. It never reads or changes files you encrypted in the editor.
 
 To set it up:
 

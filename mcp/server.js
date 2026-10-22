@@ -1,5 +1,6 @@
 // Builds the tracker MCP server from environment variables. Shared by the
 // Cloudflare Worker, the Node HTTP server and the stdio server.
+import { DEFAULT_EDITOR_URL } from '../app/js/editorLinks.js';
 import { createGitHubClient } from '../app/js/github.js';
 import { createNotifier } from './notify.js';
 import { createMcpServer } from './protocol.js';
@@ -18,6 +19,7 @@ export function readConfig(env = {}) {
     filesDir: String(env.TRACKER_FILES_DIR ?? '').trim() || 'files',
     device: String(env.TRACKER_DEVICE ?? '').trim() || 'Claude',
     appUrl: String(env.TRACKER_APP_URL ?? '').trim(),
+    editorUrl: String(env.TRACKER_EDITOR_URL ?? '').trim() || DEFAULT_EDITOR_URL,
     secret: String(env.MCP_SECRET ?? ''),
     allowedOrigins: list(env.MCP_ALLOWED_ORIGINS),
     redirectHosts: list(env.OAUTH_REDIRECT_HOSTS),

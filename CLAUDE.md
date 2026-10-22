@@ -20,6 +20,10 @@ Personal tracker for tasks, ideas, Claude work and documents. Electron on deskto
   - Entry points: `worker.js` (Cloudflare), `http.js`, `stdio.js`.
   - Documents go to `files/<date>-<slug>-<id6>/<name>` in the data repo; items reference them in `files`. The user's review lives in `decision` and `feedback`.
   - Tool results must stay small (`MAX_READ_CHARS`); `read_file` pages through long files.
+  - `editor.js` gives Claude the Tracker Editor files (`*_editor_file(s)` tools): `editor/index.json` at the repo root lists records, the text is in `editor/files/<id>/<safeName(name)>`.
+    - Keep its record fields, `safeName` and `serializeEditorIndex` in step with the editor's `app/js/model.js`. Records keep fields the connector does not know.
+    - A save writes the text first, then the index (retried on 409/422); a rename deletes the old path. Text changes set `modifiedAt`/`modifiedBy`; name, project and tags bump `updatedAt`.
+    - Encrypted files (`encrypted: true`, or text starting with `TRACKER-EDITOR-ENCRYPTED v1`) are never returned or overwritten. Tombstones are never resurrected.
   - `router.js` serves HTTP: `/mcp`, OAuth (`oauth.js`: discovery metadata, DCR, `/authorize` with the connector password, `/token` with PKCE + refresh), and `/push/*`.
     - OAuth state is HMAC-signed with a key derived from `MCP_SECRET`; an optional `OAUTH_KV` store adds single-use codes and refresh-reuse detection.
 - Projects:

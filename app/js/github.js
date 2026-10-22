@@ -123,6 +123,12 @@ export function createGitHubClient({
       return { sha: data?.content?.sha ?? null, commit: data?.commit?.sha ?? null };
     },
 
+    async deleteFile(filePath, { sha, branch, message }) {
+      const body = { message, sha };
+      if (branch) body.branch = branch;
+      await request('DELETE', `${repoPath}/contents/${encodePath(filePath)}`, { body });
+    },
+
     // Creates `branch` from the default branch if it does not exist yet.
     async ensureBranch(branch) {
       try {

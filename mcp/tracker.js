@@ -2,6 +2,7 @@
 // file as the app (through the shared model), plus attached files stored in
 // the data repo. Every write is a commit; conflicting writes are retried.
 import { describeChanges } from '../app/js/changes.js';
+import { createEditorFiles } from './editor.js';
 import {
   addDays,
   applyPatch,
@@ -87,7 +88,7 @@ export function summarize(item) {
 
 // `onChange` receives notification events (see app/js/changes.js) after each
 // successful write; the server uses it to send push notifications.
-export function createTracker({ client, path = 'tracker.json', branch = '', filesDir = 'files', device = 'Claude', appUrl = '', now = nowIso, onChange = () => {} }) {
+export function createTracker({ client, path = 'tracker.json', branch = '', filesDir = 'files', device = 'Claude', appUrl = '', editorUrl = '', now = nowIso, onChange = () => {} }) {
   const ref = branch || undefined;
   const dir = filesDir.replace(/^\/+|\/+$/g, '') || 'files';
 
@@ -156,6 +157,18 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
   const withLink = (item) => ({ ...summarize(item), link: link(item.id) });
 
   return {
+    // Tracker Editor files, in the same repo; projects use the tracker's spelling.
+    editor: createEditorFiles({
+      client,
+      branch,
+      device,
+      editorUrl,
+      now,
+      canonicalProject: async (name) => (name ? canonical(name, await load()) : name),
+      maxReadChars: MAX_READ_CHARS,
+      maxFileBytes: MAX_FILE_BYTES,
+    }),
+
     async overview() {
       const data = await load();
       const items = live(data.items);

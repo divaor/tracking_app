@@ -28,6 +28,12 @@ Projects and tags
 - Call list_projects before your first write to reuse the exact existing project and tag spellings. If the project does not exist, create it with save_project (area work or personal; ask if unclear). New tags are created simply by using them.
 - Without such an instruction, set project only when it is obvious (e.g. an existing project named after the repo).
 
+Tracker Editor files
+- The user's text editor (Tracker Editor) keeps notes, snippets and drafts in the same repo. They are not tracker items; use the *_editor_file(s) tools.
+- "Save this to my editor" → save_editor_file with a name with extension (notes.md, query.sql…) and the COMPLETE text; project and tags as for items.
+- "Find X in my editor files", "what did I paste about Y" → search_editor_files, then read_editor_file. To change a file, read it, then save_editor_file with its id and the full new text.
+- Encrypted files cannot be read or changed here; tell the user to open them in the editor.
+
 Conventions
 - Set url to the most relevant link (Claude session, PR, artifact) when you know it.
 - Keep titles short and specific; put details in notes (Markdown, checklists with "- [ ]").
@@ -228,6 +234,69 @@ export function createTools(getTracker) {
       },
       annotations: write,
       run: run((t, a) => t.sendDocument(a)),
+    },
+    {
+      name: 'list_editor_files',
+      title: 'List Tracker Editor files',
+      description: 'Files in Tracker Editor, the user\'s text editor (notes, snippets, drafts; not tracker items), most recently changed first: name, id, project, tags, size, when and by whom, and a link that opens it in the editor.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: str('Words to match in the file name, project or tags. To search the text, use search_editor_files.'),
+          project: str('Only files in this project (case-insensitive).'),
+          tag: str('Only files with this tag.'),
+          limit: { type: 'integer', minimum: 1, maximum: 200, description: 'Default 50.' },
+        },
+      },
+      annotations: readOnly,
+      run: run((t, a) => t.editor.list(a)),
+    },
+    {
+      name: 'search_editor_files',
+      title: 'Search Tracker Editor files',
+      description: 'Search the text of the user\'s Tracker Editor files (case-insensitive), most recently changed files first. Returns matching files with line numbers and snippets; then use read_editor_file. Covers the 60 newest files and skips encrypted and very large ones; the note says when it stopped early.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: str('Text to find, e.g. a word or phrase.'),
+          limit: { type: 'integer', minimum: 1, maximum: 100, description: 'Most matching lines to return. Default 40.' },
+        },
+        required: ['query'],
+      },
+      annotations: readOnly,
+      run: run((t, a) => t.editor.search(a)),
+    },
+    {
+      name: 'read_editor_file',
+      title: 'Read a Tracker Editor file',
+      description: 'Read one Tracker Editor file by id (or its exact name). Long files come in pages: pass nextOffset from the previous result as offset. End-to-end encrypted files cannot be read here.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: str('File id from list_editor_files or search_editor_files (or the exact file name).'),
+          offset: { type: 'integer', minimum: 0, description: 'Character offset to start from. Default 0.' },
+        },
+        required: ['id'],
+      },
+      annotations: readOnly,
+      run: run((t, a) => t.editor.read(a.id, a.offset)),
+    },
+    {
+      name: 'save_editor_file',
+      title: 'Save a Tracker Editor file',
+      description: 'Save text to Tracker Editor. Without id it creates a file (name and content required). With id it changes that file: content replaces its whole text; name renames it; project and tags replace its project and tags. It syncs to the editor on the user\'s devices. Encrypted files are never changed.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          id: str('Existing file to change. Omit to create a new file.'),
+          name: str('File name with extension, e.g. notes.md, query.sql. Required for a new file; renames an existing one.'),
+          content: str('The COMPLETE text of the file (not a summary or a diff). Optional when only renaming or changing project/tags.'),
+          project: { ...ITEM_FIELDS.project, description: 'Project name, shared with the tracker (see list_projects); matching is case-insensitive. "" for none.' },
+          tags: tagsSchema,
+        },
+      },
+      annotations: { ...write, idempotentHint: true },
+      run: run((t, a) => t.editor.save(a)),
     },
   ];
 }
