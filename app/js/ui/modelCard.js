@@ -1,9 +1,9 @@
 import { html, useEffect, useState } from '../../vendor/preact-htm.js';
 import { createAsyncLlmClient, parseProfile, PLACEHOLDERS, PROFILE_EXAMPLE } from '../asyncLlm.js';
-import { llmClient } from '../assistant.js';
 import { DICTATION_LANGUAGES, dictationSupported } from './dictation.js';
 import { DEFAULT_LLM_URL } from '../llm.js';
 import { localFetch } from '../localFetch.js';
+import { API_PROVIDERS, connectionOf, createModelClient, keySecret, providerOf } from '../providers.js';
 import { getSecret, getSettings, saveSettings, setSecret } from '../settings.js';
 import { Segmented } from './components.js';
 import { Icon } from './icons.js';
@@ -38,34 +38,52 @@ const PRESETS = [
   { id: 'lmstudio', label: 'LM Studio', url: 'http://localhost:1234/v1' },
 ];
 
-const PROVIDERS = [
-  { id: 'openai', label: 'OpenAI-compatible server' },
-  { id: 'async', label: 'Service that answers later' },
+const CONNECTIONS = [
+  { id: 'local', label: 'This computer' },
+  { id: 'api', label: 'AI provider' },
+  { id: 'async', label: 'Answers later' },
 ];
 
-/** The model, set up as in Tracker Editor: a server on this computer, or a service that answers later. */
+/** The model, set up as in Tracker Editor: a server on this computer, an AI provider with your key, or a service that answers later. */
 export function ModelCard({ actions }) {
   const settings = getSettings();
-  const [provider, setProvider] = useState(settings.llm.provider || 'openai');
+  const [connection, setConnection] = useState(connectionOf(settings.llm));
   return html`<${Card} title="Model" icon="sparkle" id="model">
     <p>With a model connected, quick add understands plain language (“call Ana tomorrow about the invoice, urgent”), each item gets <strong>Ask the model about this</strong> (summarize, break into steps, draft your review of a document, risks, translate, or any question), and the Overview can plan your day or review your week.</p>
     <div class="field span-2"><span>Connection</span>
-      <${Segmented} options=${PROVIDERS} value=${provider} onChange=${setProvider} label="Connection" />
+      <${Segmented} options=${CONNECTIONS} value=${connection} onChange=${setConnection} label="Connection" />
     </div>
-    ${provider === 'async' ? html`<${AsyncModelForm} actions=${actions} />` : html`<${OpenAiModelForm} actions=${actions} />`}
+    ${connection === 'async' ? html`<${AsyncModelForm} actions=${actions} />` : connection === 'api' ? html`<${ApiModelForm} actions=${actions} />` : html`<${OpenAiModelForm} actions=${actions} />`}
   </${Card}>`;
 }
 
+/** Whether a key is saved for a connection (the field then says so instead of showing it). */
+function useSavedKey(service) {
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    let current = true;
+    getSecret(keySecret(service)).then((k) => current && setSaved(Boolean(k)), () => {});
+    return () => {
+      current = false;
+    };
+  }, [service]);
+  return [saved, setSaved];
+}
+
+// A model server on this computer (Ollama, LM Studio…): the OpenAI API at localhost.
 function OpenAiModelForm({ actions }) {
   const { llm } = getSettings();
-  const [form, setForm] = useState(llm);
+  const [form, setForm] = useState(() => ({ ...llm, ...(connectionOf(llm) === 'local' ? {} : { baseUrl: DEFAULT_LLM_URL, chatModel: '' }) }));
+  const [key, setKey] = useState('');
+  const [savedKey, setSavedKey] = useSavedKey('local');
   const [models, setModels] = useState(null);
   const [check, setCheck] = useState(null);
   const set = (patch) => setForm({ ...form, ...patch });
+  const target = { ...form, provider: 'openai', service: 'local' };
   const test = async () => {
     setCheck({ state: 'busy', text: 'Connecting…' });
     try {
-      const list = (await llmClient({ llm: { ...form, provider: 'openai' } }).listModels()).filter((m) => !/embed|bge|e5|minilm|nomic/i.test(m));
+      const list = (await createModelClient(target, { getSecret, fetchImpl: localFetch, apiKey: key.trim() }).listModels()).filter((m) => !/embed|bge|e5|minilm|nomic/i.test(m));
       setModels(list);
       setForm((f) => ({ ...f, chatModel: f.chatModel || list[0] || '' }));
       setCheck({ state: 'ok', text: list.length ? `Connected. ${list.length} model${list.length === 1 ? '' : 's'} available.` : 'Connected, but no models are downloaded yet (for Ollama: ollama pull llama3.2).' });
@@ -73,8 +91,13 @@ function OpenAiModelForm({ actions }) {
       setCheck({ state: 'error', text: err.message });
     }
   };
-  const save = () => {
-    saveSettings({ llm: { ...form, provider: 'openai', webhook: llm.webhook, enabled: true } });
+  const save = async () => {
+    if (key.trim()) {
+      await setSecret(keySecret('local'), key.trim());
+      setSavedKey(true);
+      setKey('');
+    }
+    saveSettings({ llm: { ...target, apiKey: '', webhook: llm.webhook, enabled: true } });
     actions.toast('Model saved and turned on.');
   };
   const options = [...new Set([form.chatModel, ...(models ?? [])].filter(Boolean))];
@@ -93,11 +116,13 @@ function OpenAiModelForm({ actions }) {
           ? html`<select value=${form.chatModel} onChange=${(e) => set({ chatModel: e.currentTarget.value })}><option value="">Choose…</option>${options.map((m) => html`<option key=${m} value=${m}>${m}</option>`)}</select>`
           : html`<input value=${form.chatModel} onInput=${(e) => set({ chatModel: e.currentTarget.value })} placeholder="llama3.2" spellcheck=${false} />`}
       </${Field}>
-      <${Field} label="API key" hint="Only if your server needs one"><input type="password" value=${form.apiKey} onInput=${(e) => set({ apiKey: e.currentTarget.value })} autocomplete="off" /></${Field}>
+      <${Field} label="API key" hint="Only if your server needs one. Kept on this device, never in the settings.">
+        <input type="password" value=${key} onInput=${(e) => setKey(e.currentTarget.value)} autocomplete="off" placeholder=${savedKey ? 'Saved on this device (type to replace)' : ''} />
+      </${Field}>
       <div class="form-actions span-2">
         <button type="button" class="btn primary" disabled=${!form.chatModel} onClick=${save}>Save and turn on</button>
         <button type="button" class="btn" onClick=${test}>Test and list models</button>
-        ${llm.enabled && llm.provider !== 'async' && html`<button type="button" class="btn ghost" onClick=${() => saveSettings({ llm: { enabled: false } })}>Turn off</button>`}
+        ${llm.enabled && connectionOf(llm) === 'local' && html`<button type="button" class="btn ghost" onClick=${() => saveSettings({ llm: { enabled: false } })}>Turn off</button>`}
       </div>
       <${Notice} check=${check} />
     </div>
@@ -109,6 +134,86 @@ function OpenAiModelForm({ actions }) {
         ${!window.desktop && html`<li>In the browser, Ollama must also allow this site: set <code>OLLAMA_ORIGINS=${location.origin}</code> and restart it. The desktop app needs none of this.</li>`}
       </ol>
     </details>`;
+}
+
+// An AI provider reached with your own API key (providers.js): Claude through its SDK, the
+// others through their OpenAI-compatible API. The key stays on this device.
+function ApiModelForm({ actions }) {
+  const { llm } = getSettings();
+  const mine = connectionOf(llm) === 'api';
+  const current = llm.provider === 'anthropic' ? 'anthropic' : llm.service;
+  const [service, setService] = useState(mine ? current : 'anthropic');
+  const provider = providerOf(service) ?? API_PROVIDERS[0];
+  const fresh = (p) => ({ baseUrl: p.baseUrl ?? '', chatModel: p.model ?? '' });
+  const [form, setForm] = useState(() => (mine ? { ...llm } : fresh(provider)));
+  const [key, setKey] = useState('');
+  const [savedKey, setSavedKey] = useSavedKey(service);
+  const [models, setModels] = useState(null);
+  const [check, setCheck] = useState(null);
+  const set = (patch) => setForm({ ...form, ...patch });
+  const claude = provider.kind === 'anthropic';
+  const choose = (id) => {
+    setService(id);
+    setForm(mine && current === id ? { ...llm } : fresh(providerOf(id)));
+    setModels(null);
+    setCheck(null);
+    setKey('');
+  };
+  const target = { ...form, provider: claude ? 'anthropic' : 'openai', service, baseUrl: claude ? '' : provider.id === 'custom' ? form.baseUrl : provider.baseUrl };
+  const test = async () => {
+    setCheck({ state: 'busy', text: 'Connecting…' });
+    try {
+      const list = (await createModelClient(target, { getSecret, fetchImpl: localFetch, apiKey: key.trim() }).listModels()).filter((m) => !/embed/i.test(m));
+      setModels(list);
+      setForm((f) => ({ ...f, chatModel: f.chatModel || list[0] || '' }));
+      setCheck({ state: 'ok', text: `Connected to ${provider.label}. ${list.length} model${list.length === 1 ? '' : 's'} available.` });
+    } catch (err) {
+      setCheck({ state: 'error', text: err.message });
+    }
+  };
+  const save = async () => {
+    if (key.trim()) {
+      await setSecret(keySecret(service), key.trim());
+      setSavedKey(true);
+      setKey('');
+    } else if (!savedKey) return setCheck({ state: 'error', text: `Paste your ${provider.label} API key first.` });
+    saveSettings({ llm: { ...target, apiKey: '', webhook: llm.webhook, enabled: true } });
+    actions.toast(`${provider.label} saved and turned on.`);
+  };
+  const forget = async () => {
+    await setSecret(keySecret(service), '');
+    setSavedKey(false);
+    if (mine && llm.enabled) saveSettings({ llm: { enabled: false } });
+    actions.toast('The key is gone from this device.');
+  };
+  const options = [...new Set([form.chatModel, ...(models ?? [])].filter(Boolean))];
+  return html`
+    <p class="muted">Use a model at an AI provider with your own API key: Claude, OpenAI, Gemini, OpenRouter (many models with one key), Mistral, Groq or another service with an OpenAI-compatible API. What you ask about is sent to that provider, and it bills your account for what you use. The key is kept on this device (the keychain in the desktop app, this browser's storage on the web and on phones), never synced or put in the settings.</p>
+    <div class="field-grid">
+      <${Field} label="Provider">
+        <select value=${service} onChange=${(e) => choose(e.currentTarget.value)} aria-label="Provider">${API_PROVIDERS.map((p) => html`<option key=${p.id} value=${p.id}>${p.label}</option>`)}</select>
+      </${Field}>
+      <${Field} label="API key" hint=${html`${provider.keyUrl ? html`<a href=${provider.keyUrl} target="_blank" rel="noopener">Get a key</a>. ` : ''}Stays on this device.`}>
+        <input type="password" value=${key} onInput=${(e) => setKey(e.currentTarget.value)} autocomplete="off" placeholder=${savedKey ? 'Saved on this device (type to replace)' : 'Paste it here'} />
+      </${Field}>
+      ${provider.id === 'custom' && html`<${Field} label="Address" wide hint="The API's base address, ending before /chat/completions, e.g. https://api.example.com/v1"><input value=${form.baseUrl} onInput=${(e) => set({ baseUrl: e.currentTarget.value })} placeholder="https://…/v1" spellcheck=${false} /></${Field}>`}
+      <${Field} label="Chat model" hint=${claude ? 'e.g. claude-opus-5-5, or claude-haiku-5-5 for faster, cheaper answers' : 'Press Test and list models to pick one'}>
+        ${models
+          ? html`<select value=${form.chatModel} onChange=${(e) => set({ chatModel: e.currentTarget.value })}><option value="">Choose…</option>${options.map((m) => html`<option key=${m} value=${m}>${m}</option>`)}</select>`
+          : html`<input value=${form.chatModel} onInput=${(e) => set({ chatModel: e.currentTarget.value })} placeholder=${claude ? 'claude-opus-5-5' : ''} spellcheck=${false} />`}
+      </${Field}>
+      <div class="form-actions span-2">
+        <button type="button" class="btn primary" disabled=${!form.chatModel || (provider.id === 'custom' && !form.baseUrl)} onClick=${save}>Save and turn on</button>
+        <button type="button" class="btn" disabled=${!key.trim() && !savedKey} onClick=${test}>Test and list models</button>
+        ${savedKey && html`<button type="button" class="btn ghost" onClick=${forget}>Forget the key</button>`}
+        ${llm.enabled && mine && html`<button type="button" class="btn ghost" onClick=${() => saveSettings({ llm: { enabled: false } })}>Turn off</button>`}
+      </div>
+      <${Notice} check=${check} />
+    </div>
+    ${claude &&
+    html`<details class="help"><summary>Claude: an API key, not your Claude subscription</summary>
+      <p>The Claude API is paid per use with a key from the <a href="https://platform.claude.com/" target="_blank" rel="noopener">Claude Console</a>. A Claude Pro or Max subscription cannot be connected here: Anthropic allows its sign-in only in its own apps. To use your subscription with the tracker, add the Tracker connector in the Claude app (Settings → Connectors): Claude can then read, add and update your items from its own app, on your phone too.</p>
+    </details>`}`;
 }
 
 // A model service that takes a request, answers with a task id, and gives the

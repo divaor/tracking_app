@@ -1,8 +1,9 @@
 // Copied from Tracker Editor (github.com/divaor/tracker-editor, app/js/llm.js); keep the two in step.
-// Client for a local model server with an OpenAI-compatible API: Ollama
-// (http://localhost:11434/v1), LM Studio (http://localhost:1234/v1),
-// llama.cpp, Jan and others. On desktop the app passes a fetch that goes
-// through the Electron main process, so no CORS settings are needed.
+// Client for a model server with an OpenAI-compatible API: on this computer
+// (Ollama at http://localhost:11434/v1, LM Studio at http://localhost:1234/v1,
+// llama.cpp, Jan…) or at an AI provider (OpenAI, Gemini, OpenRouter, Mistral,
+// Groq…; Claude has its own client, claude.js). On desktop the app passes a fetch
+// that goes through the Electron main process, so no CORS settings are needed.
 
 export class LlmError extends Error {
   constructor(message, status = 0) {
@@ -14,19 +15,22 @@ export class LlmError extends Error {
 
 export const DEFAULT_LLM_URL = 'http://localhost:11434/v1';
 
+/** `apiKey` is the key, or an async function returning it (read for each request). */
 export function createLlmClient({ baseUrl = DEFAULT_LLM_URL, apiKey = '', fetchImpl = globalThis.fetch?.bind(globalThis) }) {
   const base = baseUrl.replace(/\/+$/, '');
 
   async function call(path, body, signal) {
     const headers = { Accept: body?.stream ? 'text/event-stream' : 'application/json' };
     if (body) headers['Content-Type'] = 'application/json';
-    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    const key = typeof apiKey === 'function' ? await apiKey() : apiKey;
+    if (key) headers.Authorization = `Bearer ${key}`;
     let res;
     try {
       res = await fetchImpl(`${base}${path}`, { method: body ? 'POST' : 'GET', headers, body: body ? JSON.stringify(body) : undefined, signal });
     } catch (err) {
       if (err?.name === 'AbortError') throw err;
-      throw new LlmError(`Could not reach the model server at ${base}. Is Ollama or LM Studio running?`);
+      const local = /^https?:\/\/(localhost|127\.|\[::1\])/.test(base);
+      throw new LlmError(local ? `Could not reach the model server at ${base}. Is Ollama or LM Studio running?` : `Could not reach ${base}. Check the connection (in a browser, some providers do not accept requests from web pages: use the desktop app).`);
     }
     if (!res.ok) {
       let detail = '';
@@ -36,7 +40,7 @@ export function createLlmClient({ baseUrl = DEFAULT_LLM_URL, apiKey = '', fetchI
       } catch {
         // not JSON
       }
-      const hint = res.status === 404 ? ' Check the model name and that it is downloaded (for Ollama: ollama pull <model>).' : '';
+      const hint = res.status === 404 ? ' Check the model name and that it is downloaded (for Ollama: ollama pull <model>).' : res.status === 401 ? ' Check the API key.' : '';
       throw new LlmError(`The model server answered ${res.status}${detail ? `: ${detail}` : ''}.${hint}`, res.status);
     }
     return res;

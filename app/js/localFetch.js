@@ -1,5 +1,5 @@
 // Copied from Tracker Editor (github.com/divaor/tracker-editor, app/js/localFetch.js); keep the two in step.
-// fetch() for servers on this computer (the local model, a speech server). In
+// fetch() for model and speech servers (on this computer, or an AI provider). In
 // the desktop app it goes through the main process, so Ollama, LM Studio or
 // Kokoro need no CORS setup; in the browser it is plain fetch().
 
@@ -18,7 +18,9 @@ function desktopFetch(url, init = {}) {
     if (done || error) off();
   });
   init.signal?.addEventListener('abort', () => bridge.abort(id));
-  return bridge.request(id, url, { method: init.method ?? 'GET', headers: init.headers ?? {}, body: init.body ?? null }).then(
+  // Plain values only cross to the main process (a Headers object does not).
+  const headers = Object.fromEntries(new Headers(init.headers ?? {}).entries());
+  return bridge.request(id, url, { method: init.method ?? 'GET', headers, body: init.body ?? null }).then(
     // 204 and the like may not have a body.
     (meta) => new Response([101, 204, 205, 304].includes(meta.status) ? null : stream, { status: meta.status, statusText: meta.statusText, headers: meta.headers }),
     (err) => {

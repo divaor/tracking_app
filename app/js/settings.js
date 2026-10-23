@@ -1,6 +1,7 @@
 // User preferences (synchronous, localStorage) and the GitHub token (kept in
 // the OS keychain via Electron's safeStorage on desktop, localStorage on web).
 import { DEFAULT_LLM_URL } from './llm.js';
+import { keySecret, LLM_KEY_SECRETS } from './providers.js';
 
 const KEY = 'tracker.settings.v1';
 const TOKEN_KEY = 'tracker.token';
@@ -42,6 +43,8 @@ export const DEFAULT_SETTINGS = {
     provider: 'openai',
     baseUrl: DEFAULT_LLM_URL,
     chatModel: '',
+    // Which connection (providers.js): 'local' (a server on this computer) or an AI provider's id.
+    service: 'local',
     apiKey: '',
     profile: '',
     webhook: { enabled: false, port: 8766, path: '/llm-webhook', publicUrl: '' },
@@ -109,8 +112,9 @@ export async function setToken(value) {
   tokenCache = token;
 }
 
-// Other secrets (the model service's API key and webhook secret), kept like the token.
-export const SECRET_NAMES = ['llm-api-key', 'llm-webhook-secret'];
+// Other secrets (the model service's API key and webhook secret, the API key of each model
+// connection: providers.js), kept like the token.
+export const SECRET_NAMES = ['llm-api-key', 'llm-webhook-secret', ...LLM_KEY_SECRETS];
 const secretCache = new Map();
 
 export async function getSecret(name) {
@@ -135,4 +139,14 @@ export async function setSecret(name, value) {
   else if (v) localStorage.setItem(`${TOKEN_KEY}:${name}`, v);
   else localStorage.removeItem(`${TOKEN_KEY}:${name}`);
   secretCache.set(name, v);
+}
+
+// Before, a local model server's API key was kept in the settings; it moves to the secrets
+// (the keychain on desktop), and the settings forget it.
+if (settings.llm.apiKey) {
+  const key = settings.llm.apiKey;
+  setSecret(keySecret('local'), key).then(
+    () => saveSettings({ llm: { apiKey: '' } }),
+    () => {},
+  );
 }

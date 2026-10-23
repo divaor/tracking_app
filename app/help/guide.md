@@ -126,10 +126,12 @@ Open **Projects → Manage** in the sidebar. There you can add projects, set eac
 
 ## 9. The model (optional)
 
-Connect a model of your own in **Settings → Model**, the same kind as in Tracker Editor:
+Connect a model of your own in **Settings → Model**, the same kinds as in Tracker Editor:
 
-- **A server on your computer** (Ollama, LM Studio or anything with an OpenAI-compatible API): press **Ollama**, then **Test and list models**, pick one and **Save and turn on**. Nothing leaves your machine. The desktop app makes the requests itself, so the server needs no setup; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS=https://divaor.github.io`).
-- **A service that answers later:** paste its connection profile (the same JSON as in Tracker Editor; **Start from the example** shows the shape), the model or agent name and the API key, which the desktop app keeps in the system keychain. The desktop app can also receive answers by webhook (use a different port from Tracker Editor's).
+- **A server on your computer** (**This computer**: Ollama, LM Studio or anything with an OpenAI-compatible API): press **Ollama**, then **Test and list models**, pick one and **Save and turn on**. Nothing leaves your machine. The desktop app makes the requests itself, so the server needs no setup; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS=https://divaor.github.io`).
+- **An AI provider with your own API key** (**AI provider**): **Claude**, OpenAI, Google Gemini, OpenRouter (many models with one key), Mistral, Groq, or another service with an OpenAI-compatible API. Pick the provider, paste your key (**Get a key** opens the provider's page), press **Test and list models**, pick a model and **Save and turn on**. What you ask about is sent to that provider, which bills your account for what you use. The key stays on the device: the keychain in the desktop app, the browser's storage on the web and on your phone; it is never synced or put in the settings (**Forget the key** removes it). Each device needs the key once. Works on the phone too.
+- **Your Claude subscription (Pro or Max) cannot be connected here**: Anthropic allows its sign-in only in its own apps, and the API is paid separately with a key from the [Claude Console](https://platform.claude.com/). To use your subscription with the tracker, add the Tracker connector in the Claude app (section 11): Claude can then read, add and update your items from its own app, on your phone too.
+- **A service that answers later** (**Answers later**): paste its connection profile (the same JSON as in Tracker Editor; **Start from the example** shows the shape), the model or agent name and the API key, which the desktop app keeps in the system keychain. The desktop app can also receive answers by webhook (use a different port from Tracker Editor's).
 
 With a model on:
 
@@ -226,7 +228,7 @@ On a Mac, use **Cmd** for **Ctrl**.
 | Claude says the connector isn't available | Turn Tracker on under **+ → Connectors** in that chat. If it asks you to sign in again, enter the connector password. |
 | Remove Claude's access everywhere | Change the connector's `MCP_SECRET` and deploy it again. Every Claude sign-in and phone notification subscription stops working until you connect again. |
 | The quick add shortcut does nothing | Another app may own the keys: Settings → Quick add says so. Pick other keys. |
-| The model doesn't answer | Settings → Model → **Test and list models**. A local server must be running; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS`). |
+| The model doesn't answer | Settings → Model → **Test and list models**. A local server must be running; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS`). With an AI provider: check the key and that the account has credit; a provider that refuses requests from web pages works from the desktop app. |
 | The phone app shows an old version | Close it completely and open it again while online. It updates itself on the next start. |
 
 ## 17. Updates and releases

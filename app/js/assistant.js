@@ -3,14 +3,14 @@
 // checking of replies are in assist.js.
 import { itemMessages, parseQuickAddReply, planMessages, quickAddMessages } from './assist.js';
 import { asyncClient } from './asyncConnection.js';
-import { createLlmClient } from './llm.js';
 import { localFetch } from './localFetch.js';
-import { getSettings } from './settings.js';
+import { createModelClient } from './providers.js';
+import { getSecret, getSettings } from './settings.js';
 
-/** A client for the model in Settings: an OpenAI-compatible server, or a service that answers later. */
+/** A client for the model in Settings: a server on this computer, an AI provider (Claude…), or a service that answers later. */
 export function llmClient(settings = getSettings()) {
   if (settings.llm.provider === 'async') return asyncClient(settings);
-  return createLlmClient({ baseUrl: settings.llm.baseUrl, apiKey: settings.llm.apiKey, fetchImpl: localFetch });
+  return createModelClient(settings.llm, { getSecret, fetchImpl: localFetch });
 }
 
 /** Whether a model is connected and turned on. */

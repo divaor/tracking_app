@@ -14,7 +14,8 @@ const { pathToFileURL } = require('node:url');
 const APP_DIR = path.join(__dirname, '..', 'app');
 const APP_ORIGIN = 'app://tracker';
 const REPO_URL = 'https://github.com/divaor/tracking_app';
-const SECRET_KEYS = new Set(['github-token', 'llm-api-key', 'llm-webhook-secret']);
+// The model connections' keys are providers.js's LLM_KEY_SECRETS (test/providers.test.js checks the list).
+const SECRET_KEYS = new Set(['github-token', 'llm-api-key', 'llm-webhook-secret', 'llm-key-local', 'llm-key-anthropic', 'llm-key-openai', 'llm-key-gemini', 'llm-key-openrouter', 'llm-key-mistral', 'llm-key-groq', 'llm-key-custom']);
 // Tracker Editor's desktop app opens tracker-editor:// links.
 const EDITOR_SCHEME = 'tracker-editor:';
 
