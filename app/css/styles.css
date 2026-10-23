@@ -422,6 +422,7 @@ select {
   font-size: 12px;
   font-weight: 500;
   line-height: 20px;
+  white-space: nowrap;
 }
 
 button.tag:hover {
@@ -1142,6 +1143,32 @@ button.tag:hover {
 
 .row .item-meta {
   margin-top: 1px;
+}
+
+/* The review decision and priority: on the right, or under the title when the list is narrow
+   (a phone), so they never squeeze the title and tags into a sliver. */
+.row-badges {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+}
+
+.rows {
+  container-type: inline-size;
+}
+
+@container (max-width: 560px) {
+  .row {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    column-gap: 12px;
+    row-gap: 3px;
+  }
+
+  .row-badges {
+    grid-column: 3;
+  }
 }
 
 .empty {

@@ -117,8 +117,8 @@ export function ItemRow({ item, onOpen, onStatus, today }) {
       <div class="row-title">${item.title || 'Untitled'}</div>
       <${ItemMeta} item=${item} today=${today} />
     </div>
-    <${DecisionBadge} decision=${item.decision} />
-    <${PriorityMark} priority=${item.priority} />
+    ${(item.decision || item.priority === 'high' || item.priority === 'urgent') &&
+    html`<span class="row-badges"><${DecisionBadge} decision=${item.decision} /><${PriorityMark} priority=${item.priority} /></span>`}
   </div>`;
 }
 
