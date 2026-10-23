@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createAsyncLlmClient, fillTemplate, formatSources, getPath, parseProfile, PROFILE_EXAMPLE, promptFromMessages } from '../app/js/asyncLlm.js';
+import { createLlmClient } from '../app/js/llm.js';
 
 test('templates keep types, drop empty keys and fill strings', () => {
   const values = { task_id: 42, rev: '', prompt: 'Hi "there"', date: '2026-10-22', model: 'docs kb' };
@@ -130,4 +131,16 @@ test('stopping ends the wait', async () => {
   const pending = createAsyncLlmClient({ profile, fetchImpl: service.fetchImpl }).chat({ messages: [{ role: 'user', content: 'x' }], signal: controller.signal });
   setTimeout(() => controller.abort(), 30);
   await assert.rejects(pending, /Stopped|abort/i);
+});
+
+test('the model server completes text, with what follows the cursor', async () => {
+  const service = fakeService(() => [200, { choices: [{ text: 'b) {\n  return a + b;' }] }]);
+  const client = createLlmClient({ baseUrl: 'http://localhost:11434/v1/', fetchImpl: service.fetchImpl });
+  const text = await client.complete({ model: 'coder', prompt: 'function add(a, ', suffix: '\n}', maxTokens: 64, stop: ['\n\n'] });
+  assert.equal(text, 'b) {\n  return a + b;');
+  assert.equal(service.calls[0].url, 'http://localhost:11434/v1/completions');
+  assert.deepEqual(service.calls[0].body, { model: 'coder', prompt: 'function add(a, ', suffix: '\n}', max_tokens: 64, temperature: 0.2, stream: false, stop: ['\n\n'] });
+  // A server without the endpoint says so with its status.
+  const missing = fakeService(() => [404, { error: { message: 'not found' } }]);
+  await assert.rejects(createLlmClient({ baseUrl: 'http://x.test/v1', fetchImpl: missing.fetchImpl }).complete({ model: 'm', prompt: 'x' }), (err) => err.status === 404);
 });

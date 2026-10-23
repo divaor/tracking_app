@@ -89,6 +89,19 @@ export function createLlmClient({ baseUrl = DEFAULT_LLM_URL, apiKey = '', fetchI
       return full;
     },
 
+    /**
+     * Text that continues `prompt` (the legacy /completions endpoint, not streamed), for
+     * suggestions as you type. `suffix` is the text after the cursor: models that fill in the
+     * middle (FIM) use it, others ignore it.
+     */
+    async complete({ model, prompt, suffix = '', maxTokens = 128, temperature = 0.2, stop, signal }) {
+      const body = { model, prompt, max_tokens: maxTokens, temperature, stream: false };
+      if (suffix) body.suffix = suffix;
+      if (stop?.length) body.stop = stop;
+      const data = await (await call('/completions', body, signal)).json();
+      return data?.choices?.[0]?.text ?? '';
+    },
+
     /** One vector per input text. */
     async embed({ model, input, signal }) {
       const data = await (await call('/embeddings', { model, input }, signal)).json();
