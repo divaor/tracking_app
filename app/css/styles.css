@@ -260,6 +260,8 @@ kbd {
   background: none;
   color: var(--accent);
   font-weight: 600;
+  white-space: normal;
+  text-align: left;
 }
 
 .btn.link:hover {
