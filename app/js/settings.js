@@ -16,6 +16,9 @@ function defaultDevice() {
 }
 
 export const DEFAULT_SETTINGS = {
+  // Where the data is kept: 'local' (this computer: a data folder Tracker Editor shares on desktop,
+  // the browser's storage on the web; no GitHub) or 'github' (the data repo, synced across devices).
+  storage: 'local',
   owner: '',
   repo: '',
   branch: '',
@@ -59,6 +62,8 @@ let settings = { ...DEFAULT_SETTINGS };
 try {
   const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}');
   settings = { ...DEFAULT_SETTINGS, ...saved, llm: { ...DEFAULT_SETTINGS.llm, ...saved.llm, webhook: { ...DEFAULT_SETTINGS.llm.webhook, ...saved.llm?.webhook } } };
+  // Installs from before local mode that sync with GitHub stay on it.
+  if (!saved.storage) settings = { ...settings, storage: saved.owner && saved.repo ? 'github' : 'local' };
 } catch {
   // keep defaults
 }
@@ -83,6 +88,8 @@ export function onSettings(fn) {
 }
 
 export const isSyncConfigured = (s = settings) => Boolean(s.owner && s.repo && s.path);
+/** The data stays on this device (no GitHub, nothing about syncing shown). */
+export const isLocal = (s = settings) => s.storage !== 'github';
 
 export function applyTheme(theme = settings.theme) {
   const root = document.documentElement;

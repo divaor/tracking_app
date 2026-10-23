@@ -2,7 +2,7 @@
 
 One place for your **tasks**, **ideas**, the **Claude work** you have going, and the **documents you need to read**. Each item moves from **Pending → In progress → Done** (documents: To read → Reading → Read).
 
-It runs as an **Electron desktop app** on your computers and as an **installable web app** on your phone. Everything syncs through a JSON file in a **private GitHub repository**.
+It runs as an **Electron desktop app** on your computers and as an **installable web app** on your phone. A new install keeps everything **on this computer** (shared with Tracker Editor on the same computer, no account needed); turn on sync and everything goes through a JSON file in a **private GitHub repository**, copied there first so nothing is lost.
 
 <img src="docs/board.png" alt="Board view on desktop" width="640"> <img src="docs/phone.png" alt="Overview on a phone in dark mode" width="180">
 

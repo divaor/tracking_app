@@ -3148,3 +3148,10 @@ button.help-command:focus-visible {
     columns: 2;
   }
 }
+
+/* Settings → Where your data is: the GitHub part of the card. */
+.card-subtitle {
+  margin: 16px 0 4px;
+  font-size: 14px;
+  font-weight: 650;
+}

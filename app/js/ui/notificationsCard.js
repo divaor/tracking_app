@@ -12,7 +12,7 @@ import {
   sendTestPush,
   updatePushEvents,
 } from '../push.js';
-import { getSettings, isSyncConfigured, saveSettings } from '../settings.js';
+import { getSettings, isLocal, isSyncConfigured, saveSettings } from '../settings.js';
 import { Icon } from './icons.js';
 
 const eventsFrom = (prefs) => NOTIFY_EVENTS.map((e) => e.id).filter((id) => prefs[id]);
@@ -122,7 +122,7 @@ function PushNotifications({ prefs, setPrefs, actions }) {
 
   return html`
     <p class="muted">Get a notification on this device when Claude sends a document for review, stores a file, or adds or updates items, even when the app is closed. The Claude connector sends them.</p>
-    ${!isSyncConfigured() && html`<p class="notice warn"><${Icon} name="alert" size=${16} />Set up GitHub sync first.</p>`}
+    ${!isSyncConfigured() && html`<p class="notice warn"><${Icon} name="alert" size=${16} />${isLocal() ? 'Phone notifications come through the Claude connector, which works with GitHub sync: set it up first (Settings → Where your data is).' : 'Set up GitHub sync first.'}</p>`}
     <label class="field">
       <span>Connector address</span>
       <input value=${connectorUrl} onInput=${(e) => setConnectorUrl(e.currentTarget.value)} onBlur=${() => saveSettings({ connectorUrl: normalizeConnectorUrl(connectorUrl) })}

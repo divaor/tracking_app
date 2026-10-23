@@ -1,3 +1,4 @@
+import { isLocal } from '../settings.js';
 import { html, useState } from '../../vendor/preact-htm.js';
 import { addDays, SORTS, sortItems, STATUSES, statusLabel, TYPES } from '../model.js';
 import { formatLongToday, greeting } from '../format.js';
@@ -33,7 +34,7 @@ function Welcome({ actions }) {
       <strong> Pending</strong> to <strong>In progress</strong> to <strong>Done</strong>.
     </p>
     <p>
-      Everything is saved on this device straight away. Connect a private GitHub repository in Settings to keep your phone and other computers in sync.
+      Everything is saved on this device straight away${isLocal() ? ', and Tracker Editor on this computer works with it.' : '. Connect a private GitHub repository in Settings to keep your phone and other computers in sync.'}
     </p>
     <div class="welcome-actions">
       <button class="btn primary" onClick=${() => actions.newItem({ type: 'task' })}><${Icon} name="task" />Add a task</button>

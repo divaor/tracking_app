@@ -46,3 +46,8 @@ test('while searching, label matches come first, and their group with them', () 
   assert.equal(findCommands('new')[0].id, 'new-item');
   assert.deepEqual(groupsOf(findCommands(''), false), COMMAND_GROUPS);
 });
+
+test('local mode (no GitHub): nothing about syncing in Help', () => {
+  assert.ok(!findCommands('', { local: true }).some((c) => c.id === 'sync'));
+  assert.ok(findCommands('', {}).some((c) => c.id === 'sync'));
+});

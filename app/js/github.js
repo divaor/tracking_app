@@ -90,9 +90,38 @@ export function createGitHubClient({
     return data;
   }
 
-  return {
+  const client = {
     getRepo() {
       return request('GET', repoPath);
+    },
+
+    /** Commit sha at the tip of a branch, or null when the branch (or the whole repo) is empty. */
+    async getBranchHead(branch) {
+      try {
+        const ref = await request('GET', `${repoPath}/git/ref/heads/${encodePath(branch)}`);
+        return ref?.object?.sha ?? null;
+      } catch (err) {
+        if (err.status === 404 || err.status === 409) return null;
+        throw err;
+      }
+    },
+
+    async getCommitTree(commitSha) {
+      const commit = await request('GET', `${repoPath}/git/commits/${commitSha}`);
+      return commit.tree.sha;
+    },
+
+    /** Every file at a ref (a branch, a commit, or nothing: the default branch): [{ path, sha }]; empty for an empty repo. */
+    async listTree(ref) {
+      const commit = (await client.getBranchHead(ref || (await client.getRepo()).default_branch)) ?? (ref || null);
+      if (!commit) return [];
+      const tree = await request('GET', `${repoPath}/git/trees/${await client.getCommitTree(commit)}`, { query: { recursive: '1' } });
+      return (tree?.tree ?? []).filter((e) => e.type === 'blob').map((e) => ({ path: e.path, sha: e.sha }));
+    },
+
+    async getBlobText(sha) {
+      const blob = await request('GET', `${repoPath}/git/blobs/${sha}`);
+      return blob.encoding === 'base64' ? decodeBase64(blob.content ?? '') : (blob.content ?? '');
     },
 
     // Returns { sha, text } or null when the file (or branch) does not exist.
@@ -152,4 +181,5 @@ export function createGitHubClient({
       return true;
     },
   };
+  return client;
 }

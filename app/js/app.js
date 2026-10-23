@@ -14,10 +14,10 @@ import {
   typeInfo,
 } from './model.js';
 import { store } from './store.js';
-import { getSettings, isSyncConfigured, onSettings, saveSettings } from './settings.js';
+import { getSettings, isLocal, isSyncConfigured, onSettings, saveSettings } from './settings.js';
 import { appendToNotes, refinement } from './assist.js';
 import { modelReady, readQuickAdd } from './assistant.js';
-import { getSyncState, onSyncState, syncNow } from './syncManager.js';
+import { getSyncState, movedTo, onSyncState, syncNow } from './syncManager.js';
 import { setNotificationHandlers } from './notifier.js';
 import { Icon } from './ui/icons.js';
 import { ProjectsContext, SyncBadge, Toasts } from './ui/components.js';
@@ -267,7 +267,7 @@ export function App() {
     syncNow().then(() => {
       if (cancelled || store.get(linkedItem)) return;
       setLinkedItem(null);
-      toast('That item is not on this device. Check that GitHub sync is set up.', { kind: 'error' });
+      toast(isLocal() ? 'That item is not on this device.' : 'That item is not on this device. Check that GitHub sync is set up.', { kind: 'error' });
     });
     return () => {
       cancelled = true;
@@ -297,6 +297,23 @@ export function App() {
   };
   const toastRef = useRef(toast);
   toastRef.current = toast;
+  // Local mode, and Tracker Editor moved the data on this device to GitHub: offer to follow it.
+  useEffect(() => {
+    movedTo().then(
+      (to) =>
+        to &&
+        toastRef.current(`Your data moved to GitHub (${to.owner}/${to.repo}). Connect here too, with the same token, to keep working on it.`, {
+          duration: 30000,
+          action: {
+            label: 'Connect',
+            run: () => {
+              saveSettings({ owner: to.owner, repo: to.repo, branch: to.branch ?? '', path: to.path || 'tracker.json' });
+              location.hash = '#/settings';
+            },
+          },
+        }),
+    );
+  }, []);
 
   const navigate = (patch) => {
     location.hash = hrefFor({ ...route, ...patch });
@@ -613,7 +630,7 @@ export function App() {
       </header>
       ${query && route.view !== 'settings' &&
       html`<div class="search-banner">Showing matches for <strong>${query}</strong><button type="button" class="btn link" onClick=${() => setQuery('')}>Clear</button></div>`}
-      ${!isSyncConfigured(settings) && items.length > 0 && route.view === 'home' &&
+      ${!isLocal(settings) && !isSyncConfigured(settings) && items.length > 0 && route.view === 'home' &&
       html`<a class="sync-hint" href="#/settings"><${Icon} name="cloudOff" size=${16} />Items are only on this device. Set up GitHub sync to use them on your phone and other computers.</a>`}
       <div class="content" ref=${contentRef}>
         ${scoped && html`<${ScopeBar} scope=${scope} projects=${projects} onChange=${setScope} />`}

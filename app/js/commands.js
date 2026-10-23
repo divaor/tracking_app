@@ -15,7 +15,7 @@ export const COMMAND_LIST = [
   { id: 'new-doc', group: 'Items', label: 'New document to read' },
   { id: 'import-docs', group: 'Items', label: 'Add Markdown files to the reading list', hint: 'Or drop them on the window' },
   { id: 'quick-add-window', group: 'Items', label: 'Quick add from any app (when turned on)', keys: 'Mod+Alt+T', only: 'desktop', hint: 'The keys you set in Settings → Quick add' },
-  { id: 'sync', group: 'Items', label: 'Sync now', desktop: 'Mod+Shift+S' },
+  { id: 'sync', group: 'Items', label: 'Sync now', desktop: 'Mod+Shift+S', local: false },
 
   { id: 'go-home', group: 'Go to', label: 'Overview' },
   { id: 'go-board', group: 'Go to', label: 'Board' },
@@ -72,8 +72,10 @@ export function keysFor(command, { mac = false, desktop = false } = {}) {
  * The commands for this place (desktop-only ones left out in the browser), matching every
  * word of `query`; while searching, the ones whose label matches come first.
  */
-export function findCommands(query = '', { desktop = false, list = COMMAND_LIST, mac = false } = {}) {
+export function findCommands(query = '', { desktop = false, list = COMMAND_LIST, mac = false, local = false } = {}) {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  // Local mode (no GitHub): nothing about syncing (`local: false` leaves a command out, a string relabels it).
+  if (local) list = list.filter((c) => c.local !== false).map((c) => (typeof c.local === 'string' ? { ...c, label: c.local } : c));
   const found = list.filter(
     (c) => (desktop || c.only !== 'desktop') && words.every((w) => `${c.label} ${c.group} ${keysFor(c, { mac, desktop })} ${c.code ?? ''} ${c.how ?? ''} ${c.hint ?? ''}`.toLowerCase().includes(w)),
   );

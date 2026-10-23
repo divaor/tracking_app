@@ -1,10 +1,11 @@
 import { html, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { createGitHubClient, decodeBase64, encodeBase64 } from '../github.js';
 import { localDate, parseData, serializeDocument } from '../model.js';
-import { getSettings, getToken, isSyncConfigured, saveSettings, setToken } from '../settings.js';
+import { getSettings, getToken, isLocal, isSyncConfigured, saveSettings, setToken } from '../settings.js';
 import { DEFAULT_EDITOR_URL } from '../editorLinks.js';
 import { store } from '../store.js';
-import { syncNow } from '../syncManager.js';
+import { switchStorage, syncNow } from '../syncManager.js';
+import { localDataInfo } from '../localData.js';
 import { formatDateTime, timeAgo } from '../format.js';
 import { APP_VERSION } from '../version.js';
 import { Icon } from './icons.js';
@@ -52,6 +53,14 @@ function Field({ label, hint, children, wide = false }) {
 }
 
 function SyncCard({ sync, actions }) {
+  const local = isLocal();
+  // Local mode: the GitHub form opens on request; where the data is kept; a move running.
+  const [githubOpen, setGithubOpen] = useState(!local || Boolean(getSettings().owner));
+  const [where, setWhere] = useState(null);
+  const [moving, setMoving] = useState('');
+  useEffect(() => {
+    localDataInfo().then(setWhere, () => setWhere({ browser: true }));
+  }, []);
   const [form, setForm] = useState(() => pick(getSettings(), SYNC_FIELDS));
   const [token, setTokenValue] = useState('');
   const [savedToken, setSavedToken] = useState('');
@@ -75,6 +84,22 @@ function SyncCard({ sync, actions }) {
 
   const save = async (e) => {
     e.preventDefault();
+    if (isLocal()) {
+      // From this computer to GitHub: everything here is copied there first, nothing is lost.
+      if (!clean.owner || !clean.repo || !token.trim()) return actions.toast('Fill in the owner, the repository and a token first', { kind: 'error' });
+      await setToken(token);
+      setSavedToken(token.trim());
+      setMoving('Copying your data to GitHub…');
+      try {
+        const moved = await switchStorage('github', { ...clean, path: clean.path || 'tracker.json' });
+        actions.toast(`Your data is on GitHub now (${clean.owner}/${clean.repo}${moved.copied ? `, ${moved.copied} files copied` : ''}). Connect Tracker Editor too, with the same token.`, { duration: 10000 });
+      } catch (err) {
+        actions.toast(`Your data stays on this computer: ${err.message}`, { kind: 'error', duration: 10000 });
+      } finally {
+        setMoving('');
+      }
+      return;
+    }
     const target = (s) => [s.owner, s.repo, s.branch, s.path].join('/');
     if (target(clean) !== target(saved)) store.markUnsynced();
     saveSettings({ ...clean, path: clean.path || 'tracker.json' });
@@ -103,12 +128,19 @@ function SyncCard({ sync, actions }) {
     }
   };
 
-  const disconnect = async () => {
-    if (!confirm('Stop syncing on this device? Your items stay here; the token is removed from this device.')) return;
-    await setToken('');
-    setTokenValue('');
-    setSavedToken('');
-    syncNow();
+  // Back to this computer: GitHub's copy comes here first; the repository keeps everything.
+  const keepHere = async () => {
+    if (!confirm('Stop syncing with GitHub? Everything is kept on this computer (what is only on GitHub is copied here first), and the repository keeps its copy.')) return;
+    setMoving('Copying your data to this computer…');
+    try {
+      await switchStorage('local');
+      setGithubOpen(false);
+      actions.toast('Your data is kept on this computer now. Tracker Editor here uses it too once it stops syncing with GitHub.', { duration: 10000 });
+    } catch (err) {
+      actions.toast(`Still syncing with GitHub: ${err.message}`, { kind: 'error', duration: 10000 });
+    } finally {
+      setMoving('');
+    }
   };
 
   const copySetup = async () => {
@@ -138,7 +170,7 @@ function SyncCard({ sync, actions }) {
     }
   };
 
-  return html`<${Card} title="Sync with GitHub" icon="cloud" id="sync">
+  const statusPart = html`
     <div class="sync-status">
       <${SyncBadge} sync=${sync} onClick=${() => syncNow()} />
       <span class="muted">
@@ -149,8 +181,9 @@ function SyncCard({ sync, actions }) {
         <${Icon} name="sync" size=${15} />Sync now
       </button>
     </div>
-    ${sync.phase === 'error' && html`<p class="notice error"><${Icon} name="alert" size=${16} />${sync.error}</p>`}
+    ${sync.phase === 'error' && html`<p class="notice error"><${Icon} name="alert" size=${16} />${sync.error}</p>`}`;
 
+  const githubPart = html`
     <form class="field-grid settings-form" onSubmit=${save}>
       <${Field} label="GitHub owner" hint="Your username or organization">
         <input value=${form.owner} onInput=${set('owner')} placeholder="your-username" autocomplete="off" autocapitalize="off" spellcheck=${false} />
@@ -175,14 +208,14 @@ function SyncCard({ sync, actions }) {
       <${Field} label="This device’s name" hint="Shown in commit messages">
         <input value=${form.device} onInput=${set('device')} placeholder="Work PC" />
       </${Field}>
-      <label class="field checkbox">
+      ${!local &&
+      html`<label class="field checkbox">
         <input type="checkbox" checked=${form.autoSync} onChange=${set('autoSync')} />
         <span>Sync automatically<small>After edits, every 5 minutes and when the app regains focus</small></span>
-      </label>
+      </label>`}
       <div class="form-actions span-2">
-        <button type="submit" class="btn primary" disabled=${!changed}>Save</button>
+        <button type="submit" class="btn primary" disabled=${(!local && !changed) || Boolean(moving)}>${local ? 'Copy my data to GitHub and sync' : 'Save'}</button>
         <button type="button" class="btn" disabled=${!clean.owner || !clean.repo || !token.trim()} onClick=${test}>Test connection</button>
-        ${savedToken && html`<button type="button" class="btn ghost danger" onClick=${disconnect}>Disconnect</button>`}
       </div>
     </form>
     ${check && html`<p class="notice ${check.state}">${check.message}</p>`}
@@ -217,7 +250,33 @@ function SyncCard({ sync, actions }) {
         <input value=${setupCode} onInput=${(e) => setSetupCode(e.currentTarget.value)} placeholder="Paste a setup code" autocomplete="off" />
         <button type="button" class="btn sm" disabled=${!setupCode.trim()} onClick=${applySetup}>Apply</button>
       </div>
-    </details>
+    </details>`;
+
+  if (local) {
+    return html`<${Card} title="Where your data is" icon="folder" id="sync">
+      <p class="muted">
+        ${where?.dir
+          ? html`Kept on this computer, in <code>${where.dir}</code>. Tracker Editor on this computer uses the same folder: your projects and documents show in both, and its Send to tracker reaches you here.`
+          : 'Kept in this browser, on this device. Tracker Editor opened in this browser (or installed from it) shares it.'}
+      </p>
+      ${where?.dir && html`<div class="form-actions"><button type="button" class="btn sm" onClick=${() => window.desktop.data.show()}><${Icon} name="folder" size=${15} />Show the folder</button></div>`}
+      ${moving && html`<p class="notice"><${Icon} name="sync" size=${16} />${moving}</p>`}
+      ${githubOpen
+        ? html`<h3 class="card-subtitle">Sync across your devices with GitHub</h3>
+            <p class="muted small">Everything here is copied to your private data repository first, so nothing is lost; then this app syncs with it (and so can your phone, other computers, Tracker Editor and the Claude connector).</p>
+            ${githubPart}`
+        : html`<div class="field-grid">
+              <${Field} label="This device’s name" hint="Shown on items changed here"><input value=${form.device} onInput=${set('device')} onChange=${() => saveSettings({ device: form.device.trim() })} placeholder="Work PC" /></${Field}>
+            </div>
+            <button type="button" class="btn link" onClick=${() => setGithubOpen(true)}>Sync across your devices with GitHub…</button>`}
+    </${Card}>`;
+  }
+
+  return html`<${Card} title="Sync with GitHub" icon="cloud" id="sync">
+    ${statusPart}
+    ${moving && html`<p class="notice"><${Icon} name="sync" size=${16} />${moving}</p>`}
+    ${githubPart}
+    <button type="button" class="btn link" disabled=${Boolean(moving)} onClick=${keepHere}>Stop syncing with GitHub and keep everything on this computer…</button>
   </${Card}>`;
 }
 
@@ -229,6 +288,7 @@ function ConnectorCard() {
       Let Claude work with your tracker from any chat or Claude Code session: “send this proposal to my tracker”, “send the artifact to my
       tracker”, “update tasks on my tracker”, “check my tracker for feedback”.
     </p>
+    ${isLocal() && html`<p class="notice"><${Icon} name="cloud" size=${16} />The connector reaches your data on GitHub: turn on <strong>Sync across your devices with GitHub</strong> above first.</p>`}
     <ol class="connector-steps">
       <li>Deploy the connector once: a small free Cloudflare Worker that reads and writes your data repository.</li>
       <li>In Claude, open <strong>Customize → Connectors → Add custom connector</strong> and paste its address ending in <code>/mcp</code>.</li>

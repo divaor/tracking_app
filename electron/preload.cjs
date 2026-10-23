@@ -9,6 +9,22 @@ contextBridge.exposeInMainWorld('desktop', {
     get: (key) => ipcRenderer.invoke('secret:get', key),
     set: (key, value) => ipcRenderer.invoke('secret:set', key, value),
   },
+  // The data on this computer in local mode: the folder Tracker Editor shares (localStore.cjs), for localRepo.js.
+  data: {
+    get: (key) => ipcRenderer.invoke('data:get', key),
+    put: (key, value) => ipcRenderer.invoke('data:put', key, value),
+    cas: (key, expected, value) => ipcRenderer.invoke('data:cas', key, expected, value),
+    del: (key) => ipcRenderer.invoke('data:del', key),
+    list: (prefix) => ipcRenderer.invoke('data:list', prefix),
+    info: () => ipcRenderer.invoke('data:info'),
+    show: () => ipcRenderer.invoke('data:show'),
+    onChanged(callback) {
+      const listener = () => callback();
+      ipcRenderer.on('data:changed', listener);
+      ipcRenderer.send('data:watch');
+      return () => ipcRenderer.removeListener('data:changed', listener);
+    },
+  },
   // Model requests go through the main process (no CORS setup on the server).
   llm: {
     request: (id, url, init) => ipcRenderer.invoke('llm:request', id, url, init),

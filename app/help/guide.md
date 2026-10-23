@@ -17,7 +17,9 @@ Every item has a **type** and a **status**:
 - **Docs**: things to read or review, such as proposals, artifacts, READMEs, specs, reports and articles.
 - Status moves **Pending → In progress → Done**. For docs the same steps read **To read → Reading → Read**.
 
-Each device keeps a full copy and syncs it through `tracker.json` in your private data repo on GitHub. Claude reads and writes the same file through the connector, and Tracker Editor keeps its files in the same repo. Every change becomes a commit, so the repo history is also your backup.
+**Your data starts on this computer.** A new install keeps everything on the device: on the desktop in a data folder (`Documents/Tracker data`) that Tracker Editor on the same computer shares, in the browser in its own storage (the editor opened in the same browser shares it). Projects, tags, documents and Tracker Editor's Send to tracker all work, and nothing about syncing shows.
+
+**To use your phone and other computers too**, turn on *Sync across your devices with GitHub* (Settings → Where your data is): everything on this device is copied to your private data repo first, so nothing is lost. Each device then keeps a full copy and syncs it through `tracker.json` in that repo. Claude reads and writes the same file through the connector, and Tracker Editor keeps its files in the same repo. Every change becomes a commit, so the repo history is also your backup.
 
 ## 2. Get it and connect it
 
@@ -41,15 +43,26 @@ The installers aren't code-signed, so your computer warns you once. Windows Smar
 
 The desktop app looks and works like the web app. It also shows native notifications, opens a quick add window from any app, and can keep running in the system tray when you close the window.
 
-### Connect a device to your data
+### Keep your data on this computer (the default)
+
+Nothing to set up. **Settings → Where your data is** says where it is (on the desktop, **Show the folder** opens it; copying that folder is a backup). Install Tracker Editor on the same computer and the two work together straight away: its projects are yours, it opens the tracker's documents, its *Send to tracker* lands here at once.
+
+- History is kept here too, for 180 days.
+- Phone notifications and the Claude connector need GitHub sync (below).
+- On an iPhone, apps added to the home screen each keep their own storage, so the tracker and the editor work together there in Safari, or through GitHub.
+
+### Connect a device to your data (GitHub sync)
 
 Do this once on each device. You need a private repository for your data (for example `tracker-data`; it can start empty) and a GitHub token that can read and write it:
 
 1. On GitHub: Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token.
 2. Under *Repository access*, choose **Only select repositories** and pick your data repo.
 3. Under *Repository permissions*, set **Contents** to **Read and write**, then create the token.
-4. In the app, open **Settings → Sync with GitHub**. Enter the owner, the repository, the token, and a name for this device (for example *Work PC* or *Phone*).
-5. Press **Test connection**, then **Save**. The badge changes to *Synced*.
+4. In the app, open **Settings → Where your data is → Sync across your devices with GitHub…**. Enter the owner, the repository, the token, and a name for this device (for example *Work PC* or *Phone*).
+5. Press **Test connection**, then **Copy my data to GitHub and sync**. Everything on this device goes to the repo first (an empty repo gets all of it; one with data from other devices is merged item by item, the newest edit winning). The badge then shows *Synced*.
+6. **Tracker Editor on this computer** offers to follow (*Your data moved to GitHub: Connect*): connect it with the same token.
+
+To go back, **Stop syncing with GitHub and keep everything on this computer…** at the bottom of the card copies anything that is only on GitHub to this computer first; the repo keeps its copy.
 
 The device name appears in commit messages and in notifications about changes from your other devices.
 
@@ -194,6 +207,7 @@ Choose what you hear about in **Settings → Notifications**.
 
 ## 14. Sync, offline and backups
 
+- **On this computer only** (the default): there is nothing to sync and no badge; the data is saved as you work.
 - **Offline first:** everything works without a connection, and changes sync when you're back online.
 - **Automatic sync** runs after edits, every few minutes and when the app comes back into focus. The badge in the sidebar (or the cloud icon on the phone) shows the state; click it to sync now (**Ctrl+Shift+S** on the desktop).
 - **Conflicts** are resolved per item: the most recent edit wins. Deletions sync too.
@@ -222,7 +236,7 @@ On a Mac, use **Cmd** for **Ctrl**.
 
 | Problem | Fix |
 | --- | --- |
-| Sync shows an error about the token | The token expired or lost access. Create a new fine-grained token for your data repo (Contents: Read and write) and paste it in Settings → Sync with GitHub. |
+| Sync shows an error about the token | The token expired or lost access. Create a new fine-grained token for your data repo (Contents: Read and write) and paste it in Settings → Sync with GitHub (Where your data is when not syncing). |
 | "Set up GitHub sync to open attached files" | Files are read from your data repo, so that device needs sync set up. |
 | No notifications on iPhone | Needs iOS 16.4 or later, with the app opened from its Home Screen icon (not Safari). Then turn notifications on again in Settings. |
 | Claude says the connector isn't available | Turn Tracker on under **+ → Connectors** in that chat. If it asks you to sign in again, enter the connector password. |

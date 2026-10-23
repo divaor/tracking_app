@@ -94,6 +94,47 @@ ipcMain.handle('secret:set', (event, key, value) => {
   return true;
 });
 
+// ---- The data on this computer ("on this computer" mode, localStore.cjs) ----
+// A folder Tracker Editor uses too (Documents/Tracker data unless both were told
+// another), made only once the page uses it (GitHub users never get one).
+const localStore = require('./localStore.cjs');
+let dataStoreCache = null;
+const dataStore = () => (dataStoreCache ??= localStore.createLocalStore(localStore.dataDir({ appData: app.getPath('appData'), documents: app.getPath('documents') })));
+const dataSeen = new Map(); // branch head → its value this app wrote, or last told the page about
+let stopDataWatch = null;
+const appOnly = (handler) => (event, ...args) => {
+  if (!fromApp(event)) throw new Error('Not allowed');
+  return handler(...args);
+};
+ipcMain.handle('data:get', appOnly((key) => dataStore().get(key)));
+ipcMain.handle('data:put', appOnly((key, value) => dataStore().put(key, value)));
+ipcMain.handle('data:cas', appOnly(async (key, expected, value) => {
+  const done = await dataStore().cas(key, expected, value);
+  if (done && key.startsWith('ref/')) dataSeen.set(key, value);
+  return done;
+}));
+ipcMain.handle('data:del', appOnly((key) => dataStore().del(key)));
+ipcMain.handle('data:list', appOnly((prefix) => dataStore().list(prefix)));
+ipcMain.handle('data:info', appOnly(() => ({ dir: dataStore().dir })));
+ipcMain.handle('data:show', appOnly(() => shell.openPath(dataStore().dir)));
+// The page in local mode: tell it when Tracker Editor changed the data (it syncs at once).
+ipcMain.on('data:watch', (event) => {
+  if (!fromApp(event) || stopDataWatch) return;
+  try {
+    stopDataWatch = localStore.watchRefs(
+      dataStore().dir,
+      () => mainWindow?.webContents.send('data:changed'),
+      (key, value) => {
+        if (dataSeen.get(key) === value) return true;
+        dataSeen.set(key, value);
+        return false;
+      },
+    );
+  } catch (err) {
+    console.warn('Cannot watch the data folder', err);
+  }
+});
+
 ipcMain.handle('window:show', (event) => {
   if (!fromApp(event)) throw new Error('Not allowed');
   showWindow();

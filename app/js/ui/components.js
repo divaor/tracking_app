@@ -2,7 +2,7 @@ import { createContext, html, useContext, useEffect, useRef, useState } from '..
 import { checklistProgress, decisionLabel, isOverdue, kindLabel, nextStatus, projectKey, statusLabel, TYPES, typeInfo } from '../model.js';
 import { formatDue, timeAgo } from '../format.js';
 import { editorLink, parseEditorLink } from '../editorLinks.js';
-import { getSettings } from '../settings.js';
+import { getSettings, isLocal } from '../settings.js';
 import { Icon, StatusIcon } from './icons.js';
 import { ProjectChip } from './projects.js';
 import { MicButton } from './dictation.js';
@@ -207,6 +207,8 @@ export function syncDescription(sync) {
 }
 
 export function SyncBadge({ sync, onClick, compact = false }) {
+  // Local mode: the data stays here, nothing to show.
+  if (isLocal()) return null;
   const { icon, label, cls } = syncDescription(sync);
   return html`<button type="button" class="sync-badge ${cls} ${compact ? 'compact' : ''}" title=${sync.error || label}
     aria-label=${label} onClick=${onClick}>
