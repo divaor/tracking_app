@@ -105,10 +105,13 @@ function createLocalStore(dir) {
         await handle.close();
         break;
       } catch (err) {
-        if (err.code !== 'EEXIST') throw err;
-        const stat = await fsp.stat(lock).catch(() => null);
+        // Windows answers EPERM (or EACCES) while the lock another app just let go of is still being
+        // deleted: busy too. Only after the wait does that error stand (a folder we cannot write to).
+        const held = err.code === 'EEXIST';
+        if (!held && err.code !== 'EPERM' && err.code !== 'EACCES') throw err;
+        const stat = held ? await fsp.stat(lock).catch(() => null) : null;
         if (stat && Date.now() - stat.mtimeMs > LOCK_STALE_MS) await fsp.rm(lock, { force: true });
-        else if (Date.now() - start > LOCK_WAIT_MS) throw new Error('The data folder is busy (another app is writing to it).');
+        else if (Date.now() - start > LOCK_WAIT_MS) throw held ? new Error('The data folder is busy (another app is writing to it).') : err;
         else await sleep(15);
       }
     }
