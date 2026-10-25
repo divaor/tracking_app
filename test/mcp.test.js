@@ -361,3 +361,37 @@ test('projects and tags: Claude files work under a project and tags repos', asyn
   assert.match(prompt.result.messages[0].content.text, /project "Platform"/);
   assert.match(prompt.result.messages[0].content.text, /tag each item with the repositories/);
 });
+
+test('pin and unpin items: on top of the lists and the overview, whatever their status', async () => {
+  const { call, items } = setup();
+  const added = await call('add_items', {
+    items: [
+      { title: 'Release checklist', project: 'Tracker App', status: 'done' },
+      { title: 'Plain task', project: 'Tracker App' },
+      { title: 'Pinned from the start', pinned: true },
+    ],
+  });
+  const [checklist, plain, early] = added.data.added;
+  assert.equal(early.pinned, true);
+  const pinned = await call('update_items', { updates: [{ id: checklist.id, pinned: true }] });
+  assert.equal(pinned.isError, false, pinned.text);
+  assert.equal(pinned.data.updated[0].pinned, true);
+  assert.equal(items().find((i) => i.id === checklist.id).pinned, true);
+
+  // Asking for the pinned ones includes a done item; open lists put pinned items first.
+  const list = await call('list_items', { pinned: true });
+  assert.deepEqual(list.data.items.map((i) => i.title), ['Release checklist', 'Pinned from the start']);
+  assert.deepEqual((await call('list_items', { pinned: true, status: 'open' })).data.items.map((i) => i.title), ['Pinned from the start']);
+  assert.deepEqual((await call('list_items', { pinned: false })).data.items.map((i) => i.title), ['Plain task']);
+  assert.equal((await call('list_items', {})).data.items[0].title, 'Pinned from the start');
+  const overview = await call('get_overview', {});
+  assert.deepEqual(overview.data.pinned.map((i) => i.title), ['Release checklist', 'Pinned from the start']);
+
+  // Unpinning leaves no trace in the data file; anything but true/false is refused.
+  await call('update_items', { updates: [{ id: checklist.id, pinned: false }] });
+  assert.equal('pinned' in items().find((i) => i.id === checklist.id), false);
+  assert.equal((await call('update_items', { updates: [{ id: plain.id, pinned: 'yes' }] })).isError, true);
+  // The tool says how.
+  const tools = await call('list_items', { pinned: true });
+  assert.equal(tools.data.total, 1);
+});

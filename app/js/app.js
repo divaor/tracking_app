@@ -341,6 +341,16 @@ export function App() {
       return item;
     },
     update: (id, patch) => store.update(id, patch),
+    /** Pins an item to the top of its project (in every view, whatever the filters), or unpins it. */
+    togglePin(item) {
+      const current = store.get(item.id);
+      if (!current) return;
+      const pinned = !current.pinned;
+      store.update(item.id, { pinned });
+      toast(pinned ? `Pinned “${current.title}”${current.project ? ` to the top of ${current.project}` : ' to the top'}` : `Unpinned “${current.title}”`, {
+        action: { label: 'Undo', run: () => store.update(item.id, { pinned: !pinned }) },
+      });
+    },
     setStatus(id, status) {
       const prev = store.get(id);
       if (!prev || prev.status === status) return;
@@ -583,7 +593,8 @@ export function App() {
     if (value && (route.view === 'home' || route.view === 'settings')) location.hash = hrefFor({ view: 'list' });
   };
 
-  const filtered = useMemo(() => filterItems(scopedItems, { query }), [scopedItems, query]);
+  // Pinned items stay in view past the category, status and #tag filters (their project is in scope).
+  const filtered = useMemo(() => filterItems(scopedItems, { query, keepPinned: true }), [scopedItems, query]);
   const tagNames = useMemo(() => tagCounts(items).map((t) => t.tag), [items]);
 
   const modalItem = modal?.id ? items.find((i) => i.id === modal.id) : null;
@@ -612,7 +623,7 @@ export function App() {
   }
   const scoped = ['home', 'board', 'list'].includes(route.view);
 
-  return html`<${ProjectsContext.Provider} value=${{ byKey, showProject: actions.showProject }}><div class="app ${drawer ? 'drawer-open' : ''}">
+  return html`<${ProjectsContext.Provider} value=${{ byKey, showProject: actions.showProject, togglePin: actions.togglePin }}><div class="app ${drawer ? 'drawer-open' : ''}">
     <${Sidebar} route=${route} items=${scopedItems} projects=${projects} scope=${scope} onProject=${actions.showProject}
       sync=${sync} onSyncClick=${onSyncClick} onNew=${() => actions.newItem()} onTag=${(tag) => actions.searchTag(tag)} onHelp=${() => openHelp()} />
     <div class="scrim" onClick=${() => setDrawer(false)} />

@@ -40,6 +40,8 @@ export function describeChanges(before, after, { self = '' } = {}) {
       events.push({ ...base, category: 'items', title: `${who} marked a ${noun(item)} ${statusLabel(item.status, item.type).toLowerCase()}`, body: item.title });
     } else if ((item.decision ?? '') !== (old.decision ?? '') && item.decision) {
       events.push({ ...base, category: 'documents', title: `${who} reviewed a ${noun(item)}`, body: item.title });
+    } else if (Boolean(item.pinned) !== Boolean(old.pinned)) {
+      events.push({ ...base, category: 'items', title: `${who} ${item.pinned ? 'pinned' : 'unpinned'} a ${noun(item)}`, body: item.title });
     } else {
       events.push({ ...base, category: 'items', title: `${who} updated a ${noun(item)}`, body: item.title });
     }

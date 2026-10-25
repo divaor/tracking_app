@@ -324,6 +324,9 @@ export function ItemModal({ item, initial, actions, projects, tagSuggestions = [
       } else if (!editing && e.key === 'e' && !e.metaKey && !e.ctrlKey && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) {
         e.preventDefault();
         startEdit();
+      } else if (!editing && e.key === 'p' && !e.metaKey && !e.ctrlKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) {
+        e.preventDefault();
+        actions.togglePin(item);
       }
     };
     document.addEventListener('keydown', onKey);
@@ -340,7 +343,9 @@ export function ItemModal({ item, initial, actions, projects, tagSuggestions = [
           : html`<${TypeBadge} type=${item.type} kind=${item.kind} />`}
         <span class="spacer" />
         ${!editing &&
-        html`<button type="button" class="icon-btn" title="Edit (E)" aria-label="Edit" onClick=${startEdit}><${Icon} name="edit" /></button>
+        html`<button type="button" class="icon-btn pin-toggle ${item.pinned ? 'on' : ''}" title=${item.pinned ? 'Unpin (P)' : 'Pin to the top of its project (P)'}
+            aria-label=${item.pinned ? 'Unpin' : 'Pin'} aria-pressed=${Boolean(item.pinned)} onClick=${() => actions.togglePin(item)}><${Icon} name="pin" /></button>
+          <button type="button" class="icon-btn" title="Edit (E)" aria-label="Edit" onClick=${startEdit}><${Icon} name="edit" /></button>
           <button type="button" class="icon-btn danger" title="Delete" aria-label="Delete" onClick=${() => {
             actions.remove(item.id);
             onClose();

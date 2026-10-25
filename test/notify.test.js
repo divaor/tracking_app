@@ -174,3 +174,12 @@ test('notification preferences filter events', () => {
   assert.deepEqual(pick({ items: false }), ['documents:true']);
   assert.deepEqual(pick({ documents: false, devices: true }), ['items:true', 'items:false']);
 });
+
+test('pinning and unpinning are named in notifications', async () => {
+  const { normalizeItem } = await import('../app/js/model.js');
+  const before = [normalizeItem({ id: 'a', title: 'Plan', updatedAt: '2026-10-01T00:00:00.000Z' })];
+  const pinned = [normalizeItem({ ...before[0], pinned: true, updatedAt: '2026-10-02T00:00:00.000Z', updatedBy: 'Claude' })];
+  assert.equal(describeChanges(before, pinned)[0].title, 'Claude pinned a task');
+  const unpinned = [normalizeItem({ ...before[0], updatedAt: '2026-10-03T00:00:00.000Z', updatedBy: 'Claude' })];
+  assert.equal(describeChanges(pinned, unpinned)[0].title, 'Claude unpinned a task');
+});

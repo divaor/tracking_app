@@ -19,6 +19,7 @@ import {
   normalizeItem,
   nowIso,
   parseData,
+  pinnedFirst,
   PRIORITIES,
   projectKey,
   projectList,
@@ -47,7 +48,7 @@ const isConflict = (err) => err?.status === 409 || err?.status === 422;
 const byteLength = (s) => new TextEncoder().encode(s).length;
 const has = (obj, key) => obj[key] !== undefined && obj[key] !== null;
 
-const EDITABLE = ['type', 'title', 'status', 'priority', 'kind', 'project', 'url', 'due', 'notes', 'decision', 'feedback'];
+const EDITABLE = ['type', 'title', 'status', 'priority', 'kind', 'project', 'url', 'due', 'notes', 'decision', 'feedback', 'pinned'];
 
 function checkFields(fields, type) {
   if (has(fields, 'type') && !TYPE_IDS.includes(fields.type)) throw new TrackerError(`type must be one of ${TYPE_IDS.join(', ')}`);
@@ -59,6 +60,7 @@ function checkFields(fields, type) {
     throw new TrackerError(`decision must be one of ${DECISIONS.map((d) => d.id).join(', ')} or "" to clear it`);
   }
   if (has(fields, 'due') && fields.due !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(fields.due)) throw new TrackerError('due must be YYYY-MM-DD or "" to clear it');
+  if (has(fields, 'pinned') && typeof fields.pinned !== 'boolean') throw new TrackerError('pinned must be true or false');
   const kinds = KINDS[fields.type ?? type];
   if (has(fields, 'kind') && fields.kind !== '' && !kinds?.some((k) => k.id === fields.kind)) {
     throw new TrackerError(kinds ? `kind for ${fields.type ?? type} must be one of ${kinds.map((k) => k.id).join(', ')}` : `items of type ${fields.type ?? type} have no kind`);
@@ -81,6 +83,7 @@ export function summarize(item) {
   if (item.tags.length) out.tags = item.tags;
   if (item.url) out.url = item.url;
   if (item.decision) out.decision = item.decision;
+  if (item.pinned) out.pinned = true;
   if (item.files.length) out.files = item.files.map((f) => f.path);
   out.updatedAt = item.updatedAt;
   return out;
@@ -181,6 +184,8 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       const open = items.filter((i) => i.status !== 'done');
       return {
         counts,
+        // What the user keeps on top of each project, whatever its status.
+        pinned: pinnedFirst(sortItems(items.filter((i) => i.pinned))).slice(0, 30).map(summarize),
         inProgress: sortItems(items.filter((i) => i.status === 'in_progress')).slice(0, 20).map(summarize),
         dueSoon: sortItems(open.filter((i) => i.due && i.due <= addDays(today, 7)), 'due').slice(0, 20).map(summarize),
         awaitingReview: sortItems(items.filter((i) => i.type === 'doc' && i.status !== 'done' && (i.files.length || ['proposal', 'artifact'].includes(i.kind))))
@@ -250,7 +255,9 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       return { project: summary, itemsMoved: moved || undefined };
     },
 
-    async list({ type, status = 'open', query = '', tag, project, projects, area, kind, decision, limit = 50 } = {}) {
+    async list({ type, status, query = '', tag, project, projects, area, kind, decision, pinned, limit = 50 } = {}) {
+      // Pinned items are asked for whatever their status, unless one is given.
+      status ??= pinned === true ? 'all' : 'open';
       const terms = String(query).toLowerCase().split(/\s+/).filter(Boolean);
       const data = await load();
       const areas = new Map(projectList(data.items, data.projects).map((p) => [p.key, p.area]));
@@ -264,10 +271,11 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
           (!area || (area === 'none' ? !i.project || !areas.get(projectKey(i.project)) : areas.get(projectKey(i.project)) === area)) &&
           (!kind || i.kind === kind) &&
           (!decision || (decision === 'none' ? !i.decision : i.decision === decision)) &&
+          (typeof pinned !== 'boolean' || Boolean(i.pinned) === pinned) &&
           terms.every((term) => [i.title, i.notes, i.feedback, i.project, i.url, ...i.tags, ...i.files.map((f) => f.name)].join('\n').toLowerCase().includes(term)),
       );
       const max = Math.min(Math.max(Number(limit) || 50, 1), 200);
-      return { total: matches.length, shown: Math.min(max, matches.length), items: sortItems(matches).slice(0, max).map(summarize) };
+      return { total: matches.length, shown: Math.min(max, matches.length), items: pinnedFirst(sortItems(matches)).slice(0, max).map(summarize) };
     },
 
     async get(id, { includeFiles = false } = {}) {

@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 1.8.1 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 1.9.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -79,7 +79,7 @@ The connector then works in Claude on the web, desktop and phone, and in Claude 
 
 ## 3. Overview
 
-The home screen shows what needs attention: **due soon**, **in progress**, **up next**, your **reading list** and **recently completed** items, with a quick add at the top. Click any card to open it. Click the round status icon on a card to move it to the next status.
+The home screen shows what needs attention: your **pinned** items, **due soon**, **in progress**, **up next**, your **reading list** and **recently completed** items, with a quick add at the top. Click any card to open it. Click the round status icon on a card to move it to the next status.
 
 With a model connected, the Overview can also **Plan my day** or **Review my week** (section 9).
 
@@ -116,9 +116,15 @@ Filter by type and status, and sort by priority, due date and more (*Smart* list
 - **Search** (`/`) matches titles, notes, links and file names. Use `#tag` for a tag or `+project` for a project. **Esc** in the search box clears it.
 - Click a **tag** in the sidebar or on an item to see everything with that tag. Click a **project chip** to show that project.
 
+### Pinned items
+
+Pin an item (the pin at the top of an open item, or **P**) to keep it on top of its project: first on the Overview (under **Pinned**), in the list and in its column on the board, grouped by project. It is marked with a pin and tinted in its project's color, and clicking the pin unpins it (with **Undo**).
+
+A pinned item shows whatever type, status or `#tag` you filter by, and even when it is done, as long as its project is shown: picking other projects in the bar above hides it, and so do `+project` and words you search for. **Projects → Manage** counts each project's pinned items.
+
 ## 7. Editing an item
 
-Open an item and press the pencil (or **E**). You can change its type, status, priority, due date, project, link and tags, and write notes in Markdown.
+Open an item and press the pencil (or **E**), or the pin (or **P**) to pin it (section 6). You can change its type, status, priority, due date, project, link and tags, and write notes in Markdown.
 
 - **Checklists:** write `- [ ] step` lines. You can tick them right in the reader, and cards show the progress (for example 1/3).
 - **Tags** are chips: type one and press Enter (Backspace in an empty field removes the last one). Suggestions come from tags you already use.
@@ -175,6 +181,7 @@ In any Claude chat or Claude Code session with the Tracker connector on, just sa
 | "Send the artifact to my tracker" | Saves the artifact (HTML, Markdown, code…) as a file you can preview. |
 | "Add a task to my tracker: renew the domain, due Friday" | Adds items, checking first for duplicates. |
 | "Update tasks on my tracker: the login fix is done" | Finds the items and changes their status, notes or dates. |
+| "Pin the release checklist in my tracker" / "Unpin it" | Pins or unpins items, so they stay on top of their project (section 6). |
 | "Log this session as Claude work on my tracker" | Adds a Claude work item with a link to the session or PR. |
 | "For this conversation use project Platform in my tracker and tag with the repos you touch" | Files everything it adds or sends under Platform and tags each item with the repositories involved, creating them if needed. |
 | "What's on my tracker?" / "What's left open?" | Summarizes counts, what's in progress, what's due and what's waiting for review. |
@@ -224,6 +231,7 @@ Press **F1** or **?** to open Help: **Commands and shortcuts** lists everything 
 | **/** | Search (**Ctrl+F** on the desktop) |
 | **Esc** | Clear the search, or close what's open |
 | **E** | Edit the open item |
+| **P** | Pin or unpin the open item |
 | **Ctrl+Enter** | Save the item |
 | **Ctrl+Shift+S** | Sync now (desktop) |
 | **Ctrl+,** | Settings (desktop) |

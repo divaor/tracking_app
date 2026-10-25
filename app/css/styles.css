@@ -3157,3 +3157,50 @@ button.help-command:focus-visible {
   font-size: 14px;
   font-weight: 650;
 }
+
+/* ---- Pinned items: on top of their project, in its color (--pc) ---- */
+.card.pinned {
+  border-color: color-mix(in srgb, var(--pc) 45%, var(--border));
+  background: color-mix(in srgb, var(--pc) 7%, var(--surface));
+}
+
+.row.pinned {
+  background: color-mix(in srgb, var(--pc) 7%, transparent);
+  box-shadow: inset 3px 0 0 var(--pc);
+}
+
+.pin-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: -2px -4px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--pc);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.pin-mark:hover {
+  background: color-mix(in srgb, var(--pc) 16%, transparent);
+}
+
+.row-title .pin-mark {
+  margin: -3px 4px 0 -4px;
+}
+
+.pin-mark svg {
+  fill: currentColor;
+}
+
+.icon-btn.pin-toggle.on {
+  color: var(--accent);
+}
+
+.icon-btn.pin-toggle.on svg {
+  fill: currentColor;
+}

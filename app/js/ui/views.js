@@ -1,6 +1,6 @@
 import { isLocal } from '../settings.js';
 import { html, useState } from '../../vendor/preact-htm.js';
-import { addDays, SORTS, sortItems, STATUSES, statusLabel, TYPES } from '../model.js';
+import { addDays, pinnedFirst, SORTS, sortItems, STATUSES, statusLabel, TYPES } from '../model.js';
 import { formatLongToday, greeting } from '../format.js';
 import { Icon, StatusIcon } from './icons.js';
 import { EmptyState, ItemCard, ItemRow, QuickAdd, Segmented, TypeFilter } from './components.js';
@@ -48,17 +48,21 @@ function Welcome({ actions }) {
 export function HomeView({ items, today, actions, hrefFor }) {
   const [captureType, setCaptureType] = useState('task');
   const open = items.filter((i) => i.status !== 'done');
-  const inProgress = sortItems(items.filter((i) => i.status === 'in_progress'));
-  const dueSoon = sortItems(open.filter((i) => i.due && i.due <= addDays(today, 7)), 'due');
+  const inProgressCount = items.filter((i) => i.status === 'in_progress').length;
+  // Pinned items come first, by project; the sections below show the others.
+  const pinned = pinnedFirst(sortItems(items.filter((i) => i.pinned)));
+  const rest = items.filter((i) => !i.pinned);
+  const inProgress = sortItems(rest.filter((i) => i.status === 'in_progress'));
+  const dueSoon = sortItems(rest.filter((i) => i.status !== 'done' && i.due && i.due <= addDays(today, 7)), 'due');
   const dueIds = new Set(dueSoon.map((i) => i.id));
-  const upNext = sortItems(items.filter((i) => i.status === 'pending' && i.type !== 'doc' && !dueIds.has(i.id)));
-  const reading = sortItems(items.filter((i) => i.type === 'doc' && i.status !== 'done'));
-  const recentDone = sortItems(items.filter((i) => i.status === 'done'));
+  const upNext = sortItems(rest.filter((i) => i.status === 'pending' && i.type !== 'doc' && !dueIds.has(i.id)));
+  const reading = sortItems(rest.filter((i) => i.type === 'doc' && i.status !== 'done'));
+  const recentDone = sortItems(rest.filter((i) => i.status === 'done'));
 
   return html`<div class="home">
     <div class="hero">
       <h1>${greeting()}</h1>
-      <p>${formatLongToday()} · ${inProgress.length} in progress · ${open.length - inProgress.length} pending</p>
+      <p>${formatLongToday()} · ${inProgressCount} in progress · ${open.length - inProgressCount} pending</p>
     </div>
 
     <${QuickAdd} type=${captureType} onTypeChange=${setCaptureType} showTypes
@@ -81,6 +85,11 @@ export function HomeView({ items, today, actions, hrefFor }) {
         </a>`;
       })}
     </div>
+
+    ${pinned.length > 0 &&
+    html`<${Section} title="Pinned" icon="pin" count=${pinned.length}>
+      <${CardGrid} items=${pinned} actions=${actions} today=${today} />
+    </${Section}>`}
 
     ${dueSoon.length > 0 &&
     html`<${Section} title="Due soon" icon="calendar" count=${dueSoon.length}>
@@ -129,7 +138,8 @@ export function BoardView({ items, type, onType, actions, today }) {
   const [dropTarget, setDropTarget] = useState(null);
   const [showAllDone, setShowAllDone] = useState(false);
   const newType = type === 'all' ? 'task' : type;
-  const ofType = type === 'all' ? items : items.filter((i) => i.type === type);
+  // Pinned items show whatever the category, on top of their column.
+  const ofType = type === 'all' ? items : items.filter((i) => i.type === type || i.pinned);
 
   return html`<div class="board-view">
     <div class="toolbar">
@@ -138,7 +148,7 @@ export function BoardView({ items, type, onType, actions, today }) {
     <${QuickAdd} type=${newType} placeholder=${addPlaceholder(newType)} onAdd=${(value) => actions.quickAdd(value, { type: newType })} />
     <div class="board">
       ${STATUSES.map((status) => {
-        const all = sortItems(ofType.filter((i) => i.status === status));
+        const all = pinnedFirst(sortItems(ofType.filter((i) => i.status === status)));
         const shown = status === 'done' && !showAllDone ? all.slice(0, DONE_LIMIT) : all;
         return html`<section key=${status} class="column status-${status} ${dropTarget === status ? 'drop' : ''}"
           onDragOver=${(e) => {
@@ -179,7 +189,10 @@ export function BoardView({ items, type, onType, actions, today }) {
 
 export function ListView({ items, type, status, onType, onStatus, sort, onSort, actions, today, query }) {
   const ofType = type === 'all' ? items : items.filter((i) => i.type === type);
-  const shown = sortItems(status === 'all' ? ofType : ofType.filter((i) => i.status === status), sort);
+  const matching = status === 'all' ? ofType : ofType.filter((i) => i.status === status);
+  // Pinned items show whatever the category and status, on top, by project.
+  const matched = new Set(matching);
+  const shown = pinnedFirst(sortItems([...items.filter((i) => i.pinned && !matched.has(i)), ...matching], sort));
   const statusOptions = [
     { id: 'all', label: 'All', count: ofType.length },
     ...STATUSES.map((s) => ({ id: s, label: statusLabel(s, type), count: ofType.filter((i) => i.status === s).length })),

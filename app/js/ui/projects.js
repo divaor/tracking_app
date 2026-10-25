@@ -188,7 +188,7 @@ function ProjectRow({ project, actions }) {
               if (e.key === 'Escape') cancel();
             }} onBlur=${save} ref=${(el) => el?.focus()} />`
         : html`<button type="button" class="project-name" onClick=${() => actions.showProject(project.key)}>${project.name}</button>`}
-      <div class="muted small">${project.open} open · ${project.total} total${project.registered ? '' : ' · from items'}</div>
+      <div class="muted small">${project.open} open · ${project.total} total${project.pinned ? ` · ${project.pinned} pinned` : ''}${project.registered ? '' : ' · from items'}</div>
       ${colors && html`<${ColorPicker} value=${project.color} onChange=${(c) => {
         store.saveProject(project.name, { color: c });
         setColors(false);

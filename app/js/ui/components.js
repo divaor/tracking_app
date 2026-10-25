@@ -8,8 +8,22 @@ import { ProjectChip } from './projects.js';
 import { MicButton } from './dictation.js';
 import { modelReady } from '../assistant.js';
 
-// Project colors and the "show this project" action, provided by the app.
-export const ProjectsContext = createContext({ byKey: new Map(), showProject: () => {} });
+// Project colors and the "show this project" and "pin" actions, provided by the app.
+export const ProjectsContext = createContext({ byKey: new Map(), showProject: () => {}, togglePin: () => {} });
+
+// A pinned item wears its project's color (the accent without a project).
+const pinStyle = (item, byKey) => (item.pinned ? { '--pc': byKey.get(projectKey(item.project))?.color || 'var(--accent)' } : undefined);
+
+// The pin on a pinned item: a click unpins it (the item itself does not open).
+function PinMark({ item }) {
+  const { togglePin } = useContext(ProjectsContext);
+  return html`<button type="button" class="pin-mark" title="Pinned to the top of its project · click to unpin" aria-label=${`Unpin ${item.title || 'this item'}`}
+    onClick=${(e) => {
+      e.stopPropagation();
+      togglePin(item);
+    }}
+    onKeyDown=${(e) => e.stopPropagation()}><${Icon} name="pin" size=${14} /></button>`;
+}
 
 export function TypeBadge({ type, kind }) {
   return html`<span class="badge type-${type}"><${Icon} name=${type} size=${13} />${kindLabel(type, kind) || typeInfo(type).label}</span>`;
@@ -85,7 +99,8 @@ const openOnEnter = (fn) => (e) => {
 };
 
 export function ItemCard({ item, onOpen, onStatus, today, draggable = false, showType = true }) {
-  return html`<article class="card type-${item.type} status-${item.status}" tabindex="0" draggable=${draggable}
+  const { byKey } = useContext(ProjectsContext);
+  return html`<article class="card type-${item.type} status-${item.status} ${item.pinned ? 'pinned' : ''}" style=${pinStyle(item, byKey)} tabindex="0" draggable=${draggable}
     onClick=${() => onOpen(item)} onKeyDown=${openOnEnter(() => onOpen(item))}
     onDragStart=${draggable
       ? (e) => {
@@ -98,6 +113,7 @@ export function ItemCard({ item, onOpen, onStatus, today, draggable = false, sho
     <div class="card-head">
       <${StatusButton} item=${item} onStatus=${onStatus} />
       <div class="card-title">${item.title || 'Untitled'}</div>
+      ${item.pinned && html`<${PinMark} item=${item} />`}
     </div>
     <div class="card-foot">
       ${showType && html`<${TypeBadge} type=${item.type} kind=${item.kind} />`}
@@ -109,12 +125,13 @@ export function ItemCard({ item, onOpen, onStatus, today, draggable = false, sho
 }
 
 export function ItemRow({ item, onOpen, onStatus, today }) {
-  return html`<div class="row type-${item.type} status-${item.status}" role="button" tabindex="0"
+  const { byKey } = useContext(ProjectsContext);
+  return html`<div class="row type-${item.type} status-${item.status} ${item.pinned ? 'pinned' : ''}" style=${pinStyle(item, byKey)} role="button" tabindex="0"
     onClick=${() => onOpen(item)} onKeyDown=${openOnEnter(() => onOpen(item))}>
     <${StatusButton} item=${item} onStatus=${onStatus} />
     <span class="row-type" title=${typeInfo(item.type).label}><${Icon} name=${item.type} size=${16} /></span>
     <div class="row-main">
-      <div class="row-title">${item.title || 'Untitled'}</div>
+      <div class="row-title">${item.pinned && html`<${PinMark} item=${item} />`}${item.title || 'Untitled'}</div>
       <${ItemMeta} item=${item} today=${today} />
     </div>
     ${(item.decision || item.priority === 'high' || item.priority === 'urgent') &&

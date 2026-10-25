@@ -22,6 +22,7 @@ How to handle requests
 - "Update tasks on my tracker", "mark X done", "add a task …" → list_items first to find existing items and avoid duplicates, then update_items / add_items. Batch several changes into one call.
 - "Log / track this Claude work" → add_items with type "claude", kind (code, chat, pr, artifact) and url = the session, PR or artifact link.
 - "What's on my tracker?" → get_overview. "Any feedback on my proposal?" → list_items with decision, or get_item; then read decision and feedback.
+- "Pin / unpin X" → update_items with pinned true / false. Pinned items stay on top of their project in the app, whatever the filters; list_items with pinned true lists them.
 
 Projects and tags
 - "For this conversation use project X (and tag with the repos you touch)" → remember it: pass project "X" on every add_items and send_document (and update_items when filing items), and add the names of the repositories involved as tags (in Claude Code: the git repository you are working in; a proposal spanning several repos gets one tag per repo).
@@ -56,6 +57,7 @@ const ITEM_FIELDS = {
   url: str('Most relevant link: Claude session, PR, artifact or source.'),
   due: str('Due date as YYYY-MM-DD.'),
   notes: str('Details in Markdown. Checklists as "- [ ] step".'),
+  pinned: { type: 'boolean', description: 'Pinned items stay on top of their project in every view of the app, whatever the filters. Only when the user asks to pin or unpin.' },
 };
 
 export function createTools(getTracker) {
@@ -67,7 +69,7 @@ export function createTools(getTracker) {
     {
       name: 'get_overview',
       title: 'Tracker overview',
-      description: 'Summary of the tracker: counts per type and status, items in progress, items due within 7 days, documents waiting for review, and recent review decisions with feedback.',
+      description: 'Summary of the tracker: counts per type and status, pinned items, items in progress, items due within 7 days, documents waiting for review, and recent review decisions with feedback.',
       inputSchema: { type: 'object', properties: {} },
       annotations: readOnly,
       run: run((t) => t.overview()),
@@ -115,6 +117,7 @@ export function createTools(getTracker) {
           area: enumOf([...AREAS.map((a) => a.id), 'none'], 'Only items whose project is in this area (none = no project or no area).'),
           kind: str('Only items of this kind, e.g. proposal.'),
           decision: enumOf([...DECISIONS.map((d) => d.id), 'none'], 'Only docs with this review decision (none = not reviewed yet).'),
+          pinned: { type: 'boolean', description: 'true: only pinned items (any status unless status is given); false: only unpinned ones.' },
           limit: { type: 'integer', minimum: 1, maximum: 200, description: 'Default 50.' },
         },
       },
@@ -173,7 +176,7 @@ export function createTools(getTracker) {
     {
       name: 'update_items',
       title: 'Update tracker items',
-      description: 'Change one or more existing items in one commit: status (e.g. mark done), title, priority, due, notes, tags, review fields. Only the fields you pass change; pass "" to clear due or decision.',
+      description: 'Change one or more existing items in one commit: status (e.g. mark done), title, priority, due, notes, tags, pinned, review fields. Only the fields you pass change; pass "" to clear due or decision.',
       inputSchema: {
         type: 'object',
         properties: {
