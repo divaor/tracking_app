@@ -568,6 +568,11 @@ export function App() {
     'plan-day': () => actions.plan('day'),
     'plan-week': () => actions.plan('week'),
     'model-settings': () => (go({ view: 'settings' }), scrollToWhenShown('model')),
+    'pinned-past-filters': () => {
+      const on = !getSettings().pinnedPastFilters;
+      saveSettings({ pinnedPastFilters: on });
+      toast(on ? 'Pinned items now show whatever the filters' : 'The filters now apply to pinned items too');
+    },
     'windows-tile': () => windowActions.tile(),
     'windows-minimize': () => windowActions.minimizeAll(),
     'windows-close': () => windowActions.closeAll(),
@@ -738,7 +743,9 @@ export function App() {
     if (value && (route.view === 'home' || route.view === 'settings')) location.hash = hrefFor({ view: 'list' });
   };
 
-  const filtered = useMemo(() => filterItems(scopedItems, { query }), [scopedItems, query]);
+  // With the setting on, pinned items stay in view past the type, status and #tag filters.
+  const keepPinned = Boolean(settings.pinnedPastFilters);
+  const filtered = useMemo(() => filterItems(scopedItems, { query, keepPinned }), [scopedItems, query, keepPinned]);
   const tagNames = useMemo(() => tagCounts(items).map((t) => t.tag), [items]);
 
   const modalItem = modal?.id ? items.find((i) => i.id === modal.id) : null;
@@ -765,9 +772,9 @@ export function App() {
 
   let view;
   if (route.view === 'board') {
-    view = html`<${BoardView} items=${filtered} type=${route.type} onType=${(type) => navigate({ type })} actions=${actions} today=${today} />`;
+    view = html`<${BoardView} items=${filtered} type=${route.type} onType=${(type) => navigate({ type })} actions=${actions} today=${today} keepPinned=${keepPinned} />`;
   } else if (route.view === 'list') {
-    view = html`<${ListView} items=${filtered} type=${route.type} status=${route.status} query=${query}
+    view = html`<${ListView} items=${filtered} type=${route.type} status=${route.status} query=${query} keepPinned=${keepPinned}
       onType=${(type) => navigate({ type })} onStatus=${(status) => navigate({ status })}
       sort=${settings.sort} onSort=${(sort) => saveSettings({ sort })} actions=${actions} today=${today} />`;
   } else if (route.view === 'projects') {

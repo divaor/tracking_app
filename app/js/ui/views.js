@@ -134,11 +134,12 @@ function typeCounts(items) {
 const addPlaceholder = (type) =>
   ({ task: 'Add a task…', idea: 'Capture an idea…', claude: 'Add Claude work…', doc: 'Add a document to read…' })[type];
 
-export function BoardView({ items, type, onType, actions, today }) {
+export function BoardView({ items, type, onType, actions, today, keepPinned = false }) {
   const [dropTarget, setDropTarget] = useState(null);
   const [showAllDone, setShowAllDone] = useState(false);
   const newType = type === 'all' ? 'task' : type;
-  const ofType = type === 'all' ? items : items.filter((i) => i.type === type);
+  // With the setting `pinnedPastFilters`, pinned items show whatever the category.
+  const ofType = type === 'all' ? items : items.filter((i) => i.type === type || (keepPinned && i.pinned));
 
   return html`<div class="board-view">
     <div class="toolbar">
@@ -186,10 +187,12 @@ export function BoardView({ items, type, onType, actions, today }) {
   </div>`;
 }
 
-export function ListView({ items, type, status, onType, onStatus, sort, onSort, actions, today, query }) {
+export function ListView({ items, type, status, onType, onStatus, sort, onSort, actions, today, query, keepPinned = false }) {
   const ofType = type === 'all' ? items : items.filter((i) => i.type === type);
-  // Pinned items that match come first, by project.
-  const shown = pinnedFirst(sortItems(status === 'all' ? ofType : ofType.filter((i) => i.status === status), sort));
+  const matching = status === 'all' ? ofType : ofType.filter((i) => i.status === status);
+  // Pinned items that match come first, by project; with `pinnedPastFilters`, all pinned items do.
+  const extra = keepPinned ? items.filter((i) => i.pinned && !matching.includes(i)) : [];
+  const shown = pinnedFirst(sortItems([...extra, ...matching], sort));
   const statusOptions = [
     { id: 'all', label: 'All', count: ofType.length },
     ...STATUSES.map((s) => ({ id: s, label: statusLabel(s, type), count: ofType.filter((i) => i.status === s).length })),

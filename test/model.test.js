@@ -248,6 +248,13 @@ test('pinned items: stored only when set, first by project, filtered like the re
   assert.deepEqual(ids({ query: 'task' }), ['t']);
   // …and those that match come first.
   assert.deepEqual(pinnedFirst(filterItems([...pool].reverse(), { query: '+work' })).map((i) => i.id), ['p', 't']);
+  // The setting pinnedPastFilters (keepPinned): pinned items pass the type, status and #tag
+  // filters, but not words searched for or another +project.
+  const kept = (opts) => filterItems(pool, { keepPinned: true, ...opts }).map((i) => i.id);
+  assert.deepEqual(kept({ type: 'task', status: 'pending' }), ['p', 't']);
+  assert.deepEqual(kept({ query: '#y' }), ['p', 't']);
+  assert.deepEqual(kept({ query: 'task' }), ['t']);
+  assert.deepEqual(kept({ query: '+other' }), []);
 
   const projects = projectList([...items, ...pool]);
   assert.equal(projects.find((p) => p.key === 'zeta').pinned, 1);

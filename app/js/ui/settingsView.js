@@ -395,6 +395,10 @@ export function SettingsView({ sync, actions, items, installPrompt, onInstall, t
     <${Card} title="Appearance" icon="eye">
       <${Segmented} label="Theme" value=${theme} onChange=${(t) => saveSettings({ theme: t })}
         options=${[{ id: 'system', label: 'System' }, { id: 'light', label: 'Light' }, { id: 'dark', label: 'Dark' }]} />
+      <label class="field checkbox">
+        <input type="checkbox" checked=${Boolean(getSettings().pinnedPastFilters)} onChange=${(e) => saveSettings({ pinnedPastFilters: e.currentTarget.checked })} />
+        <span>Show pinned items whatever the filters<small>On top of every list and board column, whatever type, status or #tag you filter by, as long as their project is shown. Off: they show only when they match, then on top.</small></span>
+      </label>
     </${Card}>
     <${DataCard} actions=${actions} items=${items} />
     <${AppsCard} installPrompt=${installPrompt} onInstall=${onInstall} />

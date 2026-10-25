@@ -31,6 +31,8 @@ export const DEFAULT_SETTINGS = {
   projectScope: [],
   // What an open item shows under its title, which always shows (see ITEM_HEAD in ui/itemModal.js).
   itemHead: { status: true, priority: true, project: true, tags: true, id: false },
+  // Pinned items show whatever type, status or #tag is picked (their project still has to be shown).
+  pinnedPastFilters: false,
   // In a browser on a computer: links to items not on this device go to the desktop app (tracker-app://).
   openItemsInApp: false,
   // Claude connector address, used for push notifications.

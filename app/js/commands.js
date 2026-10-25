@@ -35,6 +35,7 @@ export const COMMAND_LIST = [
   { id: 'scope-all', group: 'Search and filter', label: 'Show all projects' },
   { id: 'scope-work', group: 'Search and filter', label: 'Show only work projects' },
   { id: 'scope-personal', group: 'Search and filter', label: 'Show only personal projects' },
+  { id: 'pinned-past-filters', group: 'Search and filter', label: 'Show pinned items whatever the filters, or not (Settings → Appearance)' },
 
   { id: 'item-edit', group: 'In an item', label: 'Edit the open item', keys: 'E', run: false },
   { id: 'item-pin', group: 'In an item', label: 'Pin or unpin the open item (it comes first in the lists it shows in, and on the Overview)', keys: 'P', run: false, hint: 'Or the pin on a pinned item' },

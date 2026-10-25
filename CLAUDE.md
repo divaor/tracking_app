@@ -35,7 +35,7 @@ Personal tracker for tasks, ideas, Claude work and documents. Electron on deskto
   - `tracker.json` has a `projects` list next to `items`: one record per project, keyed by its lowercase name, with area work/personal and a color. It's merged per key with last write wins.
   - Items reference projects by name; `projectList` combines the records with names used on items. Rename and delete logic (`renameProjectIn`, `deleteProjectIn`) is shared by the app store and the connector.
   - The scope filter (`matchesScope`) lives in settings as `projectScope`.
-  - Pinned items (`pinned: true`, stored only when set): `pinnedFirst` puts them first, by project name (none last), in Home's Pinned section (all of them in scope, any status), the list and each board column. The filters (type, status, `#tag`, `+project`, scope, words) apply to them as to any item. The connector pins with `update_items` (`pinned`); `list_items` takes `pinned`.
+  - Pinned items (`pinned: true`, stored only when set): `pinnedFirst` puts them first, by project name (none last), in Home's Pinned section (all of them in scope, any status), the list and each board column. The filters (type, status, `#tag`, `+project`, scope, words) apply to them as to any item, unless the setting `pinnedPastFilters` (off by default; Settings → Appearance, command `pinned-past-filters`) is on: then `filterItems(…, { keepPinned })` and the list/board views let them past type, status and `#tag` (never the scope, `+project` or words). The connector pins with `update_items` (`pinned`); `list_items` takes `pinned`.
   - `serializeDocument(items, projects, extra)` keeps unknown top-level fields, so older/newer versions do not drop each other's data. Always pass projects when writing.
 - Tracker Editor (github.com/divaor/tracker-editor) shares the data repo:
   - `app/js/editorLinks.js` builds and recognizes its links (`#/file/<id>`, `#/repo/<path>`, `tracker-editor://`). Keep it in step with the editor's `parseRoute` and its `electron/main.cjs`.
@@ -56,6 +56,7 @@ Personal tracker for tasks, ideas, Claude work and documents. Electron on deskto
   - `.item-top` stays while `.modal-body` scrolls (`scrolled` adds its edge): the bar, then `ItemHead` (the title always; status + `PriorityPick`, project + tags as settings `itemHead` says, `ITEM_HEAD`, chosen with the eye, `HeadMenu`).
   - Saving sends only the fields changed since editing began, so changes made meanwhile elsewhere stay.
   - The dialog keeps its ids (`modal-title`, `item-form`, `project-options`); each window's get a suffix.
+  - `.modal-backdrop` has one `minmax(0, 1fr)` column and `.modal` `min-width: 0`, so wide code blocks and tables scroll inside instead of widening the column (which pushed the dialog off-center).
 - Links to items (`itemLinks.js`, pure: `itemIdIn` for `…#/item/<id>`, `tracker-app://item/<id>` and bare ids, `webItemLink`, `appItemLink`, `splitItemIds`):
   - Pasting a link or an id in the search box opens the item (`onSearch` → `actions.openById`: here, else `linkedItem`: sync, then say so). Search also matches ids (`matchesQuery`).
   - `markdown.js` `linkItemIds` makes ids in rendered text `a.item-ref` links (not in `pre`); a capture-phase click listener in app.js opens any link into this app (`linkedItemOf`: same origin, the web app's address, or tracker-app:), Ctrl/middle-click in a window.

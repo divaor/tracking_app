@@ -284,8 +284,12 @@ export function diffCounts(before, after) {
 
 // ---- Queries -------------------------------------------------------------
 
-export function matchesQuery(item, query) {
-  const terms = text(query).toLowerCase().split(/\s+/).filter(Boolean);
+/** `tags: false` leaves out the query's #tag terms (with `keepPinned`, pinned items show past them). */
+export function matchesQuery(item, query, { tags: byTags = true } = {}) {
+  const terms = text(query)
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((term) => term && (byTags || !(term.startsWith('#') && term.length > 1)));
   if (!terms.length) return true;
   const tags = item.tags.map((t) => t.toLowerCase());
   // The id too, so an item can be found by the id Claude gives.
@@ -300,13 +304,16 @@ export function matchesQuery(item, query) {
   });
 }
 
-export function filterItems(items, { type = 'all', status = 'all', query = '' } = {}) {
+/**
+ * `keepPinned` (the setting `pinnedPastFilters`, off by default): pinned items pass the type,
+ * status and #tag filters; a +project term and the words searched for still apply.
+ */
+export function filterItems(items, { type = 'all', status = 'all', query = '', keepPinned = false } = {}) {
   return items.filter(
     (i) =>
       !i.deleted &&
-      (type === 'all' || i.type === type) &&
-      (status === 'all' || i.status === status) &&
-      matchesQuery(i, query),
+      ((keepPinned && i.pinned && matchesQuery(i, query, { tags: false })) ||
+        ((type === 'all' || i.type === type) && (status === 'all' || i.status === status) && matchesQuery(i, query))),
   );
 }
 
