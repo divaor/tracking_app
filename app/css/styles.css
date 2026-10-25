@@ -3204,3 +3204,417 @@ button.help-command:focus-visible {
 .icon-btn.pin-toggle.on svg {
   fill: currentColor;
 }
+
+/* ---- An open item's top: title, status, priority, project, tags --------- */
+/* A band of its own, so it never reads as part of the content scrolling under it. */
+.item-top {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+
+.item-top.scrolled {
+  border-bottom-color: var(--border-strong);
+  box-shadow: 0 10px 16px -12px rgba(25, 23, 18, 0.45);
+}
+
+.item-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 22px 14px;
+}
+
+.item-head .item-title {
+  margin: 0;
+  transition: font-size 0.15s;
+}
+
+/* Scrolled down, the title takes less room (it is whole in its tooltip). */
+.item-top.scrolled .item-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 18px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.item-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-controls .segmented {
+  background: var(--surface-3);
+}
+
+.priority-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 38px;
+  padding: 0 0 0 11px;
+  border-radius: 10px;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+
+.priority-pick:focus-within {
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.priority-pick select {
+  width: auto;
+  min-height: 0;
+  height: 100%;
+  padding: 0 30px 0 4px;
+  border: 0;
+  background-color: transparent;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.priority-pick select:focus {
+  box-shadow: none;
+}
+
+.priority-pick.prio-low {
+  color: var(--text-3);
+}
+
+.priority-pick.prio-high {
+  color: var(--warn);
+}
+
+.priority-pick.prio-urgent {
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface-3));
+  color: var(--danger);
+}
+
+.item-labels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.item-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+}
+
+.modal-body.view {
+  padding-top: 16px;
+}
+
+.modal-body.view > :first-child {
+  margin-top: 0;
+}
+
+.head-menu {
+  position: relative;
+}
+
+.icon-btn.on {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.head-menu-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 240px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.head-menu-pop p {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.head-menu-pop label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* ---- Item windows (desktop) --------------------------------------------- */
+.item-window {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 8px 30px rgba(25, 23, 18, 0.16);
+  outline: none;
+  animation: rise 0.14s ease-out;
+}
+
+.item-window.front {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-strong));
+  box-shadow: 0 16px 48px rgba(25, 23, 18, 0.26);
+}
+
+.item-window.minimized {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.item-window .item-top {
+  border-radius: 11px 11px 0 0;
+}
+
+.item-window .modal-head {
+  padding: 6px 6px 4px 14px;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
+.item-window .modal-head .icon-btn {
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+.item-window .item-head {
+  padding: 0 16px 12px;
+}
+
+.item-window .item-title {
+  font-size: 19px;
+}
+
+.item-window .item-controls .segmented button {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 13.5px;
+}
+
+.item-window .priority-pick {
+  height: 36px;
+}
+
+.item-window .priority-pick select {
+  font-size: 13.5px;
+}
+
+.item-window .modal-body {
+  flex: 1;
+  padding-right: 16px;
+  padding-left: 16px;
+}
+
+.item-window .modal-foot {
+  padding: 10px 16px;
+}
+
+.item-window.reader .markdown {
+  font-size: 16px;
+}
+
+.win-edge {
+  position: absolute;
+  z-index: 3;
+  touch-action: none;
+}
+
+.edge-e,
+.edge-w {
+  top: 12px;
+  bottom: 12px;
+  width: 7px;
+  cursor: ew-resize;
+}
+
+.edge-e {
+  right: 0;
+}
+
+.edge-w {
+  left: 0;
+}
+
+.edge-s {
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 7px;
+  cursor: ns-resize;
+}
+
+.edge-se,
+.edge-sw {
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+}
+
+.edge-se {
+  right: 0;
+  cursor: nwse-resize;
+}
+
+.edge-sw {
+  left: 0;
+  cursor: nesw-resize;
+}
+
+body.window-dragging {
+  user-select: none;
+}
+
+body.window-dragging iframe {
+  pointer-events: none;
+}
+
+.window-dock {
+  position: fixed;
+  right: 0;
+  bottom: 10px;
+  left: var(--sidebar);
+  z-index: 46;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  pointer-events: none;
+}
+
+.dock-inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 5px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  scrollbar-width: none;
+}
+
+.dock-chip {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 90px;
+  max-width: 220px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.dock-chip.front {
+  background: var(--accent-soft);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.dock-chip.min {
+  opacity: 0.7;
+}
+
+.dock-open {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 4px 5px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.dock-open .icon {
+  flex: none;
+  color: var(--c);
+}
+
+.dock-open span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dock-close {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 3px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+}
+
+.dock-close:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.dock-sep {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: 3px 4px;
+  background: var(--border);
+}
+
+.app.has-windows .content {
+  padding-bottom: 84px;
+}
+
+@media (max-width: 860px) {
+  .pop-out {
+    display: none;
+  }
+
+  .modal .item-top {
+    border-radius: 0;
+  }
+
+  .item-head {
+    padding: 0 16px 12px;
+  }
+
+  .item-controls .segmented button {
+    padding: 5px 9px;
+  }
+
+  .window-dock {
+    bottom: calc(var(--bottom-nav) + 10px + env(safe-area-inset-bottom));
+    left: 0;
+  }
+}

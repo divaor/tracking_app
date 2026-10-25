@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 1.9.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 1.10.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -122,14 +122,36 @@ Pin an item (the pin at the top of an open item, or **P**) to keep it on top of 
 
 A pinned item shows whatever type, status or `#tag` you filter by, and even when it is done, as long as its project is shown: picking other projects in the bar above hides it, and so do `+project` and words you search for. **Projects → Manage** counts each project's pinned items.
 
-## 7. Editing an item
+## 7. Opening and editing an item
 
-Open an item and press the pencil (or **E**), or the pin (or **P**) to pin it (section 6). You can change its type, status, priority, due date, project, link and tags, and write notes in Markdown.
+Click an item to open it. Its top stays in place while you scroll the content, set apart by its own shade and an edge, so it never reads as part of the notes:
+
+- the **title**;
+- the **status** buttons, with the **priority** on their right (change either right there);
+- the **project** and **tags**.
+
+The eye in the item's bar chooses which of status, priority, project and tags show (each device remembers it); the title always shows.
+
+Press the pencil (or **E**) to edit, or the pin (or **P**) to pin it (section 6). You can change its type, status, priority, due date, project, link and tags, and write notes in Markdown.
 
 - **Checklists:** write `- [ ] step` lines. You can tick them right in the reader, and cards show the progress (for example 1/3).
 - **Tags** are chips: type one and press Enter (Backspace in an empty field removes the last one). Suggestions come from tags you already use.
 - **Documents:** paste text, use **Import file**, or drop Markdown files onto the window to add them to your reading list.
-- Save with **Ctrl+Enter** (**Cmd+Enter** on a Mac); **Esc** closes (and asks before dropping unsaved changes). Deleting an item or marking it done shows an **Undo** button for a few seconds.
+- Save with **Ctrl+Enter** (**Cmd+Enter** on a Mac); **Esc** closes (and asks before dropping unsaved changes). Deleting an item or marking it done shows an **Undo** button for a few seconds. Saving changes only what you changed, so an edit made meanwhile somewhere else stays.
+
+### Several items at once (desktop)
+
+To compare items, or keep one at hand while you open others, open them in **windows** inside the app:
+
+- In an open item, press the window button (or **W**): it moves to a window at the side, scrolled where you were.
+- **Ctrl+click** (**Cmd+click** on a Mac) or **middle-click** an item to open it straight in a window. Do it again on the same item for a second view of it, to read two parts at once.
+- A plain click still opens the item as usual, over everything.
+- **Drag** a window by its top bar, **resize** it from its edges, **double-click** the bar to maximize it.
+- **Minimize** puts it in the bar at the bottom, out of the way. Click its name there to bring it back, or to bring it to the front.
+- The bar also has **Side by side** (every open window next to each other), **Minimize all** and **Close all**; the desktop app has them in the **View** menu too.
+- **Esc** closes the window you are in. Each window has its own scroll position and can be edited on its own.
+
+On a phone, items open one at a time as before.
 
 ## 8. Projects and tags
 
@@ -232,6 +254,8 @@ Press **F1** or **?** to open Help: **Commands and shortcuts** lists everything 
 | **Esc** | Clear the search, or close what's open |
 | **E** | Edit the open item |
 | **P** | Pin or unpin the open item |
+| **W** | Open the open item in a window (desktop) |
+| **Ctrl+click** · middle-click | Open an item in a window (desktop) |
 | **Ctrl+Enter** | Save the item |
 | **Ctrl+Shift+S** | Sync now (desktop) |
 | **Ctrl+,** | Settings (desktop) |

@@ -1,4 +1,4 @@
-import { html, useContext, useEffect, useMemo, useRef, useState } from '../../vendor/preact-htm.js';
+import { html, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/preact-htm.js';
 import {
   areaLabel,
   cleanTags,
@@ -18,7 +18,7 @@ import {
 import { formatDateTime, formatDue } from '../format.js';
 import { renderMarkdown } from '../markdown.js';
 import { parseEditorLink } from '../editorLinks.js';
-import { getSettings } from '../settings.js';
+import { getSettings, saveSettings } from '../settings.js';
 import { Icon } from './icons.js';
 import { DecisionBadge, EditorLink, PriorityMark, ProjectsContext, Segmented, TypeBadge } from './components.js';
 import { ProjectChip, TagInput } from './projects.js';
@@ -116,7 +116,75 @@ function ReviewPanel({ item, actions }) {
   </section>`;
 }
 
-function ViewBody({ item, actions, today, onEdit }) {
+// What can show under an item's title (the title always shows); per device, settings `itemHead`.
+export const ITEM_HEAD = [
+  { id: 'status', label: 'Status' },
+  { id: 'priority', label: 'Priority' },
+  { id: 'project', label: 'Project' },
+  { id: 'tags', label: 'Tags' },
+];
+const headShown = () => ({ status: true, priority: true, project: true, tags: true, ...getSettings().itemHead });
+
+/** The eye in an item's bar: which of status, priority, project and tags show under the title. */
+function HeadMenu() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    document.addEventListener('pointerdown', away, true);
+    return () => document.removeEventListener('pointerdown', away, true);
+  }, [open]);
+  const shown = headShown();
+  return html`<div class="head-menu" ref=${ref} onKeyDown=${(e) => {
+    if (e.key !== 'Escape' || !open) return;
+    e.stopPropagation();
+    setOpen(false);
+  }}>
+    <button type="button" class="icon-btn ${open ? 'on' : ''}" title="Show under the title…" aria-label="Show under the title"
+      aria-expanded=${open} onClick=${() => setOpen(!open)}><${Icon} name="eye" /></button>
+    ${open &&
+    html`<div class="head-menu-pop" role="group" aria-label="Show under the title">
+      <p>Under the title (it always shows)</p>
+      ${ITEM_HEAD.map(
+        (part) => html`<label key=${part.id}><input type="checkbox" checked=${shown[part.id]}
+          onChange=${(e) => saveSettings({ itemHead: { ...shown, [part.id]: e.currentTarget.checked } })} />${part.label}</label>`,
+      )}
+    </div>`}
+  </div>`;
+}
+
+function PriorityPick({ item, actions }) {
+  return html`<label class="priority-pick prio-${item.priority}" title="Priority">
+    <${Icon} name="flag" size=${14} />
+    <select value=${item.priority} aria-label="Priority" onChange=${(e) => actions.update(item.id, { priority: e.currentTarget.value })}>
+      ${PRIORITIES.map((p) => html`<option key=${p.id} value=${p.id}>${p.label}</option>`)}
+    </select>
+  </label>`;
+}
+
+/** The top of an open item, which stays while its content scrolls: the title, then what `itemHead` shows. */
+function ItemHead({ item, actions, titleId }) {
+  const shown = headShown();
+  const statusOptions = STATUSES.map((s) => ({ id: s, label: statusLabel(s, item.type) }));
+  const project = shown.project && item.project;
+  const tags = shown.tags ? item.tags : [];
+  return html`<div class="item-head">
+    <h2 class="item-title" id=${titleId} title=${item.title}>${item.title || 'Untitled'}</h2>
+    ${(shown.status || shown.priority) &&
+    html`<div class="item-controls">
+      ${shown.status && html`<${Segmented} options=${statusOptions} value=${item.status} label="Status" onChange=${(status) => actions.setStatus(item.id, status)} />`}
+      ${shown.priority && html`<${PriorityPick} item=${item} actions=${actions} />`}
+    </div>`}
+    ${(project || tags.length > 0) &&
+    html`<div class="item-labels">
+      ${project && html`<span class="item-project"><${ProjectLink} name=${item.project} /></span>`}
+      ${tags.map((t) => html`<button type="button" class="tag" key=${t} onClick=${() => actions.searchTag(t)}>#${t}</button>`)}
+    </div>`}
+  </div>`;
+}
+
+function ViewBody({ item, actions, today, onEdit, bodyRef, onScroll }) {
   const notesHtml = useMemo(() => renderMarkdown(item.notes), [item.notes]);
   const onNotesClick = (e) => {
     const box = e.target.closest?.('input.md-check');
@@ -125,25 +193,16 @@ function ViewBody({ item, actions, today, onEdit }) {
     const boxes = [...e.currentTarget.querySelectorAll('input.md-check')];
     actions.update(item.id, { notes: toggleChecklistItem(item.notes, boxes.indexOf(box)) });
   };
-  const statusOptions = STATUSES.map((s) => ({ id: s, label: statusLabel(s, item.type) }));
   const editorRoute = parseEditorLink(item.url, getSettings().editorUrl);
 
-  return html`<div class="modal-body view">
-    <h2 class="item-title" id="modal-title">${item.title || 'Untitled'}</h2>
-    <${Segmented} options=${statusOptions} value=${item.status} label="Status"
-      onChange=${(status) => actions.setStatus(item.id, status)} />
-
-    <dl class="props">
-      ${item.priority !== 'normal' &&
-      html`<div><dt>Priority</dt><dd>${item.priority === 'low' ? 'Low' : html`<${PriorityMark} priority=${item.priority} />`}</dd></div>`}
+  return html`<div class="modal-body view" ref=${bodyRef} onScroll=${onScroll}>
+    ${(item.due || item.url || item.decision) &&
+    html`<dl class="props">
       ${item.due && html`<div><dt>Due</dt><dd>${formatDue(item.due, today)} <span class="muted">(${item.due})</span></dd></div>`}
-      ${item.project && html`<div><dt>Project</dt><dd><${ProjectLink} name=${item.project} /></dd></div>`}
-      ${item.tags.length > 0 &&
-      html`<div><dt>Tags</dt><dd class="tags">${item.tags.map((t) => html`<button type="button" class="tag" key=${t} onClick=${() => actions.searchTag(t)}>#${t}</button>`)}</dd></div>`}
       ${item.url &&
       html`<div><dt>Link</dt><dd><${ExternalLink} url=${item.url} className="link">${shortUrl(item.url)} <${Icon} name="external" size=${13} /></${ExternalLink}></dd></div>`}
       ${item.decision && html`<div><dt>Review</dt><dd><${DecisionBadge} decision=${item.decision} /></dd></div>`}
-    </dl>
+    </dl>`}
 
     ${editorRoute &&
     html`<${EditorLink} route=${editorRoute} className="btn primary open-doc"><${Icon} name="code" />Open in editor</${EditorLink}>`}
@@ -175,7 +234,7 @@ function ProjectLink({ name }) {
   return html`<${ProjectChip} project=${project} onClick=${() => showProject(projectKey(name))} />${project.area && html` <span class="muted small">${areaLabel(project.area)}</span>`}`;
 }
 
-function EditBody({ draft, setDraft, projects, tagSuggestions, onSubmit, titleRef, error }) {
+function EditBody({ draft, setDraft, projects, tagSuggestions, onSubmit, titleRef, error, ids, bodyRef, onScroll }) {
   const [tab, setTab] = useState('write');
   const fileRef = useRef(null);
   const set = (key) => (e) => setDraft({ ...draft, [key]: e.currentTarget.value });
@@ -194,7 +253,7 @@ function EditBody({ draft, setDraft, projects, tagSuggestions, onSubmit, titleRe
     });
   };
 
-  return html`<form class="modal-body edit" id="item-form" onSubmit=${onSubmit} novalidate>
+  return html`<form class="modal-body edit" id=${ids.form} onSubmit=${onSubmit} novalidate ref=${bodyRef} onScroll=${onScroll}>
     <div class="type-picker" role="group" aria-label="Type">
       ${TYPES.map(
         (t) => html`<button type="button" key=${t.id} class="type-pick type-${t.id} ${draft.type === t.id ? 'active' : ''}"
@@ -235,8 +294,8 @@ function EditBody({ draft, setDraft, projects, tagSuggestions, onSubmit, titleRe
       </label>`}
       <label class=${kinds ? '' : 'span-2'}>
         <span>Project</span>
-        <input value=${draft.project} onInput=${set('project')} list="project-options" placeholder="Optional" />
-        <datalist id="project-options">${projects.map((p) => html`<option key=${p} value=${p} />`)}</datalist>
+        <input value=${draft.project} onInput=${set('project')} list=${ids.projects} placeholder="Optional" />
+        <datalist id=${ids.projects}>${projects.map((p) => html`<option key=${p} value=${p} />`)}</datalist>
       </label>
       <label class="span-2">
         <span>Link</span>
@@ -263,15 +322,36 @@ function EditBody({ draft, setDraft, projects, tagSuggestions, onSubmit, titleRe
   </form>`;
 }
 
-export function ItemModal({ item, initial, actions, projects, tagSuggestions = [], today, onClose }) {
+let panelSeq = 0;
+const isField = (el) => /INPUT|TEXTAREA|SELECT/.test(el?.tagName);
+const plainKey = (e, key) => e.key === key && !e.metaKey && !e.ctrlKey && !e.altKey && !isField(e.target);
+
+/**
+ * An open item: its bar, the top that stays (title, status, priority, project, tags) and the
+ * content that scrolls under it; or the form while editing. `frame` 'modal' is the dialog
+ * over the app (its keys are the document's), 'window' an item window (`ItemWindow`: keys
+ * only while it has the focus; `tools` and `onHead*` come from it).
+ */
+export function ItemPanel({
+  item, initial, actions, projects, tagSuggestions = [], today, onClose, frame = 'modal', rootRef, rootProps = {},
+  tools, onHeadPointerDown, onHeadDoubleClick, onPopOut, initialScroll = 0, closeRef, children,
+}) {
   const isNew = !item;
   const [mode, setMode] = useState(isNew ? 'edit' : 'view');
   const [draft, setDraft] = useState(() => toDraft(item ?? initial));
   const [baseline, setBaseline] = useState(() => toDraft(item ?? initial));
   const [error, setError] = useState('');
+  const [scrolled, setScrolled] = useState(false);
   const titleRef = useRef(null);
-  const dialogRef = useRef(null);
+  const ownRef = useRef(null);
+  const dialogRef = rootRef ?? ownRef;
+  const bodyRef = useRef(null);
   const editing = mode === 'edit';
+  // The dialog keeps the ids it always had; each window gets its own.
+  const ids = useMemo(() => {
+    const n = frame === 'modal' ? '' : `-${++panelSeq}`;
+    return { title: `modal-title${n}`, form: `item-form${n}`, projects: `project-options${n}` };
+  }, []);
 
   const startEdit = () => {
     const d = toDraft(item);
@@ -289,6 +369,7 @@ export function ItemModal({ item, initial, actions, projects, tagSuggestions = [
     }
     onClose();
   };
+  if (closeRef) closeRef.current = requestClose;
 
   const save = (e) => {
     e?.preventDefault();
@@ -302,73 +383,103 @@ export function ItemModal({ item, initial, actions, projects, tagSuggestions = [
     if (isNew) {
       actions.create(fields);
       onClose();
-    } else {
-      actions.update(item.id, fields);
-      setMode('view');
+      return;
     }
+    // Only what was changed here, so edits made meanwhile elsewhere (another window of this
+    // item, the board, Claude) are kept.
+    const before = fromDraft(baseline);
+    const patch = Object.fromEntries(Object.entries(fields).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(before[key])));
+    if (Object.keys(patch).length) actions.update(item.id, patch);
+    setMode('view');
   };
+
+  const popOut = () => onPopOut?.({ scroll: bodyRef.current?.scrollTop ?? 0 });
 
   useEffect(() => {
     if (editing) titleRef.current?.focus();
-    else dialogRef.current?.focus();
+    else dialogRef.current?.focus({ preventScroll: true });
   }, [editing]);
 
+  // A window popped out of the dialog opens where the dialog was scrolled to.
+  useLayoutEffect(() => {
+    if (initialScroll && bodyRef.current) bodyRef.current.scrollTop = initialScroll;
+  }, []);
+
+  /** The item's keys; true when one was used. */
+  const onKey = (e) => {
+    if (e.key === 'Escape') requestClose();
+    else if (editing && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save();
+    else if (!editing && plainKey(e, 'e')) startEdit();
+    else if (!editing && plainKey(e, 'p')) actions.togglePin(item);
+    else if (!editing && onPopOut && plainKey(e, 'w')) popOut();
+    else return false;
+    e.preventDefault();
+    return true;
+  };
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        requestClose();
-      } else if (editing && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        save();
-      } else if (!editing && e.key === 'e' && !e.metaKey && !e.ctrlKey && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) {
-        e.preventDefault();
-        startEdit();
-      } else if (!editing && e.key === 'p' && !e.metaKey && !e.ctrlKey && !e.altKey && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) {
-        e.preventDefault();
-        actions.togglePin(item);
-      }
-    };
+    if (frame !== 'modal') return undefined;
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   });
 
   const type = editing ? draft.type : item.type;
-  return html`<div class="modal-backdrop" onMouseDown=${(e) => e.target === e.currentTarget && requestClose()}>
-    <div class="modal type-${type} ${editing ? 'editing' : 'viewing'} ${type === 'doc' && !editing ? 'reader' : ''}"
-      role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1" ref=${dialogRef}>
-      <header class="modal-head">
+  const Root = frame === 'window' ? 'section' : 'div';
+  const frameClass = frame === 'window' ? 'item-window' : 'modal';
+  return html`<${Root} ...${rootProps}
+    class="${frameClass} type-${type} ${editing ? 'editing' : 'viewing'} ${type === 'doc' && !editing ? 'reader' : ''} ${rootProps.class ?? ''}"
+    role="dialog" aria-modal=${frame === 'modal' ? 'true' : undefined} aria-labelledby=${ids.title} tabindex="-1" ref=${dialogRef}
+    onKeyDown=${frame === 'window' ? (e) => onKey(e) && e.stopPropagation() : undefined}>
+    <div class="item-top ${scrolled ? 'scrolled' : ''}">
+      <header class="modal-head" onPointerDown=${onHeadPointerDown} onDblClick=${onHeadDoubleClick}>
         ${editing
-          ? html`<h2 class="modal-heading" id="modal-title">${isNew ? 'New item' : 'Edit item'}</h2>`
+          ? html`<h2 class="modal-heading" id=${ids.title}>${isNew ? 'New item' : 'Edit item'}</h2>`
           : html`<${TypeBadge} type=${item.type} kind=${item.kind} />`}
         <span class="spacer" />
         ${!editing &&
-        html`<button type="button" class="icon-btn pin-toggle ${item.pinned ? 'on' : ''}" title=${item.pinned ? 'Unpin (P)' : 'Pin to the top of its project (P)'}
+        html`<${HeadMenu} />
+          <button type="button" class="icon-btn pin-toggle ${item.pinned ? 'on' : ''}" title=${item.pinned ? 'Unpin (P)' : 'Pin to the top of its project (P)'}
             aria-label=${item.pinned ? 'Unpin' : 'Pin'} aria-pressed=${Boolean(item.pinned)} onClick=${() => actions.togglePin(item)}><${Icon} name="pin" /></button>
           <button type="button" class="icon-btn" title="Edit (E)" aria-label="Edit" onClick=${startEdit}><${Icon} name="edit" /></button>
           <button type="button" class="icon-btn danger" title="Delete" aria-label="Delete" onClick=${() => {
             actions.remove(item.id);
             onClose();
           }}><${Icon} name="trash" /></button>`}
+        ${!editing &&
+        onPopOut &&
+        html`<button type="button" class="icon-btn pop-out" title="Open in a window (W): keep it aside, compare it with others" aria-label="Open in a window"
+          onClick=${popOut}><${Icon} name="popout" /></button>`}
+        ${tools}
         <button type="button" class="icon-btn" title="Close (Esc)" aria-label="Close" onClick=${requestClose}><${Icon} name="x" /></button>
       </header>
-      ${editing
-        ? html`<${EditBody} draft=${draft} setDraft=${(d) => {
-            setDraft(d);
-            if (error) setError('');
-          }} projects=${projects} tagSuggestions=${tagSuggestions} onSubmit=${save} titleRef=${titleRef} error=${error} />`
-        : html`<${ViewBody} item=${item} actions=${actions} today=${today} onEdit=${startEdit} />`}
-      ${editing &&
-      html`<footer class="modal-foot">
-        ${!isNew &&
-        html`<button type="button" class="btn ghost danger" onClick=${() => {
-          actions.remove(item.id);
-          onClose();
-        }}><${Icon} name="trash" size=${16} />Delete</button>`}
-        <span class="spacer" />
-        <button type="button" class="btn" onClick=${requestClose}>Cancel</button>
-        <button type="submit" form="item-form" class="btn primary" title="Save (Ctrl+Enter)">${isNew ? 'Add' : 'Save'}</button>
-      </footer>`}
+      ${!editing && html`<${ItemHead} item=${item} actions=${actions} titleId=${ids.title} />`}
     </div>
+    ${editing
+      ? html`<${EditBody} draft=${draft} setDraft=${(d) => {
+          setDraft(d);
+          if (error) setError('');
+        }} projects=${projects} tagSuggestions=${tagSuggestions} onSubmit=${save} titleRef=${titleRef} error=${error}
+          ids=${ids} bodyRef=${bodyRef} onScroll=${(e) => setScrolled(e.currentTarget.scrollTop > 4)} />`
+      : html`<${ViewBody} item=${item} actions=${actions} today=${today} onEdit=${startEdit}
+          bodyRef=${bodyRef} onScroll=${(e) => setScrolled(e.currentTarget.scrollTop > 4)} />`}
+    ${editing &&
+    html`<footer class="modal-foot">
+      ${!isNew &&
+      html`<button type="button" class="btn ghost danger" onClick=${() => {
+        actions.remove(item.id);
+        onClose();
+      }}><${Icon} name="trash" size=${16} />Delete</button>`}
+      <span class="spacer" />
+      <button type="button" class="btn" onClick=${requestClose}>Cancel</button>
+      <button type="submit" form=${ids.form} class="btn primary" title="Save (Ctrl+Enter)">${isNew ? 'Add' : 'Save'}</button>
+    </footer>`}
+    ${children}
+  </${Root}>`;
+}
+
+/** The item dialog: one item over the app (the default way an item opens). */
+export function ItemModal(props) {
+  const closeRef = useRef(null);
+  return html`<div class="modal-backdrop" onMouseDown=${(e) => e.target === e.currentTarget && closeRef.current?.()}>
+    <${ItemPanel} ...${props} frame="modal" closeRef=${closeRef} />
   </div>`;
 }

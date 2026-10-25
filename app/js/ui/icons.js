@@ -48,6 +48,11 @@ const PATHS = {
   send: () => html`<path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" />`,
   stop: () => html`<rect x="6" y="6" width="12" height="12" rx="2" />`,
   help: () => html`<circle cx="12" cy="12" r="9" /><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01" />`,
+  popout: () => html`<path d="M14 4h6v6M20 4l-8 8" /><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />`,
+  minimize: () => html`<path d="M6 18h12" />`,
+  maximize: () => html`<rect x="5" y="5" width="14" height="14" rx="2" />`,
+  restore: () => html`<rect x="4" y="8" width="12" height="12" rx="2" /><path d="M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2" />`,
+  columns: () => html`<rect x="3" y="4" width="7" height="16" rx="2" /><rect x="14" y="4" width="7" height="16" rx="2" />`,
 };
 
 export function Icon({ name, size = 18, class: cls = '' }) {

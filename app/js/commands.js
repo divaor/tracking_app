@@ -4,7 +4,7 @@
 // commands that exist only there. Rows with `run: false` are things done in place: they
 // show `keys`, `code` (what to type) or `how`. Pure, so the Node tests can check it.
 
-export const COMMAND_GROUPS = ['Items', 'Go to', 'Search and filter', 'In an item', 'Quick add', 'The model', 'App'];
+export const COMMAND_GROUPS = ['Items', 'Go to', 'Search and filter', 'In an item', 'Item windows', 'Quick add', 'The model', 'App'];
 
 /** [{ id, group, label, keys?, desktop?, mac?, only?, code?, how?, hint?, run? }] */
 export const COMMAND_LIST = [
@@ -44,6 +44,15 @@ export const COMMAND_LIST = [
   { id: 'item-tags', group: 'In an item', label: 'Add a tag / remove the last one', keys: 'Enter · Backspace', hint: 'In the tags field', run: false },
   { id: 'item-ask', group: 'In an item', label: 'Ask the model about this', how: 'In the item, with a model on', run: false },
   { id: 'item-undo', group: 'In an item', label: 'Undo a delete or a Done', how: 'Undo in the message', run: false },
+  { id: 'item-priority', group: 'In an item', label: 'Change the priority', how: 'The priority next to the status, under the title', run: false },
+  { id: 'item-head', group: 'In an item', label: 'Choose what shows under the title (status, priority, project, tags)', how: 'The eye in the item’s bar', run: false },
+
+  { id: 'item-window', group: 'Item windows', label: 'Open the item in a window, to keep it aside or compare it with others', keys: 'W', run: false, hint: 'In an open item, or its window button' },
+  { id: 'item-window-click', group: 'Item windows', label: 'Open an item straight in a window (again for another view of the same item)', keys: 'Mod+click · middle-click', run: false },
+  { id: 'window-move', group: 'Item windows', label: 'Move, resize, maximize or minimize a window', how: 'Drag its top bar or an edge; double-click the bar to maximize', run: false },
+  { id: 'windows-tile', group: 'Item windows', label: 'Item windows side by side' },
+  { id: 'windows-minimize', group: 'Item windows', label: 'Minimize all item windows (out of the way)' },
+  { id: 'windows-close', group: 'Item windows', label: 'Close all item windows' },
 
   { id: 'qa-project', group: 'Quick add', label: 'Put it in a project', code: '+project', run: false },
   { id: 'qa-tag', group: 'Quick add', label: 'Add a tag', code: '#tag', run: false },

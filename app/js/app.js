@@ -24,6 +24,8 @@ import { ProjectsContext, SyncBadge, Toasts } from './ui/components.js';
 import { ProjectsView, ScopeBar } from './ui/projects.js';
 import { BoardView, HomeView, ListView } from './ui/views.js';
 import { ItemModal } from './ui/itemModal.js';
+import { ItemWindow, WindowDock } from './ui/itemWindows.js';
+import { clampRect, fullRect, nextRect, tileRects } from './windowLayout.js';
 import { HelpDialog } from './ui/help.js';
 import { askForPlan } from './ui/assist.js';
 import { SettingsView } from './ui/settingsView.js';
@@ -142,6 +144,18 @@ function BottomNav({ route, onNew }) {
 }
 
 let toastSeq = 0;
+let windowSeq = 0;
+let stackSeq = 0;
+
+// Item windows share the space under the top bar, less the bar of windows at the bottom.
+const DOCK_SPACE = 56;
+function windowArea() {
+  const box = document.querySelector('.content')?.getBoundingClientRect();
+  const area = box ? { x: box.left, y: box.top, w: box.width, h: box.height } : { x: 0, y: 0, w: innerWidth, h: innerHeight };
+  return { ...area, h: Math.max(240, area.h - DOCK_SPACE) };
+}
+// On a phone (and in a narrow window) items open as before, one at a time.
+const narrowScreen = () => matchMedia('(max-width: 860px)').matches;
 
 export function App() {
   const [route, setRoute] = useState(parseHash);
@@ -158,6 +172,10 @@ export function App() {
   const [, setTick] = useState(0);
   const [linkedItem, setLinkedItem] = useState(takeItemLink);
   const [help, setHelp] = useState(null); // { tab, query }
+  // Item windows: [{ wid, id, x, y, w, h, z, min, max, restore, scroll }], in the order they were
+  // opened (the page keeps that order, so their previews do not reload); `z` stacks them.
+  const [windows, setWindows] = useState([]);
+  const windowsRef = useRef(windows);
   const searchRef = useRef(null);
   const modalRef = useRef(null);
   const helpRef = useRef(null);
@@ -329,9 +347,58 @@ export function App() {
   // Viewing a single project: new items go into it.
   const defaultProject = scope.length === 1 && scope[0].startsWith('project:') ? (byKey.get(scope[0].slice(8))?.name ?? '') : '';
 
+  const updateWindows = (fn) => {
+    windowsRef.current = fn(windowsRef.current);
+    setWindows(windowsRef.current);
+  };
+  const patchWindow = (wid, patch) => updateWindows((list) => list.map((w) => (w.wid === wid ? { ...w, ...patch } : w)));
+  const frontWindow = (list = windowsRef.current) => list.filter((w) => !w.min).reduce((top, w) => (!top || w.z > top.z ? w : top), null);
+  const windowActions = {
+    /** Opens an item in a window of its own (again for an item already open: another view of it). */
+    open(item, { scroll = 0 } = {}) {
+      if (narrowScreen()) return openModal({ id: item.id });
+      const size = { w: item.type === 'doc' ? 760 : 580, h: 700 };
+      const place = nextRect(windowsRef.current, windowArea(), size);
+      updateWindows((list) => [...list, { wid: ++windowSeq, id: item.id, ...place, z: ++stackSeq, min: false, max: false, restore: null, scroll }]);
+    },
+    focus(wid) {
+      const win = windowsRef.current.find((w) => w.wid === wid);
+      if (win && (win.min || frontWindow() !== win)) patchWindow(wid, { z: ++stackSeq, min: false });
+    },
+    close: (wid) => updateWindows((list) => list.filter((w) => w.wid !== wid)),
+    minimize: (wid) => patchWindow(wid, { min: true }),
+    toggleMax(wid) {
+      const win = windowsRef.current.find((w) => w.wid === wid);
+      if (!win) return;
+      if (win.max) patchWindow(wid, { ...(win.restore ?? {}), max: false, restore: null });
+      else patchWindow(wid, { ...fullRect(windowArea()), max: true, restore: { x: win.x, y: win.y, w: win.w, h: win.h }, z: ++stackSeq });
+    },
+    /** The dock's button: a minimized window comes back, the front one is minimized, another comes to the front. */
+    pick(win) {
+      if (!win.min && frontWindow() === win) windowActions.minimize(win.wid);
+      else windowActions.focus(win.wid);
+    },
+    /** The windows shown, side by side in the order they are on screen from left to right. */
+    tile() {
+      const shown = windowsRef.current.filter((w) => !w.min).sort((a, b) => a.x - b.x || a.y - b.y);
+      const rects = tileRects(shown.length, windowArea());
+      const placed = new Map(shown.map((w, i) => [w.wid, rects[i]]));
+      updateWindows((list) => list.map((w) => (placed.has(w.wid) ? { ...w, ...placed.get(w.wid), max: false, restore: null } : w)));
+    },
+    minimizeAll: () => updateWindows((list) => list.map((w) => ({ ...w, min: true }))),
+    closeAll: () => updateWindows(() => []),
+  };
+
   const actions = {
     toast,
-    open: (item) => openModal({ id: item.id }),
+    /** Opens an item: in the dialog, or `{ window: true }` (Ctrl+click, middle-click) in a window of its own. */
+    open: (item, { window: inWindow = false } = {}) => (inWindow ? windowActions.open(item) : openModal({ id: item.id })),
+    /** The dialog's item moves to a window at the side (the list stays free to open others), scrolled as it was. */
+    popOut(item, { scroll = 0 } = {}) {
+      if (narrowScreen()) return;
+      closeModal();
+      windowActions.open(item, { scroll });
+    },
     newItem: (draft = {}) => openModal({ draft: { type: defaultType, project: defaultProject, ...draft } }),
     create(fields) {
       const item = store.add(fields);
@@ -455,6 +522,9 @@ export function App() {
     'plan-day': () => actions.plan('day'),
     'plan-week': () => actions.plan('week'),
     'model-settings': () => (go({ view: 'settings' }), scrollToWhenShown('model')),
+    'windows-tile': () => windowActions.tile(),
+    'windows-minimize': () => windowActions.minimizeAll(),
+    'windows-close': () => windowActions.closeAll(),
     help: () => openHelp('commands'),
     'help-guide': () => openHelp('guide'),
     theme: () => {
@@ -601,6 +671,23 @@ export function App() {
   useEffect(() => {
     if (modal?.id && !modalItem) closeModal();
   }, [modal, modalItem]);
+  const itemsById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  // Windows of items deleted (here or elsewhere) close.
+  useEffect(() => {
+    if (windows.some((w) => !itemsById.has(w.id))) updateWindows((list) => list.filter((w) => itemsById.has(w.id)));
+  }, [itemsById]);
+  // A smaller app window keeps every item window reachable.
+  useEffect(() => {
+    const onResize = () => {
+      if (!windowsRef.current.length) return;
+      const screen = { x: 0, y: 0, w: innerWidth, h: innerHeight };
+      updateWindows((list) => list.map((w) => ({ ...w, ...clampRect(w, screen) })));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const front = frontWindow(windows);
+  const stackOrder = [...windows].sort((a, b) => a.z - b.z).map((w) => w.wid);
 
   let view;
   if (route.view === 'board') {
@@ -623,7 +710,7 @@ export function App() {
   }
   const scoped = ['home', 'board', 'list'].includes(route.view);
 
-  return html`<${ProjectsContext.Provider} value=${{ byKey, showProject: actions.showProject, togglePin: actions.togglePin }}><div class="app ${drawer ? 'drawer-open' : ''}">
+  return html`<${ProjectsContext.Provider} value=${{ byKey, showProject: actions.showProject, togglePin: actions.togglePin }}><div class="app ${drawer ? 'drawer-open' : ''} ${windows.length ? 'has-windows' : ''}">
     <${Sidebar} route=${route} items=${scopedItems} projects=${projects} scope=${scope} onProject=${actions.showProject}
       sync=${sync} onSyncClick=${onSyncClick} onNew=${() => actions.newItem()} onTag=${(tag) => actions.searchTag(tag)} onHelp=${() => openHelp()} />
     <div class="scrim" onClick=${() => setDrawer(false)} />
@@ -649,9 +736,20 @@ export function App() {
       </div>
     </main>
     <${BottomNav} route=${route} onNew=${() => actions.newItem()} />
+    ${windows.map((win) => {
+      const item = itemsById.get(win.id);
+      return item && html`<${ItemWindow} key=${win.wid} win=${win} item=${item} z=${30 + Math.min(15, stackOrder.indexOf(win.wid))} front=${front?.wid === win.wid}
+        actions=${actions} projects=${projects.map((p) => p.name)} tagSuggestions=${tagNames} today=${today}
+        onChange=${(patch) => patchWindow(win.wid, patch)} onFocus=${() => windowActions.focus(win.wid)} onClose=${() => windowActions.close(win.wid)}
+        onMinimize=${() => windowActions.minimize(win.wid)} onMaximize=${() => windowActions.toggleMax(win.wid)} />`;
+    })}
+    ${windows.length > 0 &&
+    html`<${WindowDock} windows=${windows} items=${itemsById} front=${front?.wid} onPick=${windowActions.pick} onClose=${(w) => windowActions.close(w.wid)}
+      onTile=${windowActions.tile} onMinimizeAll=${windowActions.minimizeAll} onCloseAll=${windowActions.closeAll} />`}
     ${modal && (modal.draft || modalItem) &&
     html`<${ItemModal} key=${modal.id ?? 'new'} item=${modalItem} initial=${modal.draft} actions=${actions}
-      projects=${projects.map((p) => p.name)} tagSuggestions=${tagNames} today=${today} onClose=${() => closeModal()} />`}
+      projects=${projects.map((p) => p.name)} tagSuggestions=${tagNames} today=${today} onClose=${() => closeModal()}
+      onPopOut=${modalItem ? (from) => actions.popOut(modalItem, from) : undefined} />`}
     ${help &&
     html`<${HelpDialog} tab=${help.tab} query=${help.query} onTab=${(tab) => setHelp((helpRef.current = { ...help, tab }))} onClose=${() => closeHelp()}
       onRun=${modal ? null : (command) => closeHelp(() => actionsRef.current.command(command.id))} />`}

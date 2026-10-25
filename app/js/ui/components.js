@@ -95,13 +95,29 @@ export function EditorLink({ route, className = '', title, children }) {
 }
 
 const openOnEnter = (fn) => (e) => {
-  if (e.key === 'Enter' && e.target === e.currentTarget) fn();
+  if (e.key === 'Enter' && e.target === e.currentTarget) fn(e);
 };
+// Ctrl+click (Cmd on a Mac), Ctrl+Enter and a middle click open the item in a window of its own.
+const inWindow = (e) => ({ window: Boolean(e.ctrlKey || e.metaKey || e.button === 1) });
+/** Click, Enter and middle-click handlers that open an item (in a window with Ctrl/Cmd or the middle button). */
+function openProps(item, onOpen) {
+  return {
+    onClick: (e) => onOpen(item, inWindow(e)),
+    onKeyDown: openOnEnter((e) => onOpen(item, inWindow(e))),
+    // The middle button would start autoscroll on Windows.
+    onMouseDown: (e) => e.button === 1 && e.preventDefault(),
+    onAuxClick: (e) => {
+      if (e.button !== 1) return;
+      e.preventDefault();
+      onOpen(item, { window: true });
+    },
+  };
+}
 
 export function ItemCard({ item, onOpen, onStatus, today, draggable = false, showType = true }) {
   const { byKey } = useContext(ProjectsContext);
   return html`<article class="card type-${item.type} status-${item.status} ${item.pinned ? 'pinned' : ''}" style=${pinStyle(item, byKey)} tabindex="0" draggable=${draggable}
-    onClick=${() => onOpen(item)} onKeyDown=${openOnEnter(() => onOpen(item))}
+    ...${openProps(item, onOpen)}
     onDragStart=${draggable
       ? (e) => {
           e.dataTransfer.setData('text/x-tracker-id', item.id);
@@ -127,7 +143,7 @@ export function ItemCard({ item, onOpen, onStatus, today, draggable = false, sho
 export function ItemRow({ item, onOpen, onStatus, today }) {
   const { byKey } = useContext(ProjectsContext);
   return html`<div class="row type-${item.type} status-${item.status} ${item.pinned ? 'pinned' : ''}" style=${pinStyle(item, byKey)} role="button" tabindex="0"
-    onClick=${() => onOpen(item)} onKeyDown=${openOnEnter(() => onOpen(item))}>
+    ...${openProps(item, onOpen)}>
     <${StatusButton} item=${item} onStatus=${onStatus} />
     <span class="row-type" title=${typeInfo(item.type).label}><${Icon} name=${item.type} size=${16} /></span>
     <div class="row-main">
