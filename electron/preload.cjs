@@ -61,4 +61,10 @@ contextBridge.exposeInMainWorld('desktop', {
     ipcRenderer.on('command', listener);
     return () => ipcRenderer.removeListener('command', listener);
   },
+  // An item to open, from a tracker-app://item/<id> link (or a link to the web app clicked here).
+  onOpenItem(callback) {
+    const listener = (_event, id) => callback(id);
+    ipcRenderer.on('open-item', listener);
+    return () => ipcRenderer.removeListener('open-item', listener);
+  },
 });

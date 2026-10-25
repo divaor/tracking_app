@@ -3306,6 +3306,36 @@ button.help-command:focus-visible {
   gap: 6px;
 }
 
+.item-id {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
+.item-id code {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.item-id .btn.sm {
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 12.5px;
+}
+
+a.item-ref {
+  font-family: var(--mono);
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+
 .item-project {
   display: inline-flex;
   align-items: center;
@@ -3330,15 +3360,13 @@ button.help-command:focus-visible {
   color: var(--text);
 }
 
+/* Fixed, placed by the page under the eye and kept on screen (item windows clip what overflows them). */
 .head-menu-pop {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  z-index: 5;
+  position: fixed;
+  z-index: 60;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 240px;
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 10px;

@@ -30,7 +30,9 @@ export const DEFAULT_SETTINGS = {
   // Project filter for the main views (see matchesScope in model.js).
   projectScope: [],
   // What an open item shows under its title, which always shows (see ITEM_HEAD in ui/itemModal.js).
-  itemHead: { status: true, priority: true, project: true, tags: true },
+  itemHead: { status: true, priority: true, project: true, tags: true, id: false },
+  // In a browser on a computer: links to items not on this device go to the desktop app (tracker-app://).
+  openItemsInApp: false,
   // Claude connector address, used for push notifications.
   connectorUrl: '',
   // Tracker Editor's web address; blank = the default (editorLinks.js).

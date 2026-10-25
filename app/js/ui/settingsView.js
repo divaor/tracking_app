@@ -373,6 +373,12 @@ function AppsCard({ installPrompt, onInstall }) {
       <div>
         <h3>Computers</h3>
         <p>Download the desktop app from the repository’s <em>Releases</em> page (Windows installer or portable .exe, macOS .dmg, Linux AppImage), or run it from a clone with <code>npm install</code> and <code>npm start</code>.</p>
+        ${isWeb &&
+        !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) &&
+        html`<label class="field checkbox">
+          <input type="checkbox" checked=${getSettings().openItemsInApp} onChange=${(e) => saveSettings({ openItemsInApp: e.currentTarget.checked })} />
+          <span>Open item links in the desktop app<small>A link to an item that is not in this browser (as Claude gives) goes to the Tracker app on this computer</small></span>
+        </label>`}
       </div>
     </div>
   </${Card}>`;

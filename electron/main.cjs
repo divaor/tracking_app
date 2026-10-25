@@ -18,6 +18,10 @@ const REPO_URL = 'https://github.com/divaor/tracking_app';
 const SECRET_KEYS = new Set(['github-token', 'llm-api-key', 'llm-webhook-secret', 'llm-key-local', 'llm-key-anthropic', 'llm-key-openai', 'llm-key-gemini', 'llm-key-openrouter', 'llm-key-mistral', 'llm-key-groq', 'llm-key-custom']);
 // Tracker Editor's desktop app opens tracker-editor:// links.
 const EDITOR_SCHEME = 'tracker-editor:';
+// This app opens tracker-app://item/<id> links (a browser without the item hands them over: app/js/itemLinks.js),
+// and links to items on the web app clicked in it.
+const LINK_SCHEME = 'tracker-app';
+const WEB_APP_URL = 'https://divaor.github.io/tracking_app/';
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
@@ -30,7 +34,12 @@ if (!app.requestSingleInstanceLock()) {
 // Windows only shows notifications for apps with an AppUserModelID.
 if (process.platform === 'win32') app.setAppUserModelId('com.divaor.tracker');
 
+if (process.defaultApp && process.argv.length >= 2) app.setAsDefaultProtocolClient(LINK_SCHEME, process.execPath, [path.resolve(process.argv[1])]);
+else app.setAsDefaultProtocolClient(LINK_SCHEME);
+
 let mainWindow = null;
+// An item to open once the page has loaded (a link that started the app).
+let pendingItem = null;
 let tray = null;
 let quitting = false;
 
@@ -418,6 +427,31 @@ function showWindow() {
   mainWindow.focus();
 }
 
+/** The item a tracker-app:// link, or a link to an item on the web app, opens; null for other links. */
+function itemOfLink(link) {
+  try {
+    const url = new URL(link);
+    const id = url.protocol === `${LINK_SCHEME}:` ? `${url.host}${url.pathname}`.match(/^item\/([^/?#]+)/)?.[1] : link.startsWith(WEB_APP_URL) ? url.hash.match(/^#\/item\/([^/?#]+)/)?.[1] : null;
+    return id ? decodeURIComponent(id) : null;
+  } catch {
+    return null;
+  }
+}
+
+function openItem(id) {
+  if (!app.isReady()) {
+    pendingItem = id;
+    return;
+  }
+  if (mainWindow && !mainWindow.webContents.isLoading()) {
+    showWindow();
+    mainWindow.webContents.send('open-item', id);
+  } else {
+    pendingItem = id;
+    showWindow();
+  }
+}
+
 function send(command) {
   if (!mainWindow) return;
   showWindow();
@@ -501,13 +535,17 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (isSafeExternal(url)) shell.openExternal(url);
+    const item = itemOfLink(url);
+    if (item) openItem(item);
+    else if (isSafeExternal(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (url.startsWith(`${APP_ORIGIN}/`)) return;
     event.preventDefault();
-    if (isSafeExternal(url)) shell.openExternal(url);
+    const item = itemOfLink(url);
+    if (item) openItem(item);
+    else if (isSafeExternal(url)) shell.openExternal(url);
   });
 
   mainWindow.on('close', (event) => {
@@ -526,7 +564,9 @@ function createWindow() {
     mainWindow = null;
   });
 
-  mainWindow.loadURL(`${APP_ORIGIN}/index.html`);
+  // The page opens #/item/<id> itself as it starts.
+  mainWindow.loadURL(`${APP_ORIGIN}/index.html${pendingItem ? `#/item/${encodeURIComponent(pendingItem)}` : ''}`);
+  pendingItem = null;
 }
 
 function buildMenu() {
@@ -587,7 +627,18 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-app.on('second-instance', showWindow);
+app.on('second-instance', (_event, argv) => {
+  const item = argv.map(itemOfLink).find(Boolean);
+  if (item) openItem(item);
+  else showWindow();
+});
+
+// macOS hands links over here (also before the app is ready).
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  const item = itemOfLink(url);
+  if (item) openItem(item);
+});
 
 app.whenReady().then(() => {
   protocol.handle('app', (request) => {
@@ -599,6 +650,7 @@ app.whenReady().then(() => {
   });
 
   buildMenu();
+  pendingItem ??= process.argv.map(itemOfLink).find(Boolean) ?? null;
   pendingAdds.push(...readJson('quick-adds.json', []));
   registerQuickAdd();
   createWindow();

@@ -1,2 +1,2 @@
 // Keep in sync with package.json (checked by test/app.test.js).
-export const APP_VERSION = '1.10.0';
+export const APP_VERSION = '1.11.0';

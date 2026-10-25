@@ -31,6 +31,7 @@ export const COMMAND_LIST = [
   { id: 'clear-search', group: 'Search and filter', label: 'Clear the search', keys: 'Esc', hint: 'In the search box' },
   { id: 'search-tag', group: 'Search and filter', label: 'Search a tag', code: '#tag', run: false },
   { id: 'search-project', group: 'Search and filter', label: 'Search a project', code: '+project', run: false },
+  { id: 'open-by-link', group: 'Search and filter', label: 'Open an item from a link to it or its ID (as Claude gives)', how: 'Paste it in the search box', run: false },
   { id: 'scope-all', group: 'Search and filter', label: 'Show all projects' },
   { id: 'scope-work', group: 'Search and filter', label: 'Show only work projects' },
   { id: 'scope-personal', group: 'Search and filter', label: 'Show only personal projects' },
@@ -46,6 +47,8 @@ export const COMMAND_LIST = [
   { id: 'item-undo', group: 'In an item', label: 'Undo a delete or a Done', how: 'Undo in the message', run: false },
   { id: 'item-priority', group: 'In an item', label: 'Change the priority', how: 'The priority next to the status, under the title', run: false },
   { id: 'item-head', group: 'In an item', label: 'Choose what shows under the title (status, priority, project, tags)', how: 'The eye in the item’s bar', run: false },
+  { id: 'item-id', group: 'In an item', label: 'See the item’s ID, copy it or a link to the item', how: 'The eye → Its ID and link', run: false },
+  { id: 'item-ref', group: 'In an item', label: 'Open an item named in the notes (its ID or a link to it)', how: 'Click it (Ctrl+click: in a window)', run: false },
 
   { id: 'item-window', group: 'Item windows', label: 'Open the item in a window, to keep it aside or compare it with others', keys: 'W', run: false, hint: 'In an open item, or its window button' },
   { id: 'item-window-click', group: 'Item windows', label: 'Open an item straight in a window (again for another view of the same item)', keys: 'Mod+click · middle-click', run: false },

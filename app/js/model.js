@@ -292,7 +292,8 @@ export function matchesQuery(item, query, { tags: byTags = true } = {}) {
     .filter((term) => term && (byTags || !(term.startsWith('#') && term.length > 1)));
   if (!terms.length) return true;
   const tags = item.tags.map((t) => t.toLowerCase());
-  const haystack = [item.title, item.notes, item.feedback, item.project, item.url, kindLabel(item.type, item.kind), ...item.files.map((f) => f.name)]
+  // The id too, so an item can be found by the id Claude gives.
+  const haystack = [item.title, item.notes, item.feedback, item.project, item.url, kindLabel(item.type, item.kind), item.id, ...item.files.map((f) => f.name)]
     .join('\n')
     .toLowerCase();
   const project = compactName(item.project);

@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 1.10.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 1.11.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -41,7 +41,7 @@ Download the file for your computer from the latest release (https://github.com/
 
 The installers aren't code-signed, so your computer warns you once. Windows SmartScreen: **More info → Run anyway**. Mac: right-click the app → **Open**.
 
-The desktop app looks and works like the web app. It also shows native notifications, opens a quick add window from any app, and can keep running in the system tray when you close the window.
+The desktop app looks and works like the web app. It also shows native notifications, opens a quick add window from any app, can keep running in the system tray when you close the window, and opens links to your items that your browser hands over (section 11).
 
 ### Keep your data on this computer (the default)
 
@@ -113,7 +113,8 @@ Each card shows its type, priority, project, due date, checklist progress, attac
 
 Filter by type and status, and sort by priority, due date and more (*Smart* lists items in progress first, then the rest by priority and due date). The sidebar's categories open the same list already filtered.
 
-- **Search** (`/`) matches titles, notes, links and file names. Use `#tag` for a tag or `+project` for a project. **Esc** in the search box clears it.
+- **Search** (`/`) matches titles, notes, links, file names and item IDs. Use `#tag` for a tag or `+project` for a project. **Esc** in the search box clears it.
+- **Paste a link to an item** (the ones Claude gives, `…/#/item/…`) **or its ID** in the search box to open that item.
 - Click a **tag** in the sidebar or on an item to see everything with that tag. Click a **project chip** to show that project.
 
 ### Pinned items
@@ -130,7 +131,9 @@ Click an item to open it. Its top stays in place while you scroll the content, s
 - the **status** buttons, with the **priority** on their right (change either right there);
 - the **project** and **tags**.
 
-The eye in the item's bar chooses which of status, priority, project and tags show (each device remembers it); the title always shows.
+The eye in the item's bar chooses which of status, priority, project and tags show (each device remembers it); the title always shows. **Its ID and link** (off at first) adds the item's ID with **Copy ID** and **Copy link**, to compare it with the one Claude names or to send the link.
+
+IDs of other items in the notes (Claude often names items by their ID) are links: click one to open that item, **Ctrl+click** for a window (below). Links to items open here too.
 
 Press the pencil (or **E**) to edit, or the pin (or **P**) to pin it (section 6). You can change its type, status, priority, due date, project, link and tags, and write notes in Markdown.
 
@@ -210,6 +213,14 @@ In any Claude chat or Claude Code session with the Tracker connector on, just sa
 | "Check my tracker for feedback on the proposal and revise it" | Reads your decision and feedback and sends a new version. |
 | "Save this to my editor as deploy-notes.md" / "Find the SQL I pasted about invoices in my editor files" | Saves, finds and reads your Tracker Editor files. |
 
+### Links Claude gives you
+
+Claude links to items as `https://divaor.github.io/tracking_app/#/item/<ID>`:
+
+- **On your phone**, or in a browser where your data syncs, the link opens the item.
+- **In the desktop app**, paste the link (or the ID) in the search box.
+- **In a browser on your computer that doesn't sync your data** (the link opens there, not in the desktop app), the page offers **Open in the app**: the desktop app opens the item. The browser may ask once to allow it (tick *Always allow*); after that, such links go to the app straight away. Turn that off in **Settings → Use it everywhere → Open item links in the desktop app**.
+
 Claude only deletes items when you explicitly ask. It never reads or changes files you encrypted in Tracker Editor. Every change it makes is a commit in your data repo, so anything can be undone from the repo history.
 
 ## 12. Tracker Editor
@@ -275,6 +286,7 @@ On a Mac, use **Cmd** for **Ctrl**.
 | Remove Claude's access everywhere | Change the connector's `MCP_SECRET` and deploy it again. Every Claude sign-in and phone notification subscription stops working until you connect again. |
 | The quick add shortcut does nothing | Another app may own the keys: Settings → Quick add says so. Pick other keys. |
 | The model doesn't answer | Settings → Model → **Test and list models**. A local server must be running; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS`). With an AI provider: check the key and that the account has credit; a provider that refuses requests from web pages works from the desktop app. |
+| A link from Claude opens the browser, not the app | Click **Open in the app** in the message the page shows (needs the desktop app 1.11 or later), or paste the link in the app's search box. |
 | The phone app shows an old version | Close it completely and open it again while online. It updates itself on the next start. |
 
 ## 17. Updates and releases

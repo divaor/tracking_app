@@ -26,6 +26,7 @@ import { BoardView, HomeView, ListView } from './ui/views.js';
 import { ItemModal } from './ui/itemModal.js';
 import { ItemWindow, WindowDock } from './ui/itemWindows.js';
 import { clampRect, fullRect, nextRect, tileRects } from './windowLayout.js';
+import { appItemLink, itemIdIn, WEB_APP_URL } from './itemLinks.js';
 import { HelpDialog } from './ui/help.js';
 import { askForPlan } from './ui/assist.js';
 import { SettingsView } from './ui/settingsView.js';
@@ -156,6 +157,20 @@ function windowArea() {
 }
 // On a phone (and in a narrow window) items open as before, one at a time.
 const narrowScreen = () => matchMedia('(max-width: 860px)').matches;
+// A browser on a computer, where the desktop app can take item links (tracker-app://).
+const desktopBrowser = () => !window.desktop && !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+/** The item a link in the page points to, when it points into this app: '#/item/<id>' here, the web app's address, or tracker-app://. */
+function linkedItemOf(href) {
+  const id = itemIdIn(href);
+  if (!id) return null;
+  try {
+    const url = new URL(href, location.href);
+    const ours = url.protocol === 'tracker-app:' || url.origin === location.origin || url.href.startsWith(WEB_APP_URL);
+    return ours ? id : null;
+  } catch {
+    return null;
+  }
+}
 
 export function App() {
   const [route, setRoute] = useState(parseHash);
@@ -285,7 +300,9 @@ export function App() {
     syncNow().then(() => {
       if (cancelled || store.get(linkedItem)) return;
       setLinkedItem(null);
-      toast(isLocal() ? 'That item is not on this device.' : 'That item is not on this device. Check that GitHub sync is set up.', { kind: 'error' });
+      // A browser that does not sync (most likely not where the data is): the desktop app may have it.
+      if (desktopBrowser() && isLocal()) offerDesktopApp(linkedItem);
+      else toast(isLocal() ? 'That item is not on this device.' : 'That item is not on this device. Check that GitHub sync is set up.', { kind: 'error' });
     });
     return () => {
       cancelled = true;
@@ -306,6 +323,29 @@ export function App() {
     navigator.serviceWorker?.addEventListener('message', onMessage);
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
   }, []);
+
+  /**
+   * A link to an item this browser does not have (Claude's links open in the browser): the desktop
+   * app on this computer can open it (tracker-app://). Once that was chosen, it goes there at once.
+   */
+  const offerDesktopApp = (id) => {
+    const inApp = () => (location.href = appItemLink(id));
+    if (getSettings().openItemsInApp) {
+      inApp();
+      toast('Opened in the Tracker app: that item is not in this browser.', { duration: 15000, action: { label: 'Open again', run: inApp } });
+      return;
+    }
+    toast('That item is not in this browser. Open it in the Tracker app on this computer?', {
+      duration: 30000,
+      action: {
+        label: 'Open in the app',
+        run: () => {
+          saveSettings({ openItemsInApp: true });
+          inApp();
+        },
+      },
+    });
+  };
 
   const dismissToast = (id) => setToasts((list) => list.filter((t) => t.id !== id));
   const toast = (message, opts = {}) => {
@@ -391,6 +431,12 @@ export function App() {
 
   const actions = {
     toast,
+    /** Opens the item with this id (from a link or a pasted id); not here: syncs first, then says so. */
+    openById(id, opts = {}) {
+      const item = store.get(id);
+      if (item) actions.open(item, opts);
+      else setLinkedItem(id);
+    },
     /** Opens an item: in the dialog, or `{ window: true }` (Ctrl+click, middle-click) in a window of its own. */
     open: (item, { window: inWindow = false } = {}) => (inWindow ? windowActions.open(item) : openModal({ id: item.id })),
     /** The dialog's item moves to a window at the side (the list stays free to open others), scrolled as it was. */
@@ -644,6 +690,27 @@ export function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
+  // Links to items anywhere in the page (notes, documents, the model's answers, ids made links) open them here;
+  // Ctrl/Cmd+click or a middle click in a window.
+  useEffect(() => {
+    const onLink = (e) => {
+      if (e.defaultPrevented || e.button > 1 || (e.type === 'click' && e.button !== 0) || (e.type === 'auxclick' && e.button !== 1)) return;
+      const link = e.target.closest?.('a[href]');
+      const id = link && linkedItemOf(link.getAttribute('href'));
+      if (!id) return;
+      e.preventDefault();
+      actionsRef.current.openById(id, { window: e.ctrlKey || e.metaKey || e.button === 1 });
+    };
+    document.addEventListener('click', onLink, true);
+    document.addEventListener('auxclick', onLink, true);
+    return () => {
+      document.removeEventListener('click', onLink, true);
+      document.removeEventListener('auxclick', onLink, true);
+    };
+  }, []);
+  // The desktop app opened from a tracker-app:// link (or one the main process kept for us).
+  useEffect(() => window.desktop?.onOpenItem?.((id) => actionsRef.current.openById(id)), []);
+
   useEffect(
     () =>
       window.desktop?.onCommand?.((command) => {
@@ -659,6 +726,14 @@ export function App() {
   }, []);
 
   const onSearch = (value) => {
+    // A link to an item (Claude's, the desktop app's) or its id, pasted or typed: open that item.
+    const linked = itemIdIn(value);
+    if (linked) {
+      setQuery('');
+      searchRef.current?.blur();
+      actions.openById(linked);
+      return;
+    }
     setQuery(value);
     if (value && (route.view === 'home' || route.view === 'settings')) location.hash = hrefFor({ view: 'list' });
   };

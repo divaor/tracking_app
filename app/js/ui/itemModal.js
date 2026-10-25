@@ -19,6 +19,7 @@ import { formatDateTime, formatDue } from '../format.js';
 import { renderMarkdown } from '../markdown.js';
 import { parseEditorLink } from '../editorLinks.js';
 import { getSettings, saveSettings } from '../settings.js';
+import { webItemLink, WEB_APP_URL } from '../itemLinks.js';
 import { Icon } from './icons.js';
 import { DecisionBadge, EditorLink, PriorityMark, ProjectsContext, Segmented, TypeBadge } from './components.js';
 import { ProjectChip, TagInput } from './projects.js';
@@ -122,29 +123,38 @@ export const ITEM_HEAD = [
   { id: 'priority', label: 'Priority' },
   { id: 'project', label: 'Project' },
   { id: 'tags', label: 'Tags' },
+  { id: 'id', label: 'Its ID and link' },
 ];
-const headShown = () => ({ status: true, priority: true, project: true, tags: true, ...getSettings().itemHead });
+const headShown = () => ({ status: true, priority: true, project: true, tags: true, id: false, ...getSettings().itemHead });
+const MENU_W = 250;
 
-/** The eye in an item's bar: which of status, priority, project and tags show under the title. */
+/** The eye in an item's bar: which of status, priority, project, tags and the item's ID show under the title. */
 function HeadMenu() {
-  const [open, setOpen] = useState(false);
+  const [at, setAt] = useState(null); // where the open menu is (fixed, kept on screen), or null
   const ref = useRef(null);
   useEffect(() => {
-    if (!open) return undefined;
-    const away = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    if (!at) return undefined;
+    const away = (e) => !ref.current?.contains(e.target) && setAt(null);
     document.addEventListener('pointerdown', away, true);
     return () => document.removeEventListener('pointerdown', away, true);
-  }, [open]);
+  }, [at]);
+  // Under the eye, but never past an edge of the screen (on a phone the eye is near the middle).
+  const toggle = (e) => {
+    if (at) return setAt(null);
+    const r = e.currentTarget.getBoundingClientRect();
+    const w = Math.min(MENU_W, innerWidth - 24);
+    setAt({ top: r.bottom + 4, left: Math.max(12, Math.min(r.right - w, innerWidth - w - 12)), width: w });
+  };
   const shown = headShown();
   return html`<div class="head-menu" ref=${ref} onKeyDown=${(e) => {
-    if (e.key !== 'Escape' || !open) return;
+    if (e.key !== 'Escape' || !at) return;
     e.stopPropagation();
-    setOpen(false);
+    setAt(null);
   }}>
-    <button type="button" class="icon-btn ${open ? 'on' : ''}" title="Show under the title…" aria-label="Show under the title"
-      aria-expanded=${open} onClick=${() => setOpen(!open)}><${Icon} name="eye" /></button>
-    ${open &&
-    html`<div class="head-menu-pop" role="group" aria-label="Show under the title">
+    <button type="button" class="icon-btn ${at ? 'on' : ''}" title="Show under the title…" aria-label="Show under the title"
+      aria-expanded=${Boolean(at)} onClick=${toggle}><${Icon} name="eye" /></button>
+    ${at &&
+    html`<div class="head-menu-pop" role="group" aria-label="Show under the title" style=${{ top: `${at.top}px`, left: `${at.left}px`, width: `${at.width}px` }}>
       <p>Under the title (it always shows)</p>
       ${ITEM_HEAD.map(
         (part) => html`<label key=${part.id}><input type="checkbox" checked=${shown[part.id]}
@@ -161,6 +171,26 @@ function PriorityPick({ item, actions }) {
       ${PRIORITIES.map((p) => html`<option key=${p.id} value=${p.id}>${p.label}</option>`)}
     </select>
   </label>`;
+}
+
+// The web app's own address where it runs on the web, else the public one (the desktop app's app:// is no link to share).
+const appBase = () => (/^https?:$/.test(location.protocol) ? `${location.origin}${location.pathname}` : WEB_APP_URL);
+
+/** The item's ID, with Copy ID and Copy link (the link opens it in the app, here or anywhere it syncs). */
+function ItemId({ item, actions }) {
+  const copy = async (text, what) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      actions.toast(`Copied ${what}`);
+    } catch {
+      actions.toast(`Could not copy the ${what}`, { kind: 'error' });
+    }
+  };
+  return html`<div class="item-id">
+    <code title="The item's ID: paste it (or a link to it) in the search box to open it">${item.id}</code>
+    <button type="button" class="btn ghost sm" onClick=${() => copy(item.id, 'the ID')}><${Icon} name="copy" size=${14} />Copy ID</button>
+    <button type="button" class="btn ghost sm" onClick=${() => copy(webItemLink(item.id, appBase()), 'the link')}><${Icon} name="link" size=${14} />Copy link</button>
+  </div>`;
 }
 
 /** The top of an open item, which stays while its content scrolls: the title, then what `itemHead` shows. */
@@ -181,6 +211,7 @@ function ItemHead({ item, actions, titleId }) {
       ${project && html`<span class="item-project"><${ProjectLink} name=${item.project} /></span>`}
       ${tags.map((t) => html`<button type="button" class="tag" key=${t} onClick=${() => actions.searchTag(t)}>#${t}</button>`)}
     </div>`}
+    ${shown.id && html`<${ItemId} item=${item} actions=${actions} />`}
   </div>`;
 }
 
@@ -416,7 +447,8 @@ export function ItemPanel({
     e.preventDefault();
     return true;
   };
-  useEffect(() => {
+  // A layout effect, so the keys work the moment the dialog shows (also when a link replaces its item).
+  useLayoutEffect(() => {
     if (frame !== 'modal') return undefined;
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);

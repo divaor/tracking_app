@@ -56,6 +56,12 @@ Personal tracker for tasks, ideas, Claude work and documents. Electron on deskto
   - `.item-top` stays while `.modal-body` scrolls (`scrolled` adds its edge): the bar, then `ItemHead` (the title always; status + `PriorityPick`, project + tags as settings `itemHead` says, `ITEM_HEAD`, chosen with the eye, `HeadMenu`).
   - Saving sends only the fields changed since editing began, so changes made meanwhile elsewhere stay.
   - The dialog keeps its ids (`modal-title`, `item-form`, `project-options`); each window's get a suffix.
+- Links to items (`itemLinks.js`, pure: `itemIdIn` for `…#/item/<id>`, `tracker-app://item/<id>` and bare ids, `webItemLink`, `appItemLink`, `splitItemIds`):
+  - Pasting a link or an id in the search box opens the item (`onSearch` → `actions.openById`: here, else `linkedItem`: sync, then say so). Search also matches ids (`matchesQuery`).
+  - `markdown.js` `linkItemIds` makes ids in rendered text `a.item-ref` links (not in `pre`); a capture-phase click listener in app.js opens any link into this app (`linkedItemOf`: same origin, the web app's address, or tracker-app:), Ctrl/middle-click in a window.
+  - The eye's `id` part (off by default) shows the id with Copy ID / Copy link (`appBase`: the page's address on the web, else `WEB_APP_URL`). `HeadMenu` places its popover fixed under the eye, kept on screen.
+  - Desktop: `main.cjs` registers `tracker-app` (`setAsDefaultProtocolClient`, `build.protocols`); `itemOfLink` reads those links and links to the web app; `openItem` sends `open-item` (preload `onOpenItem`) or keeps `pendingItem` for the first load (`#/item/<id>`); `second-instance`, `open-url`, argv at start, `setWindowOpenHandler` / `will-navigate`.
+  - A desktop browser that does not sync (`desktopBrowser`, `isLocal`) and lacks the item offers the app (`offerDesktopApp`); once chosen (setting `openItemsInApp`, also in Settings → Use it everywhere) it goes there at once.
 - Item windows (desktop; `ui/itemWindows.js`, placement in `windowLayout.js`, pure and tested):
   - App state `windows` ({ wid, id, x, y, w, h, z, min, max, restore, scroll }) in the order opened; the page keeps that order (moving a node would reload its previews) and `z` stacks them (z-index 30–45, under the dialog).
   - Opened by `actions.open(item, { window: true })` (Ctrl/Cmd+click, Ctrl+Enter, middle-click: `openProps` in components.js), the dialog's W / window button (`actions.popOut`: at the side, its scroll kept), never on narrow screens (`narrowScreen`: the dialog instead). The same item can be open more than once.
