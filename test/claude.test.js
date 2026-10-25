@@ -81,6 +81,18 @@ test('short jobs think less; models without the fallback are asked plainly', asy
   assert.equal(call.headers['anthropic-beta'], undefined);
 });
 
+test('a long system text (a guide) is cached; a short one goes as it is', async () => {
+  const api = fakeApi(() => [200, sse([start(), ...textBlock(0, 'Press F1.'), ...end()]), 'text/event-stream']);
+  const claude = createClaudeClient({ apiKey: 'k', fetchImpl: api.fetchImpl });
+  const guide = `Answer from the guide.\n\n${'A passage of the guide. '.repeat(500)}`;
+  await claude.chat({ messages: [{ role: 'system', content: guide }, { role: 'user', content: 'How do I fold?' }] });
+  assert.deepEqual(api.calls[0].body.system, [{ type: 'text', text: guide, cache_control: { type: 'ephemeral' } }]);
+  // The question comes after the cached part, so asking another one reads it from the cache.
+  assert.deepEqual(api.calls[0].body.messages, [{ role: 'user', content: 'How do I fold?' }]);
+  await claude.chat({ messages: [{ role: 'system', content: 'Be brief.' }, { role: 'user', content: 'x' }] });
+  assert.equal(api.calls[1].body.system, 'Be brief.');
+});
+
 test('a decline part way through, rescued by the fallback model, starts the answer over', async () => {
   const api = fakeApi(() => [
     200,

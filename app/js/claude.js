@@ -16,6 +16,8 @@ const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 const EFFORT_MODELS = /^claude-(fable|mythos|opus-5|opus-4-[678]|sonnet-5|sonnet-4-6|haiku-5)/;
 // Short jobs (names, filing, suggestions as you type, quick add, a test) think less and answer sooner.
 const QUICK = new Set(['name', 'file', 'complete', 'quick-add', 'test']);
+// System texts this long (about 2,000 tokens) or longer are cached.
+const CACHE_FROM = 8000;
 
 let sdk = null;
 const loadSdk = () => (sdk ??= import('../vendor/anthropic.js').then((m) => m.Anthropic));
@@ -110,7 +112,9 @@ export function createClaudeClient({ apiKey, fetchImpl = globalThis.fetch?.bind(
         // Thinking counts toward max_tokens, so even short jobs keep room.
         max_tokens: quick ? 4096 : 64000,
         messages: turns,
-        ...(system ? { system } : {}),
+        // A long system text (the editor's guide, say) is cached, so a follow-up within a few
+        // minutes reads it for a tenth of the price; below the model's minimum it is not cached.
+        ...(system ? { system: system.length >= CACHE_FROM ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }] : system } : {}),
         ...(EFFORT_MODELS.test(model) ? { output_config: { effort: quick ? 'low' : 'medium' } } : {}),
       };
       const fallback = FALLBACK_MODELS.has(model);
