@@ -22,7 +22,7 @@ How to handle requests
 - "Update tasks on my tracker", "mark X done", "add a task …" → list_items first to find existing items and avoid duplicates, then update_items / add_items. Batch several changes into one call.
 - "Log / track this Claude work" → add_items with type "claude", kind (code, chat, pr, artifact) and url = the session, PR or artifact link.
 - "What's on my tracker?" → get_overview. "Any feedback on my proposal?" → list_items with decision, or get_item; then read decision and feedback.
-- "Pin / unpin X" → update_items with pinned true / false. Pinned items stay on top of their project in the app, whatever the filters; list_items with pinned true lists them.
+- "Pin / unpin X" → update_items with pinned true / false. Pinned items come first in the app's lists and on its overview; list_items with pinned true lists them.
 
 Projects and tags
 - "For this conversation use project X (and tag with the repos you touch)" → remember it: pass project "X" on every add_items and send_document (and update_items when filing items), and add the names of the repositories involved as tags (in Claude Code: the git repository you are working in; a proposal spanning several repos gets one tag per repo).
@@ -57,7 +57,7 @@ const ITEM_FIELDS = {
   url: str('Most relevant link: Claude session, PR, artifact or source.'),
   due: str('Due date as YYYY-MM-DD.'),
   notes: str('Details in Markdown. Checklists as "- [ ] step".'),
-  pinned: { type: 'boolean', description: 'Pinned items stay on top of their project in every view of the app, whatever the filters. Only when the user asks to pin or unpin.' },
+  pinned: { type: 'boolean', description: 'Pinned items come first in the app (on the overview, and at the top of any list or filter they match). Only when the user asks to pin or unpin.' },
 };
 
 export function createTools(getTracker) {

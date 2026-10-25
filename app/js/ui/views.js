@@ -138,8 +138,7 @@ export function BoardView({ items, type, onType, actions, today }) {
   const [dropTarget, setDropTarget] = useState(null);
   const [showAllDone, setShowAllDone] = useState(false);
   const newType = type === 'all' ? 'task' : type;
-  // Pinned items show whatever the category, on top of their column.
-  const ofType = type === 'all' ? items : items.filter((i) => i.type === type || i.pinned);
+  const ofType = type === 'all' ? items : items.filter((i) => i.type === type);
 
   return html`<div class="board-view">
     <div class="toolbar">
@@ -189,10 +188,8 @@ export function BoardView({ items, type, onType, actions, today }) {
 
 export function ListView({ items, type, status, onType, onStatus, sort, onSort, actions, today, query }) {
   const ofType = type === 'all' ? items : items.filter((i) => i.type === type);
-  const matching = status === 'all' ? ofType : ofType.filter((i) => i.status === status);
-  // Pinned items show whatever the category and status, on top, by project.
-  const matched = new Set(matching);
-  const shown = pinnedFirst(sortItems([...items.filter((i) => i.pinned && !matched.has(i)), ...matching], sort));
+  // Pinned items that match come first, by project.
+  const shown = pinnedFirst(sortItems(status === 'all' ? ofType : ofType.filter((i) => i.status === status), sort));
   const statusOptions = [
     { id: 'all', label: 'All', count: ofType.length },
     ...STATUSES.map((s) => ({ id: s, label: statusLabel(s, type), count: ofType.filter((i) => i.status === s).length })),

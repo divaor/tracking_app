@@ -161,7 +161,7 @@ export function normalizeItem(raw) {
     files: cleanFiles(r.files),
     decision: DECISION_IDS.includes(r.decision) ? r.decision : '',
     feedback: text(r.feedback),
-    // Pinned items stay on top of their project in every view, whatever the filters.
+    // Pinned items come first wherever they show (the filters apply to them as to the rest).
     // Only written when set, so older data files do not change.
     ...(r.pinned === true ? { pinned: true } : {}),
     createdAt,
@@ -284,12 +284,8 @@ export function diffCounts(before, after) {
 
 // ---- Queries -------------------------------------------------------------
 
-/** `tags: false` leaves out the query's #tag terms (they filter, and pinned items show past filters). */
-export function matchesQuery(item, query, { tags: byTags = true } = {}) {
-  const terms = text(query)
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((term) => term && (byTags || !(term.startsWith('#') && term.length > 1)));
+export function matchesQuery(item, query) {
+  const terms = text(query).toLowerCase().split(/\s+/).filter(Boolean);
   if (!terms.length) return true;
   const tags = item.tags.map((t) => t.toLowerCase());
   // The id too, so an item can be found by the id Claude gives.
@@ -304,16 +300,13 @@ export function matchesQuery(item, query, { tags: byTags = true } = {}) {
   });
 }
 
-/**
- * `keepPinned`: pinned items pass the type, status and #tag filters (a +project term and
- * the words searched for still apply).
- */
-export function filterItems(items, { type = 'all', status = 'all', query = '', keepPinned = false } = {}) {
+export function filterItems(items, { type = 'all', status = 'all', query = '' } = {}) {
   return items.filter(
     (i) =>
       !i.deleted &&
-      ((keepPinned && i.pinned && matchesQuery(i, query, { tags: false })) ||
-        ((type === 'all' || i.type === type) && (status === 'all' || i.status === status) && matchesQuery(i, query))),
+      (type === 'all' || i.type === type) &&
+      (status === 'all' || i.status === status) &&
+      matchesQuery(i, query),
   );
 }
 

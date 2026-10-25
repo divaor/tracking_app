@@ -454,7 +454,7 @@ export function App() {
       return item;
     },
     update: (id, patch) => store.update(id, patch),
-    /** Pins an item to the top of its project (in every view, whatever the filters), or unpins it. */
+    /** Pins an item (it comes first wherever it shows, by project), or unpins it. */
     togglePin(item) {
       const current = store.get(item.id);
       if (!current) return;
@@ -738,8 +738,7 @@ export function App() {
     if (value && (route.view === 'home' || route.view === 'settings')) location.hash = hrefFor({ view: 'list' });
   };
 
-  // Pinned items stay in view past the category, status and #tag filters (their project is in scope).
-  const filtered = useMemo(() => filterItems(scopedItems, { query, keepPinned: true }), [scopedItems, query]);
+  const filtered = useMemo(() => filterItems(scopedItems, { query }), [scopedItems, query]);
   const tagNames = useMemo(() => tagCounts(items).map((t) => t.tag), [items]);
 
   const modalItem = modal?.id ? items.find((i) => i.id === modal.id) : null;

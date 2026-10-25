@@ -37,7 +37,7 @@ export const COMMAND_LIST = [
   { id: 'scope-personal', group: 'Search and filter', label: 'Show only personal projects' },
 
   { id: 'item-edit', group: 'In an item', label: 'Edit the open item', keys: 'E', run: false },
-  { id: 'item-pin', group: 'In an item', label: 'Pin or unpin the open item (it stays on top of its project, whatever the filters)', keys: 'P', run: false, hint: 'Or the pin on a pinned item' },
+  { id: 'item-pin', group: 'In an item', label: 'Pin or unpin the open item (it comes first in the lists it shows in, and on the Overview)', keys: 'P', run: false, hint: 'Or the pin on a pinned item' },
   { id: 'item-save', group: 'In an item', label: 'Save', keys: 'Mod+Enter', run: false },
   { id: 'item-close', group: 'In an item', label: 'Close (asks before dropping changes)', keys: 'Esc', run: false },
   { id: 'item-status', group: 'In an item', label: 'Move to the next status', how: 'Click the round status icon', run: false },

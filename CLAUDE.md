@@ -35,7 +35,7 @@ Personal tracker for tasks, ideas, Claude work and documents. Electron on deskto
   - `tracker.json` has a `projects` list next to `items`: one record per project, keyed by its lowercase name, with area work/personal and a color. It's merged per key with last write wins.
   - Items reference projects by name; `projectList` combines the records with names used on items. Rename and delete logic (`renameProjectIn`, `deleteProjectIn`) is shared by the app store and the connector.
   - The scope filter (`matchesScope`) lives in settings as `projectScope`.
-  - Pinned items (`pinned: true`, stored only when set): `pinnedFirst` puts them first, by project name (none last), in Home's Pinned section, the list and each board column. `filterItems(…, { keepPinned })` lets them past the type, status and `#tag` filters, never past the project scope, `+project` or searched words. The connector pins with `update_items` (`pinned`); `list_items` takes `pinned`.
+  - Pinned items (`pinned: true`, stored only when set): `pinnedFirst` puts them first, by project name (none last), in Home's Pinned section (all of them in scope, any status), the list and each board column. The filters (type, status, `#tag`, `+project`, scope, words) apply to them as to any item. The connector pins with `update_items` (`pinned`); `list_items` takes `pinned`.
   - `serializeDocument(items, projects, extra)` keeps unknown top-level fields, so older/newer versions do not drop each other's data. Always pass projects when writing.
 - Tracker Editor (github.com/divaor/tracker-editor) shares the data repo:
   - `app/js/editorLinks.js` builds and recognizes its links (`#/file/<id>`, `#/repo/<path>`, `tracker-editor://`). Keep it in step with the editor's `parseRoute` and its `electron/main.cjs`.

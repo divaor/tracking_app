@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 1.11.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 1.12.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -119,9 +119,9 @@ Filter by type and status, and sort by priority, due date and more (*Smart* list
 
 ### Pinned items
 
-Pin an item (the pin at the top of an open item, or **P**) to keep it on top of its project: first on the Overview (under **Pinned**), in the list and in its column on the board, grouped by project. It is marked with a pin and tinted in its project's color, and clicking the pin unpins it (with **Undo**).
+Pin an item (the pin at the top of an open item, or **P**) to keep it on top: first on the Overview (under **Pinned**, whatever its status), and first in the list and in its column on the board, grouped by project. It is marked with a pin and tinted in its project's color, and clicking the pin unpins it (with **Undo**).
 
-A pinned item shows whatever type, status or `#tag` you filter by, and even when it is done, as long as its project is shown: picking other projects in the bar above hides it, and so do `+project` and words you search for. **Projects → Manage** counts each project's pinned items.
+The filters apply to pinned items like to any other: a type, a status, a `#tag`, a `+project`, the projects picked in the bar above or words you search for show a pinned item only when it matches, and then on top of the rest. **Projects → Manage** counts each project's pinned items.
 
 ## 7. Opening and editing an item
 

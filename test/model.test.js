@@ -217,7 +217,7 @@ test('slugify, safeFileName, fileKind and formatBytes', () => {
   assert.equal(formatBytes(3 * 1024 * 1024), '3.0 MB');
 });
 
-test('pinned items: stored only when set, first by project, past the filters', async () => {
+test('pinned items: stored only when set, first by project, filtered like the rest', async () => {
   const { normalizeItem, applyPatch, pinnedFirst, filterItems, projectList, serializeDocument } = await import('../app/js/model.js');
   const a = normalizeItem({ id: 'a', title: 'A', project: 'Zeta', pinned: true });
   assert.equal(a.pinned, true);
@@ -234,18 +234,20 @@ test('pinned items: stored only when set, first by project, past the filters', a
   // Pinned first, grouped by project name (those without one last), the rest as given.
   assert.deepEqual(pinnedFirst(items).map((i) => i.id), ['3', 'a', '2', '1']);
 
-  // keepPinned: a pinned idea shows in a list of tasks, done, and past a #tag filter, but not
-  // past words searched for or another +project.
+  // The filters apply to pinned items as to any other: type, status, #tag, +project, words.
   const pool = [
     normalizeItem({ id: 'p', type: 'idea', status: 'done', title: 'Pinned idea', project: 'Work', tags: ['x'], pinned: true }),
     normalizeItem({ id: 't', type: 'task', title: 'Task', project: 'Work', tags: ['y'] }),
   ];
-  const ids = (opts) => filterItems(pool, { keepPinned: true, ...opts }).map((i) => i.id);
-  assert.deepEqual(ids({ type: 'task', status: 'pending' }), ['p', 't']);
-  assert.deepEqual(ids({ query: '#y' }), ['p', 't']);
+  const ids = (opts) => filterItems(pool, opts).map((i) => i.id);
+  assert.deepEqual(ids({ type: 'task', status: 'pending' }), ['t']);
+  assert.deepEqual(ids({ type: 'idea' }), ['p']);
+  assert.deepEqual(ids({ query: '#y' }), ['t']);
+  assert.deepEqual(ids({ query: '#x' }), ['p']);
+  assert.deepEqual(ids({ query: '+work' }), ['p', 't']);
   assert.deepEqual(ids({ query: 'task' }), ['t']);
-  assert.deepEqual(ids({ query: '+other' }), []);
-  assert.deepEqual(filterItems(pool, { query: '#y' }).map((i) => i.id), ['t'], 'without keepPinned, as before');
+  // …and those that match come first.
+  assert.deepEqual(pinnedFirst(filterItems([...pool].reverse(), { query: '+work' })).map((i) => i.id), ['p', 't']);
 
   const projects = projectList([...items, ...pool]);
   assert.equal(projects.find((p) => p.key === 'zeta').pinned, 1);
