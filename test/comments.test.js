@@ -91,6 +91,11 @@ test('two devices changing the same item keep every comment', () => {
     assert.equal(merged[0].title, 'Fix the login page');
     assert.deepEqual(liveComments(merged[0]).map((c) => c.text), ['Also handle SSO']);
   }
+  // Comments added in the same millisecond keep the order they were written in.
+  let quick = base;
+  for (const n of [1, 2, 3, 4, 5]) quick = applyPatch(quick, addCommentPatch(quick, `n${n}`, 'Phone', t(9)), t(9));
+  assert.deepEqual(liveComments(quick).map((c) => c.text), ['n1', 'n2', 'n3', 'n4', 'n5']);
+  assert.ok(liveComments(quick).every((c, i, all) => !i || c.at > all[i - 1].at));
   // Both comment at the same time: both stay, in order.
   const fromPhone = comment(base, 'From the phone', 'Phone', 3);
   const fromClaude = comment(base, 'From Claude', CLAUDE_AUTHOR, 4);

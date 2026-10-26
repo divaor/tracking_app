@@ -277,9 +277,11 @@ export function awaitsClaude(item) {
   return Boolean(last) && last.by !== CLAUDE_AUTHOR;
 }
 
-/** A patch that adds a comment by `by` (a device name, or CLAUDE_AUTHOR). */
+/** A patch that adds a comment by `by` (a device name, or CLAUDE_AUTHOR), always after the latest one. */
 export function addCommentPatch(item, body, by, now = nowIso()) {
-  return { comments: [...(item.comments ?? []), { id: newId(), by, at: now, text: text(body).trim() }] };
+  const comments = item.comments ?? [];
+  const at = comments.length ? bumpTime(comments.reduce((latest, c) => (c.at > latest ? c.at : latest), ''), now) : now;
+  return { comments: [...comments, { id: newId(), by, at, text: text(body).trim() }] };
 }
 
 /** A patch that changes a comment's text. */
