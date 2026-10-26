@@ -395,3 +395,46 @@ test('pin and unpin items: on top of the lists and the overview, whatever their 
   const tools = await call('list_items', { pinned: true });
   assert.equal(tools.data.total, 1);
 });
+
+test('comments on any item: Claude reads the unanswered ones and replies', async () => {
+  const { call, items, github } = setup();
+  const added = await call('add_items', { items: [{ title: 'Fix login', status: 'done' }, { title: 'Quiet task' }] });
+  const [login, quiet] = added.data.added;
+
+  // The user comments in the app (written to the data file as the app does).
+  const doc = JSON.parse(github.read('tracker.json'));
+  const target = doc.items.find((i) => i.id === login.id);
+  target.comments = [{ id: 'c1', by: 'Work PC', at: '2026-10-25T10:00:00.000Z', text: 'Also handle **SSO** logins.' }];
+  target.updatedAt = '2026-10-25T10:00:00.000Z';
+  github.write('tracker.json', JSON.stringify(doc));
+
+  // Waiting for a reply: in the overview, in list_items (any status) and in get_item.
+  const overview = await call('get_overview', {});
+  assert.deepEqual(overview.data.commentsAwaiting.map((i) => [i.title, i.lastComment.by, i.lastComment.device, i.lastComment.text]), [['Fix login', 'user', 'Work PC', 'Also handle **SSO** logins.']]);
+  const unanswered = await call('list_items', { comments: 'unanswered' });
+  assert.deepEqual(unanswered.data.items.map((i) => [i.title, i.comments, i.awaitingReply]), [['Fix login', 1, true]]);
+  assert.equal((await call('list_items', { query: 'sso', status: 'all' })).data.items[0].id, login.id, 'search reads comments');
+  const detail = await call('get_item', { id: login.id });
+  assert.deepEqual(detail.data.comments, [{ by: 'user', device: 'Work PC', at: '2026-10-25T10:00:00.000Z', text: 'Also handle **SSO** logins.' }]);
+  assert.equal(detail.data.awaitingReply, true);
+
+  // Claude replies (with another change in the same update); the reply is Claude's, the notes stay.
+  const reply = await call('update_items', { updates: [{ id: login.id, comment: 'Done: SSO users now land on the dashboard.', status: 'done' }] });
+  assert.equal(reply.isError, false, reply.text);
+  const saved = items().find((i) => i.id === login.id);
+  assert.deepEqual(saved.comments.map((c) => [c.by, c.text]), [['Work PC', 'Also handle **SSO** logins.'], ['Claude', 'Done: SSO users now land on the dashboard.']]);
+  assert.equal(saved.notes, '');
+  assert.equal((await call('list_items', { comments: 'unanswered' })).data.total, 0);
+  assert.equal((await call('list_items', { comments: 'any' })).data.total, 1);
+  assert.equal((await call('get_item', { id: login.id })).data.awaitingReply, undefined);
+  assert.deepEqual((await call('get_overview', {})).data.commentsAwaiting, []);
+
+  // Two comments in one call on the same item both stay; empty or odd ones are refused.
+  await call('update_items', { updates: [{ id: quiet.id, comment: 'First note.' }, { id: quiet.id, comment: 'Second note.' }] });
+  assert.deepEqual(items().find((i) => i.id === quiet.id).comments.map((c) => c.text), ['First note.', 'Second note.']);
+  assert.equal((await call('update_items', { updates: [{ id: quiet.id, comment: '  ' }] })).isError, true);
+  assert.equal((await call('list_items', { comments: 'mine' })).isError, true);
+  // Comments cannot be overwritten through update_items.
+  await call('update_items', { updates: [{ id: quiet.id, comments: [] }] });
+  assert.equal(items().find((i) => i.id === quiet.id).comments.length, 2);
+});

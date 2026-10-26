@@ -1,5 +1,5 @@
 import { createContext, html, useContext, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
-import { checklistProgress, decisionLabel, isOverdue, kindLabel, nextStatus, projectKey, statusLabel, TYPES, typeInfo } from '../model.js';
+import { checklistProgress, CLAUDE_AUTHOR, decisionLabel, isOverdue, kindLabel, liveComments, nextStatus, projectKey, statusLabel, TYPES, typeInfo } from '../model.js';
 import { formatDue, timeAgo } from '../format.js';
 import { editorLink, parseEditorLink } from '../editorLinks.js';
 import { getSettings, isLocal } from '../settings.js';
@@ -67,6 +67,11 @@ export function ItemMeta({ item, today, maxTags = 6 }) {
   }
   if (item.files.length) {
     parts.push(html`<span class="meta" title=${item.files.map((f) => f.name).join(', ')}><${Icon} name="paperclip" size=${13} />${item.files.length}</span>`);
+  }
+  const comments = liveComments(item);
+  if (comments.length) {
+    const fromClaude = comments.at(-1).by === CLAUDE_AUTHOR;
+    parts.push(html`<span class="meta comments-count ${fromClaude ? 'from-claude' : ''}" title=${`${comments.length} comment${comments.length === 1 ? '' : 's'}; the last one by ${fromClaude ? 'Claude' : 'you'}`}><${Icon} name="comment" size=${13} />${comments.length}</span>`);
   }
   if (item.url) {
     const inEditor = parseEditorLink(item.url, getSettings().editorUrl);

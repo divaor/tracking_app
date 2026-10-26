@@ -2,7 +2,7 @@
 // service that answers later): quick add in plain language, help with an item
 // or a document, and a plan for the day or a review of the week. Pure, so the
 // Node tests can import it; assistant.js talks to the model.
-import { addDays, cleanTags, compactName, isOverdue, PRIORITIES, sortItems, TYPE_IDS } from './model.js';
+import { addDays, cleanTags, CLAUDE_AUTHOR, compactName, isOverdue, liveComments, PRIORITIES, sortItems, TYPE_IDS } from './model.js';
 
 const PRIORITY_IDS = PRIORITIES.map((p) => p.id);
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -121,7 +121,22 @@ export const actionsFor = (item) => ITEM_ACTIONS.filter((a) => a.types.includes(
 const MAX_CHARS = 24000;
 const cut = (s, max) => (s.length > max ? `${s.slice(0, max)}\n[… cut: ${s.length - max} more characters]` : s);
 
-/** The item as the model reads it: its fields, its notes and its documents' text. */
+const COMMENTS_CHARS = 6000;
+
+/** The item's comments (mine and Claude's), the latest ones when they are long. */
+function commentsText(item) {
+  const lines = [];
+  let room = COMMENTS_CHARS;
+  for (const c of liveComments(item).reverse()) {
+    const line = `- ${c.by === CLAUDE_AUTHOR ? 'Claude' : 'Me'} (${c.at.slice(0, 10)}): ${c.text.trim().replace(/\n+/g, ' / ')}`;
+    if (line.length > room) break;
+    lines.unshift(line);
+    room -= line.length;
+  }
+  return lines.length ? `\n\nComments, oldest first:\n${lines.join('\n')}` : '';
+}
+
+/** The item as the model reads it: its fields, notes, review, comments and its documents' text. */
 export function describeItem(item, documents = []) {
   const lines = [`Title: ${item.title}`, `Type: ${item.type}${item.kind ? ` (${item.kind})` : ''}`, `Status: ${item.status}`];
   if (item.priority && item.priority !== 'normal') lines.push(`Priority: ${item.priority}`);
@@ -131,6 +146,8 @@ export function describeItem(item, documents = []) {
   if (item.url) lines.push(`Link: ${item.url}`);
   let out = lines.join('\n');
   if (item.notes?.trim()) out += `\n\nNotes:\n${item.notes.trim()}`;
+  if (item.decision || item.feedback?.trim()) out += `\n\nMy review: ${item.decision || 'no decision yet'}${item.feedback?.trim() ? `\n${item.feedback.trim()}` : ''}`;
+  out += commentsText(item);
   let room = MAX_CHARS - out.length;
   for (const d of documents) {
     if (room <= 200) break;

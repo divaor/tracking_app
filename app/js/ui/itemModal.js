@@ -1,10 +1,12 @@
 import { html, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/preact-htm.js';
 import {
   areaLabel,
+  CLAUDE_AUTHOR,
   cleanTags,
   DECISIONS,
   decisionLabel,
   KINDS,
+  liveComments,
   PRIORITIES,
   projectKey,
   resolveProjectName,
@@ -15,7 +17,7 @@ import {
   toggleChecklistItem,
   TYPES,
 } from '../model.js';
-import { formatDateTime, formatDue } from '../format.js';
+import { formatDateTime, formatDue, timeAgo } from '../format.js';
 import { renderMarkdown } from '../markdown.js';
 import { parseEditorLink } from '../editorLinks.js';
 import { getSettings, saveSettings } from '../settings.js';
@@ -113,6 +115,62 @@ function ReviewPanel({ item, actions }) {
         actions.update(item.id, { feedback });
         actions.toast('Feedback saved');
       }}>Save feedback</button>
+    </div>
+  </section>`;
+}
+
+// A comment being written, per item, kept while the item is closed and opened again.
+const commentDrafts = new Map();
+const submitKey = (run) => (e) => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    e.stopPropagation();
+    run();
+  }
+};
+
+/** Comments on any item, yours and Claude's, oldest first; Claude reads and answers them through the connector. */
+function Comments({ item, actions }) {
+  const list = liveComments(item);
+  const [draft, setDraftState] = useState(() => commentDrafts.get(item.id) ?? '');
+  const [editing, setEditing] = useState(null); // { id, text }
+  const setDraft = (value) => {
+    setDraftState(value);
+    if (value) commentDrafts.set(item.id, value);
+    else commentDrafts.delete(item.id);
+  };
+  const post = () => actions.addComment(item, draft) && setDraft('');
+  const saveEdit = () => actions.editComment(item, editing.id, editing.text) && setEditing(null);
+  return html`<section class="comments" aria-label="Comments">
+    <h3><${Icon} name="comment" size=${16} />Comments${list.length > 0 && html` <span class="comments-n">${list.length}</span>`}</h3>
+    ${list.map((c) => {
+      const claude = c.by === CLAUDE_AUTHOR;
+      return html`<article class="comment ${claude ? 'from-claude' : 'from-you'}" key=${c.id}>
+        <header class="comment-head">
+          <strong>${claude ? 'Claude' : 'You'}</strong>
+          <span class="muted small" title=${`${formatDateTime(c.at)}${c.edited ? ` · edited ${formatDateTime(c.editedAt)}` : ''}`}>${!claude && c.by ? `${c.by} · ` : ''}${timeAgo(c.at)}${c.edited ? ' · edited' : ''}</span>
+          <span class="spacer" />
+          ${!claude && editing?.id !== c.id && html`<button type="button" class="icon-btn sm" aria-label="Edit the comment" title="Edit" onClick=${() => setEditing({ id: c.id, text: c.text })}><${Icon} name="edit" size=${14} /></button>`}
+          <button type="button" class="icon-btn sm" aria-label="Delete the comment" title="Delete" onClick=${() => actions.deleteComment(item, c.id)}><${Icon} name="trash" size=${14} /></button>
+        </header>
+        ${editing?.id === c.id
+          ? html`<textarea class="comment-input" rows="3" value=${editing.text} aria-label="Edit the comment"
+              onInput=${(e) => setEditing({ ...editing, text: e.currentTarget.value })} onKeyDown=${submitKey(saveEdit)} />
+            <div class="comment-foot">
+              <span class="spacer" />
+              <button type="button" class="btn sm" onClick=${() => setEditing(null)}>Cancel</button>
+              <button type="button" class="btn primary sm" disabled=${!editing.text.trim()} onClick=${saveEdit}>Save</button>
+            </div>`
+          : html`<div class="markdown comment-text" dangerouslySetInnerHTML=${{ __html: renderMarkdown(c.text) }} />`}
+      </article>`;
+    })}
+    <div class="comment-new">
+      <textarea class="comment-input" rows="2" value=${draft} aria-label="Add a comment" onInput=${(e) => setDraft(e.currentTarget.value)} onKeyDown=${submitKey(post)}
+        placeholder=${list.length ? 'Reply, or add a comment…' : 'A comment for Claude, or a note: what to change, a question, a decision…'} />
+      <div class="comment-foot">
+        <span class="muted small">Claude reads the comments on any item: ask it to “check my tracker for comments”.</span>
+        <button type="button" class="btn primary sm" disabled=${!draft.trim()} title="Comment (Ctrl+Enter)" onClick=${post}><${Icon} name="send" size=${14} />Comment</button>
+      </div>
     </div>
   </section>`;
 }
@@ -250,6 +308,7 @@ function ViewBody({ item, actions, today, onEdit, bodyRef, onScroll }) {
 
     ${item.files.length > 0 && html`<${FilesPanel} item=${item} actions=${actions} />`}
     ${isReviewable(item) && html`<${ReviewPanel} item=${item} actions=${actions} />`}
+    <${Comments} key=${item.id} item=${item} actions=${actions} />
     <${ItemAssistant} item=${item} actions=${actions} />
 
     <p class="timestamps">
@@ -443,7 +502,11 @@ export function ItemPanel({
     else if (!editing && plainKey(e, 'e')) startEdit();
     else if (!editing && plainKey(e, 'p')) actions.togglePin(item);
     else if (!editing && onPopOut && plainKey(e, 'w')) popOut();
-    else return false;
+    else if (!editing && plainKey(e, 'c')) {
+      const box = dialogRef.current?.querySelector('.comment-new textarea');
+      box?.scrollIntoView({ block: 'nearest' });
+      box?.focus();
+    } else return false;
     e.preventDefault();
     return true;
   };

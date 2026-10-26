@@ -1,10 +1,14 @@
 import { html, useEffect, useMemo, useRef, useState } from '../vendor/preact-htm.js';
 import {
+  addCommentPatch,
+  deleteCommentPatch,
+  editCommentPatch,
   filterItems,
   localDate,
   matchesScope,
   parseQuickAdd,
   projectList,
+  restoreCommentPatch,
   statusLabel,
   STATUSES,
   tagCounts,
@@ -529,6 +533,28 @@ export function App() {
       const prev = store.get(item.id)?.feedback ?? '';
       store.update(item.id, { feedback: text.trim() });
       toast('Saved as your feedback: edit it under Your review', { action: { label: 'Undo', run: () => store.update(item.id, { feedback: prev }) } });
+    },
+    /** A comment on an item, by this device: for Claude (it reads them through the connector), or a note to self. */
+    addComment(item, body) {
+      const current = store.get(item.id);
+      if (!current || !body.trim()) return false;
+      store.update(item.id, addCommentPatch(current, body, getSettings().device || 'You'));
+      return true;
+    },
+    editComment(item, id, body) {
+      const current = store.get(item.id);
+      if (!current || !body.trim()) return false;
+      store.update(item.id, editCommentPatch(current, id, body));
+      return true;
+    },
+    deleteComment(item, id) {
+      const current = store.get(item.id);
+      const comment = current?.comments?.find((c) => c.id === id && !c.deleted);
+      if (!comment) return;
+      store.update(item.id, deleteCommentPatch(current, id));
+      toast('Comment deleted', {
+        action: { label: 'Undo', run: () => store.get(item.id) && store.update(item.id, restoreCommentPatch(store.get(item.id), comment)) },
+      });
     },
     showProject(key) {
       setScope([`project:${key}`]);

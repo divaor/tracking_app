@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 1.13.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 1.14.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -113,7 +113,7 @@ Each card shows its type, priority, project, due date, checklist progress, attac
 
 Filter by type and status, and sort by priority, due date and more (*Smart* lists items in progress first, then the rest by priority and due date). The sidebar's categories open the same list already filtered.
 
-- **Search** (`/`) matches titles, notes, links, file names and item IDs. Use `#tag` for a tag or `+project` for a project. **Esc** in the search box clears it.
+- **Search** (`/`) matches titles, notes, comments, links, file names and item IDs. Use `#tag` for a tag or `+project` for a project. **Esc** in the search box clears it.
 - **Paste a link to an item** (the ones Claude gives, `…/#/item/…`) **or its ID** in the search box to open that item.
 - Click a **tag** in the sidebar or on an item to see everything with that tag. Click a **project chip** to show that project.
 
@@ -143,6 +143,17 @@ Press the pencil (or **E**) to edit, or the pin (or **P**) to pin it (section 6)
 - **Tags** are chips: type one and press Enter (Backspace in an empty field removes the last one). Suggestions come from tags you already use.
 - **Documents:** paste text, use **Import file**, or drop Markdown files onto the window to add them to your reading list.
 - Save with **Ctrl+Enter** (**Cmd+Enter** on a Mac); **Esc** closes (and asks before dropping unsaved changes). Deleting an item or marking it done shows an **Undo** button for a few seconds. Saving changes only what you changed, so an edit made meanwhile somewhere else stays.
+
+### Comments
+
+Every item, not only documents, has **Comments** under its notes: what to change, a question, a decision, a note to yourself. Claude reads them through the connector and answers there.
+
+- Write in the box (or press **C** to go to it) and press **Comment** or **Ctrl+Enter**. Comments are Markdown; item IDs in them are links.
+- Each one says who wrote it: **You** (with the device) or **Claude**, in its own color. Edit yours with the pencil; delete any with the bin (**Undo** brings it back).
+- Then tell Claude *"check my tracker for comments"*: it finds the items whose latest comment is yours, reads them, does what they ask and replies, for example with what it changed and a link.
+- Lists and board cards show how many comments an item has; the count turns Claude's color when the last one is Claude's answer.
+- A comment you started stays in the box if you close the item. Search finds words in comments, and **Ask the model about this** reads them too.
+- Comments written at the same time on two devices are both kept.
 
 ### Several items at once (desktop)
 
@@ -213,6 +224,7 @@ In any Claude chat or Claude Code session with the Tracker connector on, just sa
 | "For this conversation use project Platform in my tracker and tag with the repos you touch" | Files everything it adds or sends under Platform and tags each item with the repositories involved, creating them if needed. |
 | "What's on my tracker?" / "What's left open?" | Summarizes counts, what's in progress, what's due and what's waiting for review. |
 | "Check my tracker for feedback on the proposal and revise it" | Reads your decision and feedback and sends a new version. |
+| "Check my tracker for comments" | Finds the items whose latest comment is yours, reads them, acts on them and replies in the comments. |
 | "Save this to my editor as deploy-notes.md" / "Find the SQL I pasted about invoices in my editor files" | Saves, finds and reads your Tracker Editor files. |
 
 ### Links Claude gives you
@@ -237,7 +249,7 @@ Tracker Editor (https://github.com/divaor/tracker-editor) is the companion text 
 You can be notified when:
 
 - Claude sends a **document to review** (or a new version), or stores a file.
-- Claude **adds, updates, completes or deletes** items.
+- Claude **adds, updates, completes or deletes** items, or **answers in the comments** (the notification shows the start of its comment).
 - On the desktop, an item changes **on one of your other devices**, for example a task you completed on your phone.
 
 Tap a notification to open that item.
@@ -267,6 +279,7 @@ Press **F1** or **?** to open Help: **Commands and shortcuts** lists everything 
 | **Esc** | Clear the search, or close what's open |
 | **E** | Edit the open item |
 | **P** | Pin or unpin the open item |
+| **C** | Comment on the open item |
 | **W** | Open the open item in a window (desktop) |
 | **Ctrl+click** · middle-click | Open an item in a window (desktop) |
 | **Ctrl+Enter** | Save the item |
@@ -288,6 +301,7 @@ On a Mac, use **Cmd** for **Ctrl**.
 | Remove Claude's access everywhere | Change the connector's `MCP_SECRET` and deploy it again. Every Claude sign-in and phone notification subscription stops working until you connect again. |
 | The quick add shortcut does nothing | Another app may own the keys: Settings → Quick add says so. Pick other keys. |
 | The model doesn't answer | Settings → Model → **Test and list models**. A local server must be running; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS`). With an AI provider: check the key and that the account has credit; a provider that refuses requests from web pages works from the desktop app. |
+| Claude doesn't see my comment | Claude reads your data repo: the device you commented on must be set up with GitHub sync and have synced (the badge says *Synced*). On a device that keeps its data on this computer, the connector can't reach it. |
 | A link from Claude opens the browser, not the app | Click **Open in the app** in the message the page shows (needs the desktop app 1.11 or later), or paste the link in the app's search box. |
 | The phone app shows an old version | Close it completely and open it again while online. It updates itself on the next start. |
 

@@ -68,7 +68,7 @@ export function kindLabel(type, kind) {
 const EPOCH = '1970-01-01T00:00:00.000Z';
 const KNOWN_KEYS = [
   'id', 'type', 'title', 'status', 'priority', 'kind', 'project', 'tags', 'url', 'due', 'notes',
-  'files', 'decision', 'feedback', 'pinned', 'createdAt', 'updatedAt', 'updatedBy', 'startedAt', 'completedAt', 'deleted',
+  'files', 'decision', 'feedback', 'comments', 'pinned', 'createdAt', 'updatedAt', 'updatedBy', 'startedAt', 'completedAt', 'deleted',
 ];
 
 // `updatedBy` value the Claude connector writes; the app writes its device name.
@@ -137,6 +137,36 @@ export function cleanFiles(files) {
   return out;
 }
 
+const commentTime = (c) => c.editedAt || c.at;
+function commentWins(a, b) {
+  if (commentTime(a) !== commentTime(b)) return commentTime(a) > commentTime(b);
+  if (Boolean(a.deleted) !== Boolean(b.deleted)) return Boolean(a.deleted);
+  return JSON.stringify(a) > JSON.stringify(b);
+}
+
+/**
+ * Comments on an item, the person's (`by`: the device) and Claude's, oldest first. One per id,
+ * its latest version (`editedAt`, also set when a deleted one comes back; `edited` when its
+ * text changed); a deleted one stays as `{ id, by, at, editedAt, deleted }` so a merge with an
+ * older copy does not bring it back.
+ */
+export function cleanComments(comments) {
+  if (!Array.isArray(comments)) return [];
+  const byId = new Map();
+  for (const c of comments) {
+    if (!c || typeof c !== 'object' || typeof c.id !== 'string' || !c.id) continue;
+    const at = isoOr(c.at, '');
+    if (!at) continue;
+    const editedAt = isoOr(c.editedAt, '');
+    const comment = c.deleted
+      ? { id: c.id, by: text(c.by).trim(), at, editedAt: editedAt || at, deleted: true }
+      : { id: c.id, by: text(c.by).trim(), at, text: text(c.text), ...(editedAt ? { editedAt } : {}), ...(c.edited === true ? { edited: true } : {}) };
+    const prev = byId.get(c.id);
+    if (!prev || commentWins(comment, prev)) byId.set(c.id, comment);
+  }
+  return [...byId.values()].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.id < b.id ? -1 : 1));
+}
+
 export function normalizeItem(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const id = typeof r.id === 'string' && r.id ? r.id : newId();
@@ -161,6 +191,8 @@ export function normalizeItem(raw) {
     files: cleanFiles(r.files),
     decision: DECISION_IDS.includes(r.decision) ? r.decision : '',
     feedback: text(r.feedback),
+    // Only written when there are some, so older data files do not change.
+    ...(Array.isArray(r.comments) && r.comments.length ? { comments: cleanComments(r.comments) } : {}),
     // Pinned items come first wherever they show (the filters apply to them as to the rest).
     // Only written when set, so older data files do not change.
     ...(r.pinned === true ? { pinned: true } : {}),
@@ -212,18 +244,63 @@ function wins(a, b) {
   return JSON.stringify(a) > JSON.stringify(b);
 }
 
-function mergeBy(key, lists) {
+function mergeBy(key, lists, combine = (winner) => winner) {
   const byKey = new Map();
   for (const list of lists) {
     for (const record of list) {
       const current = byKey.get(record[key]);
-      if (!current || wins(record, current)) byKey.set(record[key], record);
+      if (!current) byKey.set(record[key], record);
+      else byKey.set(record[key], combine(wins(record, current) ? record : current, record, current));
     }
   }
   return [...byKey.values()];
 }
 
-export const mergeItems = (...lists) => mergeBy('id', lists);
+// The comments of both versions of an item are kept (each at its latest), so a comment written
+// on one device is not lost to an edit made meanwhile on another; the rest is last write wins.
+function withBothComments(winner, a, b) {
+  if (winner.deleted || (!a.comments?.length && !b.comments?.length)) return winner;
+  const comments = cleanComments([...(a.comments ?? []), ...(b.comments ?? [])]);
+  return JSON.stringify(comments) === JSON.stringify(winner.comments ?? []) ? winner : { ...winner, comments };
+}
+
+export const mergeItems = (...lists) => mergeBy('id', lists, withBothComments);
+
+// ---- Comments ------------------------------------------------------------
+
+/** The comments that show (not deleted), oldest first. */
+export const liveComments = (item) => (item?.comments ?? []).filter((c) => !c.deleted);
+
+/** Whether the latest comment is the person's: Claude has not answered it yet. */
+export function awaitsClaude(item) {
+  const last = liveComments(item).at(-1);
+  return Boolean(last) && last.by !== CLAUDE_AUTHOR;
+}
+
+/** A patch that adds a comment by `by` (a device name, or CLAUDE_AUTHOR). */
+export function addCommentPatch(item, body, by, now = nowIso()) {
+  return { comments: [...(item.comments ?? []), { id: newId(), by, at: now, text: text(body).trim() }] };
+}
+
+/** A patch that changes a comment's text. */
+export function editCommentPatch(item, id, body, now = nowIso()) {
+  return { comments: (item.comments ?? []).map((c) => (c.id === id && !c.deleted ? { ...c, text: text(body).trim(), editedAt: bumpTime(commentTime(c), now), edited: true } : c)) };
+}
+
+/** A patch that deletes a comment (it stays as a tombstone). */
+export function deleteCommentPatch(item, id, now = nowIso()) {
+  return {
+    comments: (item.comments ?? []).map((c) => (c.id === id && !c.deleted ? { id: c.id, by: c.by, at: c.at, editedAt: bumpTime(commentTime(c), now), deleted: true } : c)),
+  };
+}
+
+/** A patch that brings back a deleted comment (undo), newer than its tombstone. */
+export function restoreCommentPatch(item, comment, now = nowIso()) {
+  const current = (item.comments ?? []).find((c) => c.id === comment.id);
+  const restored = { ...comment, editedAt: bumpTime(current ? commentTime(current) : commentTime(comment), now) };
+  delete restored.deleted;
+  return { comments: current ? item.comments.map((c) => (c.id === comment.id ? restored : c)) : [...(item.comments ?? []), restored] };
+}
 
 const TOMBSTONE_DAYS = 180;
 
@@ -293,7 +370,7 @@ export function matchesQuery(item, query, { tags: byTags = true } = {}) {
   if (!terms.length) return true;
   const tags = item.tags.map((t) => t.toLowerCase());
   // The id too, so an item can be found by the id Claude gives.
-  const haystack = [item.title, item.notes, item.feedback, item.project, item.url, kindLabel(item.type, item.kind), item.id, ...item.files.map((f) => f.name)]
+  const haystack = [item.title, item.notes, item.feedback, item.project, item.url, kindLabel(item.type, item.kind), item.id, ...item.files.map((f) => f.name), ...liveComments(item).map((c) => c.text)]
     .join('\n')
     .toLowerCase();
   const project = compactName(item.project);

@@ -4,9 +4,11 @@
 import { describeChanges } from '../app/js/changes.js';
 import { createEditorFiles } from './editor.js';
 import {
+  addCommentPatch,
   addDays,
   applyPatch,
   AREAS,
+  awaitsClaude,
   CLAUDE_AUTHOR,
   cleanProjectName,
   cleanTags,
@@ -16,6 +18,7 @@ import {
   formatBytes,
   KINDS,
   kindLabel,
+  liveComments,
   normalizeItem,
   nowIso,
   parseData,
@@ -85,9 +88,22 @@ export function summarize(item) {
   if (item.decision) out.decision = item.decision;
   if (item.pinned) out.pinned = true;
   if (item.files.length) out.files = item.files.map((f) => f.path);
+  const comments = liveComments(item).length;
+  if (comments) out.comments = comments;
+  if (awaitsClaude(item)) out.awaitingReply = true;
   out.updatedAt = item.updatedAt;
   return out;
 }
+
+// Comments as Claude reads them: who (Claude or the user, with the device), when, the text.
+const commentView = (c) => ({
+  by: c.by === CLAUDE_AUTHOR ? 'Claude' : 'user',
+  ...(c.by && c.by !== CLAUDE_AUTHOR ? { device: c.by } : {}),
+  at: c.at,
+  ...(c.edited ? { edited: c.editedAt } : {}),
+  text: c.text,
+});
+const clip = (text, max) => (text.length > max ? `${text.slice(0, max)}…` : text);
 
 // `onChange` receives notification events (see app/js/changes.js) after each
 // successful write; the server uses it to send push notifications.
@@ -186,6 +202,13 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
         counts,
         // What the user keeps on top of each project, whatever its status.
         pinned: pinnedFirst(sortItems(items.filter((i) => i.pinned))).slice(0, 30).map(summarize),
+        // The user's latest comment on each, newest first: read the rest with get_item, reply with update_items comment.
+        commentsAwaiting: items
+          .filter(awaitsClaude)
+          .map((i) => ({ item: i, last: liveComments(i).at(-1) }))
+          .sort((a, b) => (a.last.at < b.last.at ? 1 : -1))
+          .slice(0, 20)
+          .map(({ item, last }) => ({ ...summarize(item), lastComment: { ...commentView(last), text: clip(last.text, 400) } })),
         inProgress: sortItems(items.filter((i) => i.status === 'in_progress')).slice(0, 20).map(summarize),
         dueSoon: sortItems(open.filter((i) => i.due && i.due <= addDays(today, 7)), 'due').slice(0, 20).map(summarize),
         awaitingReview: sortItems(items.filter((i) => i.type === 'doc' && i.status !== 'done' && (i.files.length || ['proposal', 'artifact'].includes(i.kind))))
@@ -255,9 +278,10 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       return { project: summary, itemsMoved: moved || undefined };
     },
 
-    async list({ type, status, query = '', tag, project, projects, area, kind, decision, pinned, limit = 50 } = {}) {
-      // Pinned items are asked for whatever their status, unless one is given.
-      status ??= pinned === true ? 'all' : 'open';
+    async list({ type, status, query = '', tag, project, projects, area, kind, decision, pinned, comments, limit = 50 } = {}) {
+      // Pinned and commented items are asked for whatever their status, unless one is given.
+      status ??= pinned === true || comments ? 'all' : 'open';
+      if (comments && !['unanswered', 'any'].includes(comments)) throw new TrackerError('comments must be "unanswered" or "any"');
       const terms = String(query).toLowerCase().split(/\s+/).filter(Boolean);
       const data = await load();
       const areas = new Map(projectList(data.items, data.projects).map((p) => [p.key, p.area]));
@@ -272,7 +296,10 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
           (!kind || i.kind === kind) &&
           (!decision || (decision === 'none' ? !i.decision : i.decision === decision)) &&
           (typeof pinned !== 'boolean' || Boolean(i.pinned) === pinned) &&
-          terms.every((term) => [i.title, i.notes, i.feedback, i.project, i.url, ...i.tags, ...i.files.map((f) => f.name)].join('\n').toLowerCase().includes(term)),
+          (!comments || (comments === 'unanswered' ? awaitsClaude(i) : liveComments(i).length > 0)) &&
+          terms.every((term) =>
+            [i.title, i.notes, i.feedback, i.project, i.url, ...i.tags, ...i.files.map((f) => f.name), ...liveComments(i).map((c) => c.text)].join('\n').toLowerCase().includes(term),
+          ),
       );
       const max = Math.min(Math.max(Number(limit) || 50, 1), 200);
       return { total: matches.length, shown: Math.min(max, matches.length), items: pinnedFirst(sortItems(matches)).slice(0, max).map(summarize) };
@@ -281,6 +308,13 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
     async get(id, { includeFiles = false } = {}) {
       const item = resolve((await load()).items, id);
       const result = { ...item, statusLabel: statusLabel(item.status, item.type), link: link(item.id) };
+      // Only the comments that show, as Claude reads them.
+      delete result.comments;
+      const comments = liveComments(item);
+      if (comments.length) {
+        result.comments = comments.map(commentView);
+        if (awaitsClaude(item)) result.awaitingReply = true;
+      }
       if (includeFiles) {
         let budget = MAX_READ_CHARS;
         result.files = [];
@@ -355,7 +389,12 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
           if (u.add_tags || u.remove_tags) patch.tags = tags;
           if (u.append_notes) patch.notes = [patch.notes ?? item.notes, String(u.append_notes)].filter((s) => s.trim()).join('\n\n');
           if (has(patch, 'type') && patch.type !== item.type && !has(patch, 'kind')) patch.kind = '';
-          patches.set(item.id, { ...(patches.get(item.id) ?? {}), ...patch, updatedBy: CLAUDE_AUTHOR });
+          const earlier = patches.get(item.id) ?? {};
+          if (has(u, 'comment')) {
+            if (typeof u.comment !== 'string' || !u.comment.trim()) throw new TrackerError('comment must be some text');
+            patch.comments = addCommentPatch({ ...item, ...earlier }, u.comment, CLAUDE_AUTHOR, at).comments;
+          }
+          patches.set(item.id, { ...earlier, ...patch, updatedBy: CLAUDE_AUTHOR });
         }
         const out = items.map((i) => {
           if (!patches.has(i.id) || i.deleted) return i;

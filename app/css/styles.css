@@ -1101,6 +1101,12 @@ button.tag:hover {
   color: var(--done);
 }
 
+/* The last comment is Claude's: an answer to read. */
+.meta.comments-count.from-claude {
+  color: var(--claude);
+  font-weight: 600;
+}
+
 .rows {
   display: flex;
   flex-direction: column;
@@ -1833,8 +1839,102 @@ button.project-chip:hover {
   border-top: 1px solid var(--border);
 }
 
+/* Comments on any item: yours and Claude's, then a box for a new one. */
+.comments {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.comments-n {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.comment {
+  margin-bottom: 10px;
+  padding: 8px 12px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong, var(--border));
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.comment.from-claude {
+  border-left-color: var(--claude);
+  background: color-mix(in srgb, var(--claude) 6%, var(--surface));
+}
+
+.comment-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.comment.from-claude .comment-head strong {
+  color: var(--claude);
+}
+
+.comment-head .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comment-head .spacer {
+  flex: 1;
+}
+
+.comment-head .icon-btn {
+  width: 28px;
+  height: 28px;
+  opacity: 0.55;
+}
+
+.comment-head .icon-btn:hover,
+.comment-head .icon-btn:focus-visible {
+  opacity: 1;
+}
+
+.comment-text {
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.comment-text > :first-child {
+  margin-top: 0;
+}
+
+.comment-text > :last-child {
+  margin-bottom: 0;
+}
+
+.comment-input {
+  width: 100%;
+  min-height: 56px;
+  resize: vertical;
+}
+
+.comment-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.comment-foot .spacer {
+  flex: 1;
+}
+
 /* Direct children only: Markdown headings inside a file stay headings. */
 .files-panel > h3,
+.comments > h3,
 .review-panel > h3 {
   display: flex;
   align-items: center;

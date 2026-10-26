@@ -286,7 +286,7 @@ function ConnectorCard() {
   return html`<${Card} title="Claude connector" icon="claude" id="connector">
     <p>
       Let Claude work with your tracker from any chat or Claude Code session: “send this proposal to my tracker”, “send the artifact to my
-      tracker”, “update tasks on my tracker”, “check my tracker for feedback”.
+      tracker”, “update tasks on my tracker”, “check my tracker for comments”.
     </p>
     ${isLocal() && html`<p class="notice"><${Icon} name="cloud" size=${16} />The connector reaches your data on GitHub: turn on <strong>Sync across your devices with GitHub</strong> above first.</p>`}
     <ol class="connector-steps">
@@ -298,7 +298,7 @@ function ConnectorCard() {
     <a class="btn sm" href=${CONNECTOR_GUIDE} target="_blank" rel="noopener noreferrer"><${Icon} name="external" size=${15} />Step-by-step setup guide</a>
     <p class="muted small connector-note">
       Proposals and artifacts Claude sends show up under Docs with their files. Open one to read it, then approve, request changes or reject
-      and leave feedback; Claude can read your decision back.
+      and leave feedback; Claude can read your decision back. Comments on any item reach Claude too, and it answers there.
     </p>
   </${Card}>`;
 }

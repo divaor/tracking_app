@@ -1,9 +1,15 @@
 // Turns "before" and "after" item lists into notification-ready events:
 // what changed, who changed it and which notification category it is in.
-import { CLAUDE_AUTHOR, kindLabel, statusLabel, typeInfo } from './model.js';
+import { CLAUDE_AUTHOR, kindLabel, liveComments, statusLabel, typeInfo } from './model.js';
 
 const noun = (item) => (kindLabel(item.type, item.kind) || typeInfo(item.type).label).toLowerCase();
 const fileSignature = (item) => (item.files ?? []).map((f) => `${f.path}@${f.sha}`).join('|');
+const clip = (text, max = 140) => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
+/** Comments in `item` that `old` did not have. */
+const newComments = (item, old) => {
+  const seen = new Set((old?.comments ?? []).map((c) => c.id));
+  return liveComments(item).filter((c) => !seen.has(c.id));
+};
 const isReviewDoc = (item) => item.type === 'doc' && ((item.files ?? []).length > 0 || ['proposal', 'artifact'].includes(item.kind));
 
 /**
@@ -34,7 +40,12 @@ export function describeChanges(before, after, { self = '' } = {}) {
       }
       continue;
     }
-    if (fileSignature(item) !== fileSignature(old) && (item.files ?? []).length) {
+    const added = newComments(item, old);
+    if (added.length) {
+      const last = added.at(-1);
+      const author = last.by === CLAUDE_AUTHOR ? CLAUDE_AUTHOR : last.by || who;
+      events.push({ ...base, category: 'items', title: `${author} commented on “${clip(item.title, 60)}”`, body: clip(last.text.replace(/\s+/g, ' ')) });
+    } else if (fileSignature(item) !== fileSignature(old) && (item.files ?? []).length) {
       events.push({ ...base, category: 'documents', title: 'New version ready to review', body: item.title });
     } else if (item.status !== old.status) {
       events.push({ ...base, category: 'items', title: `${who} marked a ${noun(item)} ${statusLabel(item.status, item.type).toLowerCase()}`, body: item.title });

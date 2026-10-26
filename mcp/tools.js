@@ -13,6 +13,7 @@ Model
 - Status: pending → in_progress → done (docs show as To read → Reading → Read).
 - Docs can carry files (proposal.md, report.html, …) stored in the repo; the user reads them in the app.
 - The user reviews docs by setting decision (approved | changes | rejected) and writing feedback.
+- Any item can have comments: the user's notes for you (feedback, questions, decisions) and your replies. awaitingReply marks an item whose latest comment is the user's.
 - Each item belongs to at most one project. Projects can be in area work or personal; the user filters by them. Tags are free-form labels; use them for the repositories an item touches.
 
 How to handle requests
@@ -21,8 +22,8 @@ How to handle requests
 - A revised version of something already on the tracker → send_document with item_id (and the same filename to replace it); this puts it back in the user's review queue.
 - "Update tasks on my tracker", "mark X done", "add a task …" → list_items first to find existing items and avoid duplicates, then update_items / add_items. Batch several changes into one call.
 - "Log / track this Claude work" → add_items with type "claude", kind (code, chat, pr, artifact) and url = the session, PR or artifact link.
-- "What's on my tracker?" → get_overview. "Any feedback on my proposal?" → list_items with decision, or get_item; then read decision and feedback.
-- "Pin / unpin X" → update_items with pinned true / false. Pinned items come first in the app's lists and on its overview; list_items with pinned true lists them.
+- "What's on my tracker?" → get_overview. "Check my tracker for feedback / comments" → list_items with comments "unanswered" (docs: decision); read them with get_item, act, then reply with update_items comment (what you did or your answer).
+- "Pin / unpin X" → update_items pinned true / false (they come first in the app; list_items pinned true lists them).
 
 Projects and tags
 - "For this conversation use project X (and tag with the repos you touch)" → remember it: pass project "X" on every add_items and send_document (and update_items when filing items), and add the names of the repositories involved as tags (in Claude Code: the git repository you are working in; a proposal spanning several repos gets one tag per repo).
@@ -69,7 +70,7 @@ export function createTools(getTracker) {
     {
       name: 'get_overview',
       title: 'Tracker overview',
-      description: 'Summary of the tracker: counts per type and status, pinned items, items in progress, items due within 7 days, documents waiting for review, and recent review decisions with feedback.',
+      description: 'Summary of the tracker: counts per type and status, pinned items, comments waiting for your reply (with the latest comment), items in progress, items due within 7 days, documents waiting for review, and recent review decisions with feedback.',
       inputSchema: { type: 'object', properties: {} },
       annotations: readOnly,
       run: run((t) => t.overview()),
@@ -110,7 +111,7 @@ export function createTools(getTracker) {
         properties: {
           type: enumOf(['all', ...TYPE_IDS], 'Filter by type. Default: all.'),
           status: enumOf(['open', 'all', ...STATUSES], 'open = pending or in_progress (default).'),
-          query: str('Words to search for in title, notes, feedback, project, url, tags and file names.'),
+          query: str('Words to search for in title, notes, feedback, comments, project, url, tags and file names.'),
           tag: str('Only items with this tag.'),
           project: str('Only items in this project (case-insensitive).'),
           projects: { type: 'array', items: { type: 'string' }, description: 'Only items in any of these projects.' },
@@ -118,6 +119,7 @@ export function createTools(getTracker) {
           kind: str('Only items of this kind, e.g. proposal.'),
           decision: enumOf([...DECISIONS.map((d) => d.id), 'none'], 'Only docs with this review decision (none = not reviewed yet).'),
           pinned: { type: 'boolean', description: 'true: only pinned items (any status unless status is given); false: only unpinned ones.' },
+          comments: enumOf(['unanswered', 'any'], 'unanswered: items whose latest comment is the user\'s, waiting for your reply; any: items with comments. Any status unless status is given.'),
           limit: { type: 'integer', minimum: 1, maximum: 200, description: 'Default 50.' },
         },
       },
@@ -127,7 +129,7 @@ export function createTools(getTracker) {
     {
       name: 'get_item',
       title: 'Get a tracker item',
-      description: 'Full details of one item: notes, review decision and feedback, attached files. Set include_file_contents to also read the attached files (e.g. to revise a proposal the user reviewed).',
+      description: 'Full details of one item: notes, comments (the user\'s and yours, oldest first), review decision and feedback, attached files. Set include_file_contents to also read the attached files (e.g. to revise a proposal the user reviewed).',
       inputSchema: {
         type: 'object',
         properties: {
@@ -176,7 +178,7 @@ export function createTools(getTracker) {
     {
       name: 'update_items',
       title: 'Update tracker items',
-      description: 'Change one or more existing items in one commit: status (e.g. mark done), title, priority, due, notes, tags, pinned, review fields. Only the fields you pass change; pass "" to clear due or decision.',
+      description: 'Change one or more existing items in one commit: status (e.g. mark done), title, priority, due, notes, tags, pinned, review fields, or add a comment. Only the fields you pass change; pass "" to clear due or decision.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -195,6 +197,7 @@ export function createTools(getTracker) {
                 append_notes: str('Markdown appended to the existing notes (use for progress logs).'),
                 decision: enumOf(['', ...DECISIONS.map((d) => d.id)], 'Review decision; normally set by the user.'),
                 feedback: str('Review feedback; normally written by the user.'),
+                comment: str('A comment from you on the item, in Markdown: your answer to the user\'s comment, or what you did about it. It is added to the item\'s comments (the notes stay as they are).'),
               },
               required: ['id'],
             },
@@ -335,9 +338,9 @@ export const PROMPTS = [
   {
     name: 'check_feedback',
     title: 'Check tracker feedback',
-    description: 'Find review decisions and feedback on proposals and artifacts and act on them.',
+    description: 'Find my comments waiting for your reply on any item, and my review decisions on proposals and artifacts, and act on them.',
     arguments: [{ name: 'project', description: 'Limit to one project (optional).', required: false }],
     text: ({ project }) =>
-      `Check my tracker for docs I have reviewed${project ? ` in project ${project}` : ''} (list_items with status "all" and a decision; read the feedback with get_item). Summarize each decision and feedback, and propose next steps. For "changes" decisions, offer to revise and resend with send_document using item_id.`,
+      `Check my tracker${project ? ` (project ${project})` : ''} for feedback: comments waiting for your reply on any item (list_items with comments "unanswered"), and docs I have reviewed (list_items with status "all" and a decision). Read each with get_item. Summarize each comment, decision and feedback, and propose next steps. Once you have handled a comment, reply to it with update_items comment, saying what you did. For "changes" decisions, offer to revise and resend with send_document using item_id.`,
   },
 ];
