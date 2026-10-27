@@ -79,3 +79,33 @@ test('the other app’s writes are noticed; this app’s own are not', async () 
   assert.equal(seen, 1);
   stop();
 });
+
+test('a file another program holds open for a moment (Windows) is replaced once it lets go', async () => {
+  const fsp = require('node:fs').promises;
+  const rename = fsp.rename;
+  const dir = temp();
+  const store = createLocalStore(dir);
+  await store.put('meta', '{"a":1}');
+  let refused = 0;
+  fsp.rename = async (...args) => {
+    if (refused < 3) {
+      refused++;
+      throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' });
+    }
+    return rename(...args);
+  };
+  try {
+    await store.put('meta', '{"a":2}');
+    assert.equal(refused, 3);
+    assert.equal(await store.get('meta'), '{"a":2}');
+    // Held for good: the error comes back, and no temporary file is left behind.
+    fsp.rename = async () => {
+      throw Object.assign(new Error('EBUSY: resource busy or locked, rename'), { code: 'EBUSY' });
+    };
+    await assert.rejects(store.put('meta', '{"a":3}'), /EBUSY/);
+    assert.deepEqual(require('node:fs').readdirSync(dir).filter((f) => f.endsWith('.tmp')), []);
+    assert.equal(await store.get('meta'), '{"a":2}');
+  } finally {
+    fsp.rename = rename;
+  }
+});

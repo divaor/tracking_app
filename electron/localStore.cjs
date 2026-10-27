@@ -90,7 +90,23 @@ function createLocalStore(dir) {
     await fsp.mkdir(path.dirname(file), { recursive: true });
     const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
     await fsp.writeFile(tmp, value);
-    await fsp.rename(tmp, file);
+    await replace(tmp, file);
+  }
+
+  // Windows refuses to replace a file for a moment while something has it open (the other app
+  // reading it, a virus scanner): it is tried again for up to a second, as other tools do.
+  async function replace(tmp, file) {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await fsp.rename(tmp, file);
+      } catch (err) {
+        if (!['EPERM', 'EACCES', 'EBUSY'].includes(err.code) || attempt >= 20) {
+          await fsp.rm(tmp, { force: true });
+          throw err;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10 + attempt * 5));
+      }
+    }
   }
 
   // One writer at a time across apps: a lock file, taken over when it is left from a crash.
