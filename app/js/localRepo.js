@@ -12,6 +12,10 @@ import { GitHubError } from './github.js';
 const DEFAULT_BRANCH = 'main';
 // A full tree every so many changes, so reading one never walks far.
 const SNAPSHOT_EVERY = 64;
+// Two apps (or several saves at once) writing: each round one wins the branch, the others try
+// again after a short random pause, so they stop colliding.
+const TRIES = 24;
+const pause = (attempt) => new Promise((resolve) => setTimeout(resolve, Math.random() * Math.min(120, 4 * attempt)));
 // History kept: commits older than this are dropped by prune(), the last one before it stays as the first.
 export const KEEP_DAYS = 180;
 // Objects younger than this are never removed (another app may be in the middle of a sync).
@@ -254,7 +258,8 @@ export function createLocalRepo(backend, { now = () => new Date().toISOString() 
     /** Creates or replaces one file; `sha` must be the current one (409 otherwise, 422 when it exists and none is given). */
     async putFile(filePath, { text, sha, branch, message }) {
       const name = branch || (await defaultBranch());
-      for (let attempt = 0; attempt < 8; attempt++) {
+      for (let attempt = 0; attempt < TRIES; attempt++) {
+        if (attempt) await pause(attempt);
         const tip = await head(name);
         const current = tip ? (await readTree((await readCommit(tip)).tree)).get(filePath) : undefined;
         if (sha && current !== sha) throw new GitHubError(`“${filePath}” does not match ${sha} (409).`, 409);
@@ -268,7 +273,8 @@ export function createLocalRepo(backend, { now = () => new Date().toISOString() 
 
     async deleteFile(filePath, { sha, branch, message }) {
       const name = branch || (await defaultBranch());
-      for (let attempt = 0; attempt < 8; attempt++) {
+      for (let attempt = 0; attempt < TRIES; attempt++) {
+        if (attempt) await pause(attempt);
         const tip = await head(name);
         const current = tip ? (await readTree((await readCommit(tip)).tree)).get(filePath) : undefined;
         if (!current) throw notFound(`“${filePath}”`);
@@ -291,7 +297,8 @@ export function createLocalRepo(backend, { now = () => new Date().toISOString() 
 
     /** Merges `patch` into the store's notes (where the data went, when it was tidied). */
     async setMeta(patch) {
-      for (let attempt = 0; attempt < 8; attempt++) {
+      for (let attempt = 0; attempt < TRIES; attempt++) {
+        if (attempt) await pause(attempt);
         const raw = await backend.get('meta');
         const next = JSON.stringify({ ...(raw ? JSON.parse(raw) : {}), ...patch });
         if (await backend.cas('meta', raw, next)) return JSON.parse(next);
