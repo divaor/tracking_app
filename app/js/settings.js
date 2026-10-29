@@ -33,6 +33,8 @@ export const DEFAULT_SETTINGS = {
   itemHead: { status: true, priority: true, project: true, tags: true, id: false },
   // Pinned items show whatever type, status or #tag is picked (their project still has to be shown).
   pinnedPastFilters: false,
+  // The sidebar lists every project and tag (else the first ones, with "N more").
+  sidebarAll: { projects: false, tags: false },
   // In a browser on a computer: links to items not on this device go to the desktop app (tracker-app://).
   openItemsInApp: false,
   // Claude connector address, used for push notifications.

@@ -363,24 +363,158 @@ export function diffCounts(before, after) {
 
 // ---- Queries -------------------------------------------------------------
 
+// Search ignores case and accents ("cancion" finds "canción"); words are found anywhere,
+// "a phrase" in quotes as written, #tag and +project as filters.
+const FIELD_GAP = '\u0001'; // between fields, so a phrase never runs from one into the next
+
+/** Text as search compares it: lower case, accents dropped, any space a plain space. */
+export const foldSearch = (value) =>
+  text(value)
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase()
+    .replace(/\s/g, ' ');
+
+/**
+ * `foldSearch` with where each character came from: `start[i]` and `end[i]` are the place
+ * in `value` of the character folded text's i-th code unit came from.
+ */
+export function foldText(value) {
+  const source = text(value);
+  let folded = '';
+  const start = [];
+  const end = [];
+  for (let i = 0; i < source.length; ) {
+    const char = String.fromCodePoint(source.codePointAt(i));
+    const piece = foldSearch(char);
+    for (let k = 0; k < piece.length; k++) {
+      start.push(i);
+      end.push(i + char.length);
+    }
+    folded += piece;
+    i += char.length;
+  }
+  return { text: folded, start, end };
+}
+
+/** A search's parts: `words` (folded; a quoted phrase is one), `tags` (#…) and `projects` (+…). */
+export function queryTerms(query) {
+  const terms = { words: [], tags: [], projects: [] };
+  for (const [, phrase, word] of text(query).matchAll(/"([^"]*)"?|(\S+)/g)) {
+    if (phrase !== undefined) {
+      const folded = foldSearch(phrase).replace(/ +/g, ' ').trim();
+      if (folded) terms.words.push(folded);
+    } else if (word.length > 1 && word[0] === '#') terms.tags.push(word.slice(1).toLowerCase());
+    else if (word.length > 1 && word[0] === '+') terms.projects.push(compactName(word.slice(1)));
+    else terms.words.push(foldSearch(word));
+  }
+  return terms;
+}
+
+/** The words to find in an open item: every term as written (#tag too), quoted phrases as one, folded. */
+export const findWords = (query) =>
+  [...text(query).matchAll(/"([^"]*)"?|(\S+)/g)].map(([, phrase, word]) => foldSearch(phrase ?? word).replace(/ +/g, ' ').trim()).filter(Boolean);
+
+/** What a search looks for in an item's text, without its #tag and +project filters (to find in the open item). */
+export const searchWordsOf = (query) =>
+  [...text(query).matchAll(/"[^"]*"?|\S+/g)]
+    .map(([term]) => term)
+    .filter((term) => !(term.length > 1 && (term[0] === '#' || term[0] === '+')))
+    .join(' ');
+
+// Each item's text, folded once (items are replaced, never changed, when edited).
+const folded = new WeakMap();
+function searchTextOf(item) {
+  let value = folded.get(item);
+  if (value === undefined) {
+    // The id too, so an item can be found by the id Claude gives.
+    value = foldSearch(
+      [item.title, item.notes, item.feedback, item.project, item.url, kindLabel(item.type, item.kind), item.id, ...item.tags, ...item.files.map((f) => f.name), ...liveComments(item).map((c) => c.text)].join(FIELD_GAP),
+    );
+    folded.set(item, value);
+  }
+  return value;
+}
+
 /** `tags: false` leaves out the query's #tag terms (with `keepPinned`, pinned items show past them). */
 export function matchesQuery(item, query, { tags: byTags = true } = {}) {
-  const terms = text(query)
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((term) => term && (byTags || !(term.startsWith('#') && term.length > 1)));
-  if (!terms.length) return true;
-  const tags = item.tags.map((t) => t.toLowerCase());
-  // The id too, so an item can be found by the id Claude gives.
-  const haystack = [item.title, item.notes, item.feedback, item.project, item.url, kindLabel(item.type, item.kind), item.id, ...item.files.map((f) => f.name), ...liveComments(item).map((c) => c.text)]
-    .join('\n')
-    .toLowerCase();
-  const project = compactName(item.project);
-  return terms.every((term) => {
-    if (term.startsWith('#') && term.length > 1) return tags.some((t) => t.startsWith(term.slice(1)));
-    if (term.startsWith('+') && term.length > 1) return project.startsWith(compactName(term.slice(1)));
-    return haystack.includes(term) || tags.some((t) => t.includes(term));
-  });
+  const { words, tags, projects } = queryTerms(query);
+  if (byTags && tags.length) {
+    const own = item.tags.map((t) => t.toLowerCase());
+    if (!tags.every((tag) => own.some((t) => t.startsWith(tag)))) return false;
+  }
+  if (projects.length && !projects.every((p) => compactName(item.project).startsWith(p))) return false;
+  return !words.length || words.every((word) => searchTextOf(item).includes(word));
+}
+
+/** Where `words` (folded, as `queryTerms` gives them) are in `value`: [start, end] pairs in order, overlaps joined. */
+export function matchRanges(value, words) {
+  if (!words?.length || !value) return [];
+  const { text: haystack, start, end } = foldText(value);
+  const found = [];
+  for (const word of words) {
+    if (!word) continue;
+    for (let at = haystack.indexOf(word); at !== -1; at = haystack.indexOf(word, at + word.length)) found.push([start[at], end[at + word.length - 1]]);
+  }
+  found.sort((a, b) => a[0] - b[0] || b[1] - a[1]);
+  const ranges = [];
+  for (const range of found) {
+    const last = ranges.at(-1);
+    if (last && range[0] <= last[1]) last[1] = Math.max(last[1], range[1]);
+    else ranges.push([...range]);
+  }
+  return ranges;
+}
+
+// Markdown read as text in a passage: no heading marks, emphasis or code marks, links as their text.
+const plainMarkdown = (md) =>
+  text(md)
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\*\*|__|`/g, '');
+
+/**
+ * For a search result: the passage of the item that matches, when its title alone does not
+ * hold every word. `{ where, text, ranges }` (`ranges` in `text`, which may start or end
+ * with "…"), or null. The field with the most words wins, the first of equals.
+ */
+export function matchSnippet(item, query, { size = 120 } = {}) {
+  const { words } = queryTerms(query);
+  if (!words.length) return null;
+  const title = foldSearch(item.title);
+  if (words.every((word) => title.includes(word))) return null;
+  const fields = [
+    ['Notes', plainMarkdown(item.notes)],
+    ...liveComments(item).map((c) => [c.by === CLAUDE_AUTHOR ? 'Claude' : 'Comment', plainMarkdown(c.text)]),
+    ['Feedback', plainMarkdown(item.feedback)],
+    ...item.files.map((f) => ['File', f.name]),
+    ['Link', item.url],
+  ];
+  let best = null;
+  for (const [where, value] of fields) {
+    if (!value) continue;
+    const flat = text(value).replace(/\s+/g, ' ').trim();
+    const haystack = foldSearch(flat);
+    const hits = words.filter((word) => !title.includes(word) && haystack.includes(word)).length;
+    if (hits && (!best || hits > best.hits)) best = { where, flat, hits };
+  }
+  if (!best) return null;
+  const { where, flat } = best;
+  const ranges = matchRanges(flat, words);
+  // A little before the first match, the rest after it, cut at spaces.
+  let from = Math.max(0, ranges[0][0] - Math.round(size * 0.3));
+  if (from > 0) from = flat.indexOf(' ', from) + 1 || from;
+  if (from > ranges[0][0]) from = ranges[0][0];
+  let to = Math.min(flat.length, from + size);
+  if (to < flat.length) to = Math.max(flat.lastIndexOf(' ', to), ranges[0][1]);
+  // `flat` has single spaces, so the slice starts after one and ends before one.
+  const lead = from > 0 ? '…' : '';
+  const shift = lead.length - from;
+  return {
+    where,
+    text: `${lead}${flat.slice(from, to)}${to < flat.length ? '…' : ''}`,
+    ranges: ranges.filter(([a, b]) => a >= from && b <= to).map(([a, b]) => [a + shift, b + shift]),
+  };
 }
 
 /**

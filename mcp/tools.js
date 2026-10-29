@@ -111,7 +111,7 @@ export function createTools(getTracker) {
         properties: {
           type: enumOf(['all', ...TYPE_IDS], 'Filter by type. Default: all.'),
           status: enumOf(['open', 'all', ...STATUSES], 'open = pending or in_progress (default).'),
-          query: str('Words to search for in title, notes, feedback, comments, project, url, tags and file names.'),
+          query: str('Words to search for in title, notes, feedback, comments, project, url, tags and file names (case and accents ignored; "a phrase" in quotes).'),
           tag: str('Only items with this tag.'),
           project: str('Only items in this project (case-insensitive).'),
           projects: { type: 'array', items: { type: 'string' }, description: 'Only items in any of these projects.' },

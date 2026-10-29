@@ -9,6 +9,7 @@ import {
   parseQuickAdd,
   projectList,
   restoreCommentPatch,
+  searchWordsOf,
   statusLabel,
   STATUSES,
   tagCounts,
@@ -24,7 +25,7 @@ import { modelReady, readQuickAdd } from './assistant.js';
 import { getSyncState, movedTo, onSyncState, syncNow } from './syncManager.js';
 import { setNotificationHandlers } from './notifier.js';
 import { Icon } from './ui/icons.js';
-import { ProjectsContext, SyncBadge, Toasts } from './ui/components.js';
+import { ProjectsContext, SearchContext, SyncBadge, Toasts } from './ui/components.js';
 import { ProjectsView, ScopeBar } from './ui/projects.js';
 import { BoardView, HomeView, ListView } from './ui/views.js';
 import { ItemModal } from './ui/itemModal.js';
@@ -96,9 +97,21 @@ function scrollToWhenShown(id, tries = 60) {
   else if (tries > 0) requestAnimationFrame(() => scrollToWhenShown(id, tries - 1));
 }
 
-function Sidebar({ route, items, projects, scope, onProject, onTag, sync, onSyncClick, onNew, onHelp }) {
+// The sidebar's projects and tags: the first ones, or all of them (setting `sidebarAll`).
+const SIDEBAR_FIRST = 12;
+function MoreToggle({ list, part }) {
+  const all = getSettings().sidebarAll ?? {};
+  if (list.length <= SIDEBAR_FIRST) return null;
+  return html`<button type="button" class="nav-more" aria-expanded=${Boolean(all[part])} onClick=${() => saveSettings({ sidebarAll: { ...all, [part]: !all[part] } })}>
+    ${all[part] ? 'Fewer' : `${list.length - SIDEBAR_FIRST} more`}</button>`;
+}
+const firstOf = (list, part) => (getSettings().sidebarAll?.[part] ? list : list.slice(0, SIDEBAR_FIRST));
+
+function Sidebar({ route, items, projects, scope, query, onProject, onTag, sync, onSyncClick, onNew, onHelp }) {
   const open = items.filter((i) => i.status !== 'done');
-  const tags = tagCounts(items).slice(0, 12);
+  const allTags = tagCounts(items);
+  const tags = firstOf(allTags, 'tags');
+  const tagOn = (tag) => query.toLowerCase().split(/\s+/).includes(`#${tag.toLowerCase()}`);
   const link = (target, label, icon, count, extraClass = '') => {
     const active = route.view === target.view && (target.type ?? 'all') === route.type;
     return html`<a href=${hrefFor(target)} class="nav-link ${active ? 'active' : ''} ${extraClass}" aria-current=${active ? 'page' : undefined}>
@@ -116,15 +129,19 @@ function Sidebar({ route, items, projects, scope, onProject, onTag, sync, onSync
       <div class="nav-section">Categories</div>
       ${TYPES.map((t) => link({ view: categoryView, type: t.id }, t.plural, t.id, open.filter((i) => i.type === t.id).length, `type-${t.id}`))}
       <div class="nav-section nav-section-row">Projects<a href="#/projects" class="nav-manage" title="Manage projects and tags">Manage</a></div>
-      ${projects.slice(0, 12).map((p) => {
+      ${firstOf(projects, 'projects').map((p) => {
         const active = scope.length === 1 && scope[0] === `project:${p.key}`;
         return html`<button type="button" key=${p.key} class="nav-link nav-project ${active ? 'active' : ''}" style=${{ '--pc': p.color }}
           onClick=${() => onProject(p.key)}><span class="project-dot" /><span class="nav-label">${p.name}</span><span class="count">${p.open}</span></button>`;
       })}
+      <${MoreToggle} list=${projects} part="projects" />
       ${!projects.length && html`<a href="#/projects" class="nav-link muted-link"><${Icon} name="plus" size=${16} /><span>Add a project</span></a>`}
       ${tags.length > 0 &&
       html`<div class="nav-section">Tags</div>
-        <div class="nav-tags">${tags.map((t) => html`<button type="button" class="tag" key=${t.tag} onClick=${() => onTag(t.tag)}>#${t.tag}<span>${t.count}</span></button>`)}</div>`}
+        <div class="nav-tags">
+          ${tags.map((t) => html`<button type="button" class="tag ${tagOn(t.tag) ? 'on' : ''}" key=${t.tag} aria-pressed=${tagOn(t.tag)} onClick=${() => onTag(t.tag)}>#${t.tag}<span>${t.count}</span></button>`)}
+          <${MoreToggle} list=${allTags} part="tags" />
+        </div>`}
       <div class="nav-section"></div>
       ${link({ view: 'settings' }, 'Settings', 'settings')}
       <button type="button" class="nav-link" title="Commands, shortcuts and the guide (F1)" onClick=${onHelp}><${Icon} name="help" size=${18} /><span>Help</span><kbd class="nav-key">F1</kbd></button>
@@ -399,11 +416,11 @@ export function App() {
   const frontWindow = (list = windowsRef.current) => list.filter((w) => !w.min).reduce((top, w) => (!top || w.z > top.z ? w : top), null);
   const windowActions = {
     /** Opens an item in a window of its own (again for an item already open: another view of it). */
-    open(item, { scroll = 0 } = {}) {
-      if (narrowScreen()) return openModal({ id: item.id });
+    open(item, { scroll = 0, find = '' } = {}) {
+      if (narrowScreen()) return openModal({ id: item.id, find });
       const size = { w: item.type === 'doc' ? 760 : 580, h: 700 };
       const place = nextRect(windowsRef.current, windowArea(), size);
-      updateWindows((list) => [...list, { wid: ++windowSeq, id: item.id, ...place, z: ++stackSeq, min: false, max: false, restore: null, scroll }]);
+      updateWindows((list) => [...list, { wid: ++windowSeq, id: item.id, ...place, z: ++stackSeq, min: false, max: false, restore: null, scroll, find }]);
     },
     focus(wid) {
       const win = windowsRef.current.find((w) => w.wid === wid);
@@ -441,8 +458,14 @@ export function App() {
       if (item) actions.open(item, opts);
       else setLinkedItem(id);
     },
-    /** Opens an item: in the dialog, or `{ window: true }` (Ctrl+click, middle-click) in a window of its own. */
-    open: (item, { window: inWindow = false } = {}) => (inWindow ? windowActions.open(item) : openModal({ id: item.id })),
+    /**
+     * Opens an item: in the dialog, or `{ window: true }` (Ctrl+click, middle-click) in a window of its own.
+     * While searching, the item opens finding the words searched for.
+     */
+    open: (item, { window: inWindow = false } = {}) => {
+      const find = searchWordsOf(query);
+      return inWindow ? windowActions.open(item, { find }) : openModal({ id: item.id, find });
+    },
     /** The dialog's item moves to a window at the side (the list stays free to open others), scrolled as it was. */
     popOut(item, { scroll = 0 } = {}) {
       if (narrowScreen()) return;
@@ -745,7 +768,11 @@ export function App() {
   useEffect(
     () =>
       window.desktop?.onCommand?.((command) => {
-        // The menu's New Item and Search do nothing over an open item or Help (as their keys).
+        // The menu's Search (Ctrl+F) over an open item finds in it; New Item and Search do nothing over Help.
+        if (command === 'search' && !helpRef.current && (modalRef.current || document.activeElement?.closest?.('.item-window'))) {
+          window.dispatchEvent(new Event('item:find'));
+          return;
+        }
         if ((modalRef.current || helpRef.current) && ['new-item', 'search'].includes(command)) return;
         actionsRef.current.command(command);
       }),
@@ -817,8 +844,8 @@ export function App() {
   }
   const scoped = ['home', 'board', 'list'].includes(route.view);
 
-  return html`<${ProjectsContext.Provider} value=${{ byKey, showProject: actions.showProject, togglePin: actions.togglePin }}><div class="app ${drawer ? 'drawer-open' : ''} ${windows.length ? 'has-windows' : ''}">
-    <${Sidebar} route=${route} items=${scopedItems} projects=${projects} scope=${scope} onProject=${actions.showProject}
+  return html`<${ProjectsContext.Provider} value=${{ byKey, showProject: actions.showProject, togglePin: actions.togglePin }}><${SearchContext.Provider} value=${query}><div class="app ${drawer ? 'drawer-open' : ''} ${windows.length ? 'has-windows' : ''}">
+    <${Sidebar} route=${route} items=${scopedItems} projects=${projects} scope=${scope} query=${query} onProject=${actions.showProject}
       sync=${sync} onSyncClick=${onSyncClick} onNew=${() => actions.newItem()} onTag=${(tag) => actions.searchTag(tag)} onHelp=${() => openHelp()} />
     <div class="scrim" onClick=${() => setDrawer(false)} />
     <main class="main">
@@ -854,7 +881,7 @@ export function App() {
     html`<${WindowDock} windows=${windows} items=${itemsById} front=${front?.wid} onPick=${windowActions.pick} onClose=${(w) => windowActions.close(w.wid)}
       onTile=${windowActions.tile} onMinimizeAll=${windowActions.minimizeAll} onCloseAll=${windowActions.closeAll} />`}
     ${modal && (modal.draft || modalItem) &&
-    html`<${ItemModal} key=${modal.id ?? 'new'} item=${modalItem} initial=${modal.draft} actions=${actions}
+    html`<${ItemModal} key=${modal.id ?? 'new'} item=${modalItem} initial=${modal.draft} find=${modal.find} actions=${actions}
       projects=${projects.map((p) => p.name)} tagSuggestions=${tagNames} today=${today} onClose=${() => closeModal()}
       onPopOut=${modalItem ? (from) => actions.popOut(modalItem, from) : undefined} />`}
     ${help &&
@@ -863,5 +890,5 @@ export function App() {
     <${Toasts} toasts=${toasts} onDismiss=${dismissToast} />
     ${fileDrag &&
     html`<div class="drop-overlay"><div><${Icon} name="upload" size=${40} /><p>Drop Markdown files to add them to your reading list</p></div></div>`}
-  </div></${ProjectsContext.Provider}>`;
+  </div></${SearchContext.Provider}></${ProjectsContext.Provider}>`;
 }

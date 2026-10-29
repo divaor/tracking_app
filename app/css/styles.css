@@ -3750,3 +3750,125 @@ body.window-dragging iframe {
     left: 0;
   }
 }
+
+/* ---- Search: what a search found, and find in an open item --------------------- */
+/* In results: the words marked in the title, and the passage that matched under it. */
+.row-title mark,
+.card-title mark,
+.row-snippet mark,
+.card-snippet mark {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--warn) 30%, transparent);
+  color: inherit;
+}
+
+.row-snippet,
+.card-snippet {
+  margin-top: 2px;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.row-snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-snippet {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.snippet-where {
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* The find bar under an item's title, and its matches (the page itself is not changed). */
+.find-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 16px 12px 22px;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.find-bar > .icon {
+  flex: none;
+  color: var(--text-3);
+}
+
+.find-bar input {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 6px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.find-count {
+  flex: none;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.find-count.none {
+  color: var(--warn);
+}
+
+::highlight(item-find) {
+  background-color: color-mix(in srgb, var(--warn) 32%, transparent);
+}
+
+::highlight(item-find-current) {
+  background-color: var(--warn);
+  color: #fff;
+}
+
+/* The sidebar's tag picked as a filter, and "N more". */
+.nav-tags .tag.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.nav-more {
+  align-self: flex-start;
+  margin: 0 10px 2px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.nav-tags .nav-more {
+  margin: 0;
+}
+
+.nav-more:hover {
+  background: var(--accent-soft);
+}
+
+@media (max-width: 640px) {
+  .find-bar {
+    margin: 0 12px 10px;
+  }
+}

@@ -67,7 +67,7 @@ export function ItemWindow({ win, item, z, front, actions, projects, tagSuggesti
       onClick=${onMaximize}><${Icon} name=${win.max ? 'restore' : 'maximize'} /></button>`;
 
   return html`<${ItemPanel} frame="window" item=${item} actions=${actions} projects=${projects} tagSuggestions=${tagSuggestions} today=${today}
-    rootRef=${ref} initialScroll=${win.scroll} onClose=${onClose} tools=${tools}
+    rootRef=${ref} initialScroll=${win.scroll} find=${win.find} onClose=${onClose} tools=${tools}
     rootProps=${{
       class: `${front ? 'front' : ''} ${win.min ? 'minimized' : ''} ${win.max ? 'maximized' : ''}`,
       style: { left: `${win.x}px`, top: `${win.y}px`, width: `${win.w}px`, height: `${win.h}px`, zIndex: z },

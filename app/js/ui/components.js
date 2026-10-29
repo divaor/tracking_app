@@ -1,5 +1,5 @@
 import { createContext, html, useContext, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
-import { checklistProgress, CLAUDE_AUTHOR, decisionLabel, isOverdue, kindLabel, liveComments, nextStatus, projectKey, statusLabel, TYPES, typeInfo } from '../model.js';
+import { checklistProgress, CLAUDE_AUTHOR, decisionLabel, isOverdue, kindLabel, liveComments, matchRanges, matchSnippet, nextStatus, projectKey, queryTerms, statusLabel, TYPES, typeInfo } from '../model.js';
 import { formatDue, timeAgo } from '../format.js';
 import { editorLink, parseEditorLink } from '../editorLinks.js';
 import { getSettings, isLocal } from '../settings.js';
@@ -10,6 +10,35 @@ import { modelReady } from '../assistant.js';
 
 // Project colors and the "show this project" and "pin" actions, provided by the app.
 export const ProjectsContext = createContext({ byKey: new Map(), showProject: () => {}, togglePin: () => {} });
+
+// The search typed in the top bar: rows and cards mark what it found.
+export const SearchContext = createContext('');
+
+/** `text` with `ranges` ([start, end] pairs, in order) marked. */
+export function Marked({ text, ranges }) {
+  if (!ranges?.length) return text;
+  const parts = [];
+  let at = 0;
+  ranges.forEach(([from, to], i) => {
+    if (from > at) parts.push(text.slice(at, from));
+    parts.push(html`<mark key=${i}>${text.slice(from, to)}</mark>`);
+    at = to;
+  });
+  if (at < text.length) parts.push(text.slice(at));
+  return parts;
+}
+
+// A search result: its title with the words marked, and the passage that matched when the title does not hold them all.
+function useFound(item) {
+  const query = useContext(SearchContext);
+  const title = item.title || 'Untitled';
+  const words = query ? queryTerms(query).words : [];
+  if (!words.length) return { title, snippet: null };
+  return { title: html`<${Marked} text=${title} ranges=${matchRanges(title, words)} />`, snippet: matchSnippet(item, query) };
+}
+
+const Snippet = ({ snippet, className }) =>
+  snippet && html`<div class=${className}><span class="snippet-where">${snippet.where}</span> <${Marked} text=${snippet.text} ranges=${snippet.ranges} /></div>`;
 
 // A pinned item wears its project's color (the accent without a project).
 const pinStyle = (item, byKey) => (item.pinned ? { '--pc': byKey.get(projectKey(item.project))?.color || 'var(--accent)' } : undefined);
@@ -121,6 +150,7 @@ function openProps(item, onOpen) {
 
 export function ItemCard({ item, onOpen, onStatus, today, draggable = false, showType = true }) {
   const { byKey } = useContext(ProjectsContext);
+  const found = useFound(item);
   return html`<article class="card type-${item.type} status-${item.status} ${item.pinned ? 'pinned' : ''}" style=${pinStyle(item, byKey)} tabindex="0" draggable=${draggable}
     ...${openProps(item, onOpen)}
     onDragStart=${draggable
@@ -133,9 +163,10 @@ export function ItemCard({ item, onOpen, onStatus, today, draggable = false, sho
     onDragEnd=${draggable ? (e) => e.currentTarget.classList.remove('dragging') : undefined}>
     <div class="card-head">
       <${StatusButton} item=${item} onStatus=${onStatus} />
-      <div class="card-title">${item.title || 'Untitled'}</div>
+      <div class="card-title">${found.title}</div>
       ${item.pinned && html`<${PinMark} item=${item} />`}
     </div>
+    <${Snippet} snippet=${found.snippet} className="card-snippet" />
     <div class="card-foot">
       ${showType && html`<${TypeBadge} type=${item.type} kind=${item.kind} />`}
       <${DecisionBadge} decision=${item.decision} />
@@ -147,12 +178,14 @@ export function ItemCard({ item, onOpen, onStatus, today, draggable = false, sho
 
 export function ItemRow({ item, onOpen, onStatus, today }) {
   const { byKey } = useContext(ProjectsContext);
+  const found = useFound(item);
   return html`<div class="row type-${item.type} status-${item.status} ${item.pinned ? 'pinned' : ''}" style=${pinStyle(item, byKey)} role="button" tabindex="0"
     ...${openProps(item, onOpen)}>
     <${StatusButton} item=${item} onStatus=${onStatus} />
     <span class="row-type" title=${typeInfo(item.type).label}><${Icon} name=${item.type} size=${16} /></span>
     <div class="row-main">
-      <div class="row-title">${item.pinned && html`<${PinMark} item=${item} />`}${item.title || 'Untitled'}</div>
+      <div class="row-title">${item.pinned && html`<${PinMark} item=${item} />`}${found.title}</div>
+      <${Snippet} snippet=${found.snippet} className="row-snippet" />
       <${ItemMeta} item=${item} today=${today} />
     </div>
     ${(item.decision || item.priority === 'high' || item.priority === 'urgent') &&

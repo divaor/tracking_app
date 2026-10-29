@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 1.14.1 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 1.15.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -113,9 +113,13 @@ Each card shows its type, priority, project, due date, checklist progress, attac
 
 Filter by type and status, and sort by priority, due date and more (*Smart* lists items in progress first, then the rest by priority and due date). The sidebar's categories open the same list already filtered.
 
-- **Search** (`/`) matches titles, notes, comments, links, file names and item IDs. Use `#tag` for a tag or `+project` for a project. **Esc** in the search box clears it.
+- **Search** (`/`) finds words in the titles, notes, comments, review feedback, links, file names, tags and item IDs, wherever they are in an item (every word you type, in any order). Capitals and accents don't matter: *cancion* finds *canción*. Put words in quotes for a phrase as written (`"deploy the api"`). Use `#tag` for a tag or `+project` for a project. **Esc** in the search box clears it.
+- Typing a search on the **Overview** shows the matches in **All items**. The filters stay: the type, the status, and the projects picked in the bar above apply to what is found (on the board too).
+- **Each result shows where it matched**: the words are marked in its title, and when they are not all in the title, the passage that has them shows under it, with where it is from (**Notes**, **Comment**, **Claude**, **Feedback**, **File**, **Link**).
+- **Open a result** and it opens finding those words: they are marked in the item and it scrolls to the first one (see [Find in an item](#find-in-an-item)).
 - **Paste a link to an item** (the ones Claude gives, `…/#/item/…`) **or its ID** in the search box to open that item.
-- Click a **tag** in the sidebar or on an item to see everything with that tag. Click a **project chip** to show that project.
+- Click a **tag** in the sidebar or on an item to see everything with that tag (the sidebar marks the tag searched for). Click a **project chip** to show that project.
+- The sidebar lists the first 12 projects and tags; **N more** shows all of them (and **Fewer** the first ones again). Each device remembers it.
 
 ### Pinned items
 
@@ -143,6 +147,16 @@ Press the pencil (or **E**) to edit, or the pin (or **P**) to pin it (section 6)
 - **Tags** are chips: type one and press Enter (Backspace in an empty field removes the last one). Suggestions come from tags you already use.
 - **Documents:** paste text, use **Import file**, or drop Markdown files onto the window to add them to your reading list.
 - Save with **Ctrl+Enter** (**Cmd+Enter** on a Mac); **Esc** closes (and asks before dropping unsaved changes). Deleting an item or marking it done shows an **Undo** button for a few seconds. Saving changes only what you changed, so an edit made meanwhile somewhere else stays.
+
+### Find in an item
+
+**Ctrl+F** (**Cmd+F** on a Mac), **/** or the magnifier in an open item's bar shows a find bar under its title. Type, and the words are marked in the item (its notes, the file it shows, its comments), with how many there are (*2 of 5*):
+
+- **Enter** (or the down arrow) goes to the next one, **Shift+Enter** (or the up arrow) to the one before; the item scrolls there.
+- Words are found apart, in any order; `"a phrase"` in quotes as written. Capitals and accents don't matter.
+- **Esc** closes the bar (a second **Esc** closes the item). Opening an item from a search fills the bar with the words searched for.
+- It keeps up with the item: a file that finishes loading, or a comment that arrives, is searched too. Text in an HTML file's preview isn't searched (its **Source** view is).
+- Each item window has its own (desktop).
 
 ### Comments
 
@@ -276,6 +290,7 @@ Press **F1** or **?** to open Help: **Commands and shortcuts** lists everything 
 | --- | --- |
 | **N** | New item |
 | **/** | Search (**Ctrl+F** on the desktop) |
+| **Ctrl+F** · **/** | Find in the open item; **Enter** / **Shift+Enter** the next / previous match |
 | **Esc** | Clear the search, or close what's open |
 | **E** | Edit the open item |
 | **P** | Pin or unpin the open item |
@@ -303,6 +318,7 @@ On a Mac, use **Cmd** for **Ctrl**.
 | The model doesn't answer | Settings → Model → **Test and list models**. A local server must be running; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS`). With an AI provider: check the key and that the account has credit; a provider that refuses requests from web pages works from the desktop app. |
 | Claude doesn't see my comment | Claude reads your data repo: the device you commented on must be set up with GitHub sync and have synced (the badge says *Synced*). On a device that keeps its data on this computer, the connector can't reach it. |
 | A link from Claude opens the browser, not the app | Click **Open in the app** in the message the page shows (needs the desktop app 1.11 or later), or paste the link in the app's search box. |
+| Search doesn't find a phrase | Words without quotes are found apart, anywhere in the item; `"in quotes"` they must be next to each other, as written. A phrase is never found across two parts (the title and the notes, two comments). |
 | The phone app shows an old version | Close it completely and open it again while online. It updates itself on the next start. |
 
 ## 17. Updates and releases

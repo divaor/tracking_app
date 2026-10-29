@@ -27,6 +27,7 @@ import { DecisionBadge, EditorLink, PriorityMark, ProjectsContext, Segmented, Ty
 import { ProjectChip, TagInput } from './projects.js';
 import { FilesPanel } from './fileViewer.js';
 import { ItemAssistant } from './assist.js';
+import { FindBar } from './itemFind.js';
 
 const NOTES_PLACEHOLDER = {
   task: 'Details, links, or a checklist:\n- [ ] first step\n- [ ] second step',
@@ -424,7 +425,7 @@ const plainKey = (e, key) => e.key === key && !e.metaKey && !e.ctrlKey && !e.alt
  */
 export function ItemPanel({
   item, initial, actions, projects, tagSuggestions = [], today, onClose, frame = 'modal', rootRef, rootProps = {},
-  tools, onHeadPointerDown, onHeadDoubleClick, onPopOut, initialScroll = 0, closeRef, children,
+  tools, onHeadPointerDown, onHeadDoubleClick, onPopOut, initialScroll = 0, closeRef, children, find: initialFind = '',
 }) {
   const isNew = !item;
   const [mode, setMode] = useState(isNew ? 'edit' : 'view');
@@ -437,6 +438,22 @@ export function ItemPanel({
   const dialogRef = rootRef ?? ownRef;
   const bodyRef = useRef(null);
   const editing = mode === 'edit';
+  // Find in this item (Ctrl+F, /): null while the bar is closed. Opened from a search, it finds those words.
+  const [find, setFind] = useState(() => (initialFind && item ? initialFind : null));
+  const [findFocus, setFindFocus] = useState(false);
+  const findRef = useRef(null);
+  const openFind = () => {
+    setFindFocus(true);
+    if (find === null) setFind('');
+    else {
+      findRef.current?.focus();
+      findRef.current?.select();
+    }
+  };
+  const closeFind = () => {
+    setFind(null);
+    dialogRef.current?.focus({ preventScroll: true });
+  };
   // The dialog keeps the ids it always had; each window gets its own.
   const ids = useMemo(() => {
     const n = frame === 'modal' ? '' : `-${++panelSeq}`;
@@ -501,6 +518,7 @@ export function ItemPanel({
     else if (editing && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save();
     else if (!editing && plainKey(e, 'e')) startEdit();
     else if (!editing && plainKey(e, 'p')) actions.togglePin(item);
+    else if (!editing && (plainKey(e, '/') || ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'f'))) openFind();
     else if (!editing && onPopOut && plainKey(e, 'w')) popOut();
     else if (!editing && plainKey(e, 'c')) {
       const box = dialogRef.current?.querySelector('.comment-new textarea');
@@ -510,6 +528,12 @@ export function ItemPanel({
     e.preventDefault();
     return true;
   };
+  // The desktop menu's Search (Ctrl+F): the dialog's find, or the find of the window that has the focus.
+  useEffect(() => {
+    const onFind = () => !editing && (frame === 'modal' || dialogRef.current?.contains(document.activeElement)) && openFind();
+    window.addEventListener('item:find', onFind);
+    return () => window.removeEventListener('item:find', onFind);
+  });
   // A layout effect, so the keys work the moment the dialog shows (also when a link replaces its item).
   useLayoutEffect(() => {
     if (frame !== 'modal') return undefined;
@@ -531,7 +555,9 @@ export function ItemPanel({
           : html`<${TypeBadge} type=${item.type} kind=${item.kind} />`}
         <span class="spacer" />
         ${!editing &&
-        html`<${HeadMenu} />
+        html`<button type="button" class="icon-btn ${find !== null ? 'on' : ''}" title="Find in this item (Ctrl+F)" aria-label="Find in this item"
+            aria-pressed=${find !== null} onClick=${() => (find === null ? openFind() : closeFind())}><${Icon} name="search" /></button>
+          <${HeadMenu} />
           <button type="button" class="icon-btn pin-toggle ${item.pinned ? 'on' : ''}" title=${item.pinned ? 'Unpin (P)' : 'Pin to the top of its project (P)'}
             aria-label=${item.pinned ? 'Unpin' : 'Pin'} aria-pressed=${Boolean(item.pinned)} onClick=${() => actions.togglePin(item)}><${Icon} name="pin" /></button>
           <button type="button" class="icon-btn" title="Edit (E)" aria-label="Edit" onClick=${startEdit}><${Icon} name="edit" /></button>
@@ -547,6 +573,7 @@ export function ItemPanel({
         <button type="button" class="icon-btn" title="Close (Esc)" aria-label="Close" onClick=${requestClose}><${Icon} name="x" /></button>
       </header>
       ${!editing && html`<${ItemHead} item=${item} actions=${actions} titleId=${ids.title} />`}
+      ${!editing && find !== null && html`<${FindBar} bodyRef=${bodyRef} value=${find} onInput=${setFind} onClose=${closeFind} inputRef=${findRef} focus=${findFocus} />`}
     </div>
     ${editing
       ? html`<${EditBody} draft=${draft} setDraft=${(d) => {

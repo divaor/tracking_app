@@ -29,6 +29,7 @@ export const COMMAND_LIST = [
 
   { id: 'search', group: 'Search and filter', label: 'Search', keys: '/', desktop: '/ · Mod+F' },
   { id: 'clear-search', group: 'Search and filter', label: 'Clear the search', keys: 'Esc', hint: 'In the search box' },
+  { id: 'search-phrase', group: 'Search and filter', label: 'Search a phrase as written (case and accents never matter)', code: '"a phrase"', run: false },
   { id: 'search-tag', group: 'Search and filter', label: 'Search a tag', code: '#tag', run: false },
   { id: 'search-project', group: 'Search and filter', label: 'Search a project', code: '+project', run: false },
   { id: 'open-by-link', group: 'Search and filter', label: 'Open an item from a link to it or its ID (as Claude gives)', how: 'Paste it in the search box', run: false },
@@ -38,6 +39,7 @@ export const COMMAND_LIST = [
   { id: 'pinned-past-filters', group: 'Search and filter', label: 'Show pinned items whatever the filters, or not (Settings → Appearance)' },
 
   { id: 'item-edit', group: 'In an item', label: 'Edit the open item', keys: 'E', run: false },
+  { id: 'item-find', group: 'In an item', label: 'Find in the open item (its notes, the file shown, comments): Enter next, Shift+Enter previous', keys: 'Mod+F · /', run: false, hint: 'Or the magnifier in the item’s bar; opened from a search, it finds those words' },
   { id: 'item-pin', group: 'In an item', label: 'Pin or unpin the open item (it comes first in the lists it shows in, and on the Overview)', keys: 'P', run: false, hint: 'Or the pin on a pinned item' },
   { id: 'item-comment', group: 'In an item', label: 'Comment on the open item (for Claude, or a note); Ctrl+Enter posts it', keys: 'C', run: false, hint: 'Claude reads the comments of any item through the connector' },
   { id: 'item-save', group: 'In an item', label: 'Save', keys: 'Mod+Enter', run: false },

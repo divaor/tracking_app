@@ -19,6 +19,7 @@ import {
   KINDS,
   kindLabel,
   liveComments,
+  matchesQuery,
   normalizeItem,
   nowIso,
   parseData,
@@ -282,7 +283,6 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       // Pinned and commented items are asked for whatever their status, unless one is given.
       status ??= pinned === true || comments ? 'all' : 'open';
       if (comments && !['unanswered', 'any'].includes(comments)) throw new TrackerError('comments must be "unanswered" or "any"');
-      const terms = String(query).toLowerCase().split(/\s+/).filter(Boolean);
       const data = await load();
       const areas = new Map(projectList(data.items, data.projects).map((p) => [p.key, p.area]));
       const wanted = [project, projects].flat().filter(Boolean).map(projectKey);
@@ -297,9 +297,7 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
           (!decision || (decision === 'none' ? !i.decision : i.decision === decision)) &&
           (typeof pinned !== 'boolean' || Boolean(i.pinned) === pinned) &&
           (!comments || (comments === 'unanswered' ? awaitsClaude(i) : liveComments(i).length > 0)) &&
-          terms.every((term) =>
-            [i.title, i.notes, i.feedback, i.project, i.url, ...i.tags, ...i.files.map((f) => f.name), ...liveComments(i).map((c) => c.text)].join('\n').toLowerCase().includes(term),
-          ),
+          matchesQuery(i, query),
       );
       const max = Math.min(Math.max(Number(limit) || 50, 1), 200);
       return { total: matches.length, shown: Math.min(max, matches.length), items: pinnedFirst(sortItems(matches)).slice(0, max).map(summarize) };
