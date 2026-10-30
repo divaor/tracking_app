@@ -6,6 +6,7 @@
 import { describeChanges } from './changes.js';
 import { createGitHubClient } from './github.js';
 import { notifyChanges } from './notifier.js';
+import { isDesktopApp } from './platform.js';
 import { syncOnce } from './sync.js';
 import { getSettings, getToken, isLocal, isSyncConfigured, saveSettings } from './settings.js';
 import { store } from './store.js';
@@ -182,12 +183,14 @@ export function startSync() {
     }
   });
   const sinceLast = () => Date.now() - Date.parse(getSyncState().lastSyncAt ?? 0);
-  const desktop = Boolean(window.desktop);
+  // The desktop app syncs every minute, also in the background; the Android app every minute
+  // while it is in front (closed, it looks for changes itself: Changes.java).
+  const desktop = isDesktopApp();
   setInterval(
     () => {
       if (getSettings().autoSync && (desktop || document.visibilityState === 'visible')) syncNow();
     },
-    desktop ? DESKTOP_INTERVAL : INTERVAL,
+    window.desktop ? DESKTOP_INTERVAL : INTERVAL,
   );
   window.addEventListener('online', () => getSettings().autoSync && syncNow());
   // Tracker Editor changed the data on this device: sync at once (local mode only, so GitHub users get no data folder).

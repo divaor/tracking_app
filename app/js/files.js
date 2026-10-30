@@ -8,6 +8,7 @@ import { attachmentKind, filesFolder, freeFilePath, mimeOf } from './model.js';
 import { getSettings } from './settings.js';
 import { store } from './store.js';
 import { dataClient, onSynced } from './syncManager.js';
+import { saveToDevice } from './saveFile.js';
 
 /** The largest file that can be attached. */
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -285,21 +286,14 @@ export function detachFile(itemId, path) {
   };
 }
 
-/** Saves a file to the device (the browser's downloads). */
+/** Saves a file to the device (the browser's downloads; the Android app asks where). */
 export async function downloadFile(file) {
-  const url = URL.createObjectURL(blobOf(file, await loadFileBytes(file)));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = file.name;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  return saveToDevice(file.name, blobOf(file, await loadFileBytes(file)));
 }
 
 /**
- * Opens a file with its program: the desktop app hands a copy to the program set for its type;
- * a browser downloads it. Resolves 'opened' or 'downloaded'.
+ * Opens a file with its program: the desktop app hands a copy to the program set for its type,
+ * the Android app to an app the phone offers; a browser downloads it. Resolves 'opened' or 'downloaded'.
  */
 export async function openFileOutside(file) {
   const bytes = await loadFileBytes(file);

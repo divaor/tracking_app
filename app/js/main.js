@@ -20,7 +20,8 @@ try {
   root.className = 'fatal';
 }
 
-const canUseServiceWorker = location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname);
+// Not in the Android app: it carries the files itself (and its https://localhost would get one).
+const canUseServiceWorker = (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname)) && window.desktop?.platform !== 'android';
 if ('serviceWorker' in navigator && canUseServiceWorker) {
   navigator.serviceWorker.register('sw.js').catch((err) => console.warn('Service worker registration failed', err));
 }

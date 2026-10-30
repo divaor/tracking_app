@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tracker</string>
+    <string name="title_activity_main">Tracker</string>
+    <string name="package_name">com.divaor.tracker</string>
+    <string name="custom_url_scheme">com.divaor.tracker</string>
+    <string name="share_label">Tracker</string>
+    <string name="process_text_label">Add to Tracker</string>
+    <string name="shortcut_new">Quick add</string>
+    <string name="shortcut_voice">Voice note</string>
+    <string name="shortcut_log">Send a log</string>
+    <string name="shortcut_log_long">Send a log (when something goes wrong)</string>
+    <string name="changes_channel">Changes on your tracker</string>
+    <string name="changes_channel_about">What Claude and your other devices changed, checked about every 15 minutes while the app is closed</string>
+</resources>

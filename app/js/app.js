@@ -23,7 +23,10 @@ import { getSettings, isLocal, isSyncConfigured, onSettings, saveSettings } from
 import { appendToNotes, refinement } from './assist.js';
 import { modelReady, readQuickAdd } from './assistant.js';
 import { getSyncState, movedTo, onSyncState, syncNow } from './syncManager.js';
-import { setNotificationHandlers } from './notifier.js';
+import { DEFAULT_NOTIFY, setNotificationHandlers } from './notifier.js';
+import { sharedDraft } from './sharedItems.js';
+import { SharedFilesDialog } from './ui/sharedDialog.js';
+import { dictateIntoQuickAdd } from './ui/dictation.js';
 import { Icon } from './ui/icons.js';
 import { ProjectsContext, SearchContext, SyncBadge, Toasts } from './ui/components.js';
 import { ProjectsView, ScopeBar } from './ui/projects.js';
@@ -218,6 +221,8 @@ export function App() {
   const [, setTick] = useState(0);
   const [linkedItem, setLinkedItem] = useState(takeItemLink);
   const [help, setHelp] = useState(null); // { tab, query }
+  // Files shared with the Android app, waiting for where they go: { files }.
+  const [shared, setShared] = useState(null);
   // Item windows: [{ wid, id, x, y, w, h, z, min, max, restore, scroll }], in the order they were
   // opened (the page keeps that order, so their previews do not reload); `z` stacks them.
   const [windows, setWindows] = useState([]);
@@ -787,6 +792,70 @@ export function App() {
   }, []);
   // The desktop app opened from a tracker-app:// link (or one the main process kept for us).
   useEffect(() => window.desktop?.onOpenItem?.((id) => actionsRef.current.openById(id)), []);
+  // The Android app: things shared with it (text and links: a new item to review; files: where they go).
+  useEffect(() => {
+    const bridge = window.desktop?.shared;
+    if (!bridge) return undefined;
+    const takeShared = async () => {
+      for (const s of await bridge.take()) {
+        if (s.files?.length) setShared({ files: s.files });
+        else if (s.text || s.title) actionsRef.current.newItem(sharedDraft(s));
+      }
+    };
+    takeShared();
+    return bridge.onShared(takeShared);
+  }, []);
+  // The Android app's icon shortcuts: Quick add (its field, focused) and Voice note (dictating into it).
+  useEffect(
+    () =>
+      window.desktop?.android?.onShortcut?.((kind) => {
+        closeModal();
+        location.hash = '#/';
+        setTimeout(() => {
+          document.querySelector('.quick-add input:not([type=checkbox])')?.focus();
+          if (kind === 'voice') dictateIntoQuickAdd();
+        }, 350);
+      }),
+    [],
+  );
+  // The Android app's Back: closes what is on top (an item, Help, a picture, a list open), then the
+  // drawer, then goes back to the Overview; there, the app goes to the background.
+  const drawerRef = useRef(false);
+  drawerRef.current = drawer;
+  useEffect(
+    () =>
+      window.desktop?.android?.onBack?.(() => {
+        if (layers.current.length || document.querySelector('.picture-viewer, .voice-list, .shared-dialog, .head-menu-pop')) {
+          (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+          return true;
+        }
+        if (drawerRef.current) {
+          setDrawer(false);
+          return true;
+        }
+        if (location.hash.replace(/^#\/?/, '')) {
+          location.hash = '#/';
+          return true;
+        }
+        return false;
+      }),
+    [],
+  );
+  // The Android app looks for changes while it is closed (Changes.java): it needs the sync settings.
+  const notifyPrefs = { ...DEFAULT_NOTIFY, ...settings.notify };
+  useEffect(() => {
+    window.desktop?.android?.notifications?.configure({
+      enabled: Boolean(notifyPrefs.background) && isSyncConfigured(settings) && !isLocal(settings),
+      api: 'https://api.github.com',
+      owner: settings.owner ?? '',
+      repo: settings.repo ?? '',
+      branch: settings.branch ?? '',
+      device: settings.device ?? '',
+      items: Boolean(notifyPrefs.items),
+      documents: Boolean(notifyPrefs.documents),
+      devices: Boolean(notifyPrefs.devices),
+    });
+  }, [settings.owner, settings.repo, settings.branch, settings.device, settings.storage, JSON.stringify(notifyPrefs)]);
 
   useEffect(
     () =>
@@ -915,6 +984,7 @@ export function App() {
     ${help &&
     html`<${HelpDialog} tab=${help.tab} query=${help.query} onTab=${(tab) => setHelp((helpRef.current = { ...help, tab }))} onClose=${() => closeHelp()}
       onRun=${modal ? null : (command) => closeHelp(() => actionsRef.current.command(command.id))} />`}
+    ${shared && html`<${SharedFilesDialog} files=${shared.files} items=${items} actions=${actions} onClose=${() => setShared(null)} />`}
     <${ListenBar} />
     <${Toasts} toasts=${toasts} onDismiss=${dismissToast} />
     ${fileDrag &&

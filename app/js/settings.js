@@ -8,6 +8,7 @@ const TOKEN_KEY = 'tracker.token';
 
 function defaultDevice() {
   const desktop = globalThis.window?.desktop;
+  if (desktop?.platform === 'android') return 'Phone';
   if (desktop) return `Desktop (${{ win32: 'Windows', darwin: 'macOS', linux: 'Linux' }[desktop.platform] ?? desktop.platform})`;
   const ua = globalThis.navigator?.userAgent ?? '';
   if (/iPhone|Android.*Mobile/.test(ua)) return 'Phone';

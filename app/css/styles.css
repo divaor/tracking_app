@@ -1,5 +1,8 @@
 /* ---- Tokens ------------------------------------------------------------ */
 :root {
+  /* The phone's bars and cutouts: env() here; the Android app sets them from Capacitor below. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: light;
   --bg: #f6f5f1;
   --surface: #ffffff;
@@ -2106,7 +2109,7 @@ button.project-chip:hover {
   gap: 8px;
   min-width: 0;
   padding: 8px 10px calc(8px) 16px;
-  padding-top: max(8px, env(safe-area-inset-top));
+  padding-top: max(8px, var(--safe-top));
 }
 
 .picture-bar .icon-btn {
@@ -2761,8 +2764,8 @@ span.decision {
     inset: 0 auto 0 0;
     z-index: 40;
     width: min(300px, 86vw);
-    padding-top: calc(18px + env(safe-area-inset-top));
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    padding-top: calc(18px + var(--safe-top));
+    padding-bottom: calc(12px + var(--safe-bottom));
     box-shadow: var(--shadow-lg);
     transform: translateX(-105%);
     transition: transform 0.2s ease;
@@ -2796,7 +2799,7 @@ span.decision {
   .topbar {
     gap: 6px;
     min-height: 56px;
-    padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+    padding: calc(8px + var(--safe-top)) 12px 8px;
   }
 
   .view-title {
@@ -2831,7 +2834,7 @@ span.decision {
   }
 
   .content {
-    padding: 16px 16px calc(var(--bottom-nav) + 28px + env(safe-area-inset-bottom));
+    padding: 16px 16px calc(var(--bottom-nav) + 28px + var(--safe-bottom));
   }
 
   .bottom-nav {
@@ -2841,8 +2844,8 @@ span.decision {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     align-items: center;
-    height: calc(var(--bottom-nav) + env(safe-area-inset-bottom));
-    padding: 0 6px env(safe-area-inset-bottom);
+    height: calc(var(--bottom-nav) + var(--safe-bottom));
+    padding: 0 6px var(--safe-bottom);
     border-top: 1px solid var(--border);
     background: color-mix(in srgb, var(--surface) 94%, transparent);
     backdrop-filter: blur(12px);
@@ -2883,12 +2886,12 @@ span.decision {
   .toasts {
     right: 16px;
     left: 16px;
-    bottom: calc(var(--bottom-nav) + 14px + env(safe-area-inset-bottom));
+    bottom: calc(var(--bottom-nav) + 14px + var(--safe-bottom));
     align-items: stretch;
   }
 
   .modal-backdrop ~ .toasts {
-    bottom: calc(16px + env(safe-area-inset-bottom));
+    bottom: calc(16px + var(--safe-bottom));
   }
 
   .toast {
@@ -2959,7 +2962,7 @@ span.decision {
     position: fixed;
     top: auto;
     right: 12px;
-    bottom: calc(var(--bottom-nav) + 12px + env(safe-area-inset-bottom));
+    bottom: calc(var(--bottom-nav) + 12px + var(--safe-bottom));
     left: 12px;
     width: auto;
   }
@@ -2978,8 +2981,8 @@ span.decision {
     height: 100%;
     border: 0;
     border-radius: 0;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
   }
 
   .modal-head {
@@ -4260,7 +4263,7 @@ body.window-dragging iframe {
   }
 
   .window-dock {
-    bottom: calc(var(--bottom-nav) + 10px + env(safe-area-inset-bottom));
+    bottom: calc(var(--bottom-nav) + 10px + var(--safe-bottom));
     left: 0;
   }
 }
@@ -4505,7 +4508,7 @@ body.window-dragging iframe {
   bottom: 0;
   left: 0;
   max-height: 72vh;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: var(--safe-bottom);
   border-radius: 14px 14px 0 0;
 }
 
@@ -4653,7 +4656,7 @@ body.window-dragging iframe {
 .listen-bar {
   position: fixed;
   right: 0;
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  bottom: calc(16px + var(--safe-bottom));
   left: 0;
   z-index: 62;
   width: min(620px, calc(100vw - 24px));
@@ -4675,7 +4678,7 @@ body.window-dragging iframe {
 
 /* Room for it: toasts go above it, and what scrolls can scroll past it. */
 .reading-aloud .toasts {
-  bottom: calc(84px + env(safe-area-inset-bottom));
+  bottom: calc(84px + var(--safe-bottom));
 }
 
 .reading-aloud .modal-body,
@@ -4721,11 +4724,11 @@ body.window-dragging iframe {
 
 @media (max-width: 640px) {
   .listen-bar {
-    bottom: calc(var(--bottom-nav) + 10px + env(safe-area-inset-bottom));
+    bottom: calc(var(--bottom-nav) + 10px + var(--safe-bottom));
   }
 
   .modal-backdrop ~ .listen-bar {
-    bottom: calc(10px + env(safe-area-inset-bottom));
+    bottom: calc(10px + var(--safe-bottom));
   }
 
   .read-name {
@@ -4735,4 +4738,109 @@ body.window-dragging iframe {
   .read-voice {
     max-width: 132px;
   }
+}
+
+/* The Android app draws under the status and navigation bars (edge to edge): the page keeps clear
+   of them. Capacitor passes the bars' sizes as safe-area insets, and as --safe-area-inset-* for
+   WebViews that give env() as 0: the larger of the two. */
+html[data-native='android'] {
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+}
+
+/* Files shared with the app (ui/sharedDialog.js): a new item with them, or on one already there. */
+.shared-dialog {
+  width: min(560px, 100%);
+}
+
+.shared-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.shared-files li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.shared-files img,
+.shared-file-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  object-fit: cover;
+  color: var(--text-2);
+}
+
+.shared-file-name {
+  overflow: hidden;
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shared-new,
+.shared-existing {
+  margin-bottom: 16px;
+}
+
+.shared-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.shared-dialog .input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.shared-existing input[type='search'] {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.shared-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shared-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.shared-item:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.shared-item-title {
+  overflow: hidden;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

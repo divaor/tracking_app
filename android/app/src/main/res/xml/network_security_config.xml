@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The page is served by the app itself (https://localhost) and never loads plain http. Model
+     and speech servers on your own network (Ollama, LM Studio, Kokoro at http://192.168.…) are
+     asked by the app's own requests (TrackerNativePlugin.httpRequest), which need plain http. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

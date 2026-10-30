@@ -3,9 +3,11 @@ import { getSettings } from '../settings.js';
 import { Icon } from './icons.js';
 
 // Dictation into quick add, with the browser's speech service (as Tracker
-// Editor's voice notes). The desktop app has no speech service.
+// Editor's voice notes), or in the Android app the phone's own speech input (its
+// WebView has none). The desktop app has no speech service.
 const Recognition = () => globalThis.SpeechRecognition ?? globalThis.webkitSpeechRecognition;
-export const dictationSupported = () => Boolean(Recognition()) && !globalThis.window?.desktop;
+const phoneDictation = () => globalThis.window?.desktop?.android?.dictate ?? null;
+export const dictationSupported = () => Boolean(phoneDictation()) || (Boolean(Recognition()) && !globalThis.window?.desktop);
 
 export const DICTATION_LANGUAGES = [
   { id: '', label: "This device's language" },
@@ -33,7 +35,20 @@ export function MicButton({ onText, onError }) {
   const rec = useRef(null);
   useEffect(() => () => rec.current?.abort(), []);
   if (!dictationSupported()) return null;
+  // The phone's speech input: its own screen listens to one phrase.
+  const startPhone = async () => {
+    setListening(true);
+    try {
+      const text = await phoneDictation()({ lang: getSettings().dictationLang || navigator.language || '' });
+      if (text) onText(text.trim(), true);
+    } catch (err) {
+      onError?.(err.message);
+    } finally {
+      setListening(false);
+    }
+  };
   const start = () => {
+    if (phoneDictation()) return startPhone();
     const R = Recognition();
     const r = (rec.current = new R());
     r.lang = getSettings().dictationLang || navigator.language || 'en-US';
@@ -57,4 +72,9 @@ export function MicButton({ onText, onError }) {
   return html`<button type="button" class="icon-btn mic-btn ${listening ? 'listening' : ''}" aria-pressed=${listening}
     aria-label=${listening ? 'Stop dictating' : 'Dictate'} title=${listening ? 'Listening… tap to stop' : 'Say it instead of typing'}
     onClick=${() => (listening ? rec.current?.stop() : start())}><${Icon} name="mic" size=${18} /></button>`;
+}
+
+/** Starts dictating into quick add (the Android app's Voice note shortcut): its microphone, pressed. */
+export function dictateIntoQuickAdd() {
+  document.querySelector('.quick-add .mic-btn:not(.listening)')?.click();
 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older. Secrets are encrypted with a key that stays on this phone, so a copy
+     restored on another one could not be read: they stay out, and so do copies of opened files. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="secrets.xml" />
+    <exclude domain="sharedpref" path="checks.xml" />
+</full-backup-content>

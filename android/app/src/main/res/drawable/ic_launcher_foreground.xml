@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The bars and check of app/icons/icon.svg, inside the adaptive icon's safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:scaleX="0.62"
+        android:scaleY="0.62">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M130,112 L162,112 A26,26 0 0 1 188,138 L188,374 A26,26 0 0 1 162,400 L130,400 A26,26 0 0 1 104,374 L104,138 A26,26 0 0 1 130,112 Z" />
+        <path
+            android:fillColor="#D1FFFFFF"
+            android:pathData="M240,112 L272,112 A26,26 0 0 1 298,138 L298,298 A26,26 0 0 1 272,324 L240,324 A26,26 0 0 1 214,298 L214,138 A26,26 0 0 1 240,112 Z" />
+        <path
+            android:fillColor="#A3FFFFFF"
+            android:pathData="M350,112 L382,112 A26,26 0 0 1 408,138 L408,222 A26,26 0 0 1 382,248 L350,248 A26,26 0 0 1 324,222 L324,138 A26,26 0 0 1 350,112 Z" />
+        <path
+            android:fillColor="#00000000"
+            android:pathData="M341,182 L359,200 L393,162"
+            android:strokeColor="#FF4F46E5"
+            android:strokeWidth="20"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

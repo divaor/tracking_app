@@ -13,6 +13,8 @@ import { Segmented, SyncBadge } from './components.js';
 import { NotificationsCard } from './notificationsCard.js';
 import { ModelCard, QuickAddCard } from './modelCard.js';
 import { ReadAloudCard } from './readAloudCard.js';
+import { saveToDevice } from '../saveFile.js';
+import { isAndroidApp } from '../platform.js';
 
 const SETUP_PREFIX = 'tracker-setup:';
 const SYNC_FIELDS = ['owner', 'repo', 'branch', 'path', 'device', 'autoSync'];
@@ -21,18 +23,10 @@ function pick(obj, keys) {
   return Object.fromEntries(keys.map((k) => [k, obj[k]]));
 }
 
-function download(filename, text) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+const download = (filename, text) => saveToDevice(filename, new Blob([text], { type: 'application/json' }));
 
 function environmentLabel() {
+  if (isAndroidApp()) return `Android app (WebView ${window.desktop.versions?.chrome ?? ''})`;
   if (window.desktop) return `Desktop app (Electron ${window.desktop.versions?.electron ?? ''})`;
   if (matchMedia('(display-mode: standalone)').matches || navigator.standalone) return 'Installed web app';
   return 'Web browser';
@@ -199,7 +193,7 @@ function SyncCard({ sync, actions }) {
         <input value=${form.path} onInput=${set('path')} placeholder="tracker.json" autocomplete="off" autocapitalize="off" spellcheck=${false} />
       </${Field}>
       <${Field} label="Personal access token" wide
-        hint=${window.desktop ? 'Stored encrypted with your operating system’s keychain.' : 'Stored only in this browser.'}>
+        hint=${isAndroidApp() ? 'Stored encrypted with a key kept in this phone’s secure hardware.' : window.desktop ? 'Stored encrypted with your operating system’s keychain.' : 'Stored only in this browser.'}>
         <div class="input-row">
           <input type=${showToken ? 'text' : 'password'} value=${token} onInput=${(e) => setTokenValue(e.currentTarget.value)}
             placeholder="github_pat_…" autocomplete="off" autocapitalize="off" spellcheck=${false} />
@@ -368,7 +362,7 @@ function AppsCard({ installPrompt, onInstall }) {
     <div class="apps">
       <div>
         <h3>Phone</h3>
-        <p>Open the web version (GitHub Pages) in your phone’s browser, then install it: on iPhone tap <em>Share → Add to Home Screen</em>, on Android tap <em>⋮ → Install app</em>. It works offline and syncs when online.</p>
+        <p><strong>Android:</strong> the Tracker app, from the repository’s <em>Releases</em> (<code>Tracker-…apk</code>), best with Obtainium, which keeps it up to date: share things to it, notifications while it is closed, the phone’s voices. <strong>iPhone</strong> (or any phone): open the web version (GitHub Pages) in the browser and install it: on iPhone tap <em>Share → Add to Home Screen</em>. Both work offline and sync when online.</p>
         ${isWeb && installPrompt && html`<button type="button" class="btn primary sm" onClick=${onInstall}><${Icon} name="install" size=${15} />Install this app</button>`}
       </div>
       <div>

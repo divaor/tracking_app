@@ -9,6 +9,7 @@ import { cachedPlans, loadPlans, onPlans, savePlan } from '../planStore.js';
 import { getSettings, saveSettings } from '../settings.js';
 import { Icon } from './icons.js';
 import { ListenButton, sourceOf } from './listen.js';
+import { isDesktopApp } from '../platform.js';
 
 const LABELS = { day: { title: 'Your day', make: 'Plan my day', update: 'Update', name: 'plan' }, week: { title: 'Your week', make: 'Review my week', update: 'Update', name: 'review' } };
 // Updates by themselves: at most this often, and after this hour for the first plan of the day.
@@ -243,7 +244,7 @@ export function usePlanAuto({ items, today, on }) {
     if (!on) return undefined;
     const check = (checkRef.current = async () => {
       if (!modelReady() || running || !latest.current.length) return;
-      if (document.hidden && !window.desktop) return;
+      if (document.hidden && !isDesktopApp()) return;
       const plans = await loadPlans(today, { fresh: true });
       if (!plans.day) {
         if (new Date().getHours() >= AUTO_FROM_HOUR) makePlan('day', { items: latest.current, today, auto: true });

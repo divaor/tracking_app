@@ -8,20 +8,12 @@ import { attachmentKind, fileKind, formatBytes, isTextAttachment, toggleChecklis
 import { store } from '../store.js';
 import { Icon } from './icons.js';
 import { ListenButton, sourceOf } from './listen.js';
+import { saveToDevice } from '../saveFile.js';
 import { EditorLink, Segmented } from './components.js';
 
 const MIME = { markdown: 'text/markdown', html: 'text/html', svg: 'image/svg+xml', text: 'text/plain' };
 
-function download(name, text, kind) {
-  const url = URL.createObjectURL(new Blob([text], { type: `${MIME[kind]};charset=utf-8` }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+const download = (name, text, kind) => saveToDevice(name, new Blob([text], { type: `${MIME[kind]};charset=utf-8` }));
 
 const byteLength = (text) => new TextEncoder().encode(text).length;
 
@@ -246,7 +238,7 @@ function PictureViewer({ files, index, onIndex, onClose, item, actions }) {
       <span class="spacer" />
       <button type="button" class="icon-btn ${zoom ? 'on' : ''}" title=${zoom ? 'Fit to the window' : 'Full size'} aria-label="Zoom" aria-pressed=${zoom} onClick=${() => setZoom(!zoom)}><${Icon} name="zoom" /></button>
       <button type="button" class="icon-btn" title="Download" aria-label="Download" onClick=${() => downloadFile(file).catch(fail)}><${Icon} name="download" /></button>
-      ${window.desktop?.openFile && html`<button type="button" class="icon-btn" title="Open with its program" aria-label="Open with its program" onClick=${() => openFileOutside(file).catch(fail)}><${Icon} name="external" /></button>`}
+      ${window.desktop?.openFile && html`<button type="button" class="icon-btn" title=${window.desktop.android ? 'Open with another app' : 'Open with its program'} aria-label=${window.desktop.android ? 'Open with another app' : 'Open with its program'} onClick=${() => openFileOutside(file).catch(fail)}><${Icon} name="external" /></button>`}
       <button type="button" class="icon-btn danger" title="Remove from this item" aria-label="Remove" onClick=${remove}><${Icon} name="trash" /></button>
       <button type="button" class="icon-btn" title="Close (Esc)" aria-label="Close" onClick=${onClose}><${Icon} name="x" /></button>
     </div>
@@ -313,7 +305,7 @@ export function FilesPanel({ item, actions }) {
       ${others.map((f) => {
         const text = isTextAttachment(f);
         return html`<div role="listitem" key=${f.path} class="file-chip ${f.path === open ? 'active' : ''} kind-${attachmentKind(f)}">
-          <button type="button" class="file-chip-main" title=${text ? `${f.name}: read it here` : `${f.name}: open it with its program`}
+          <button type="button" class="file-chip-main" title=${text ? `${f.name}: read it here` : `${f.name}: open it with ${window.desktop?.android ? 'another app' : 'its program'}`}
             aria-expanded=${text ? f.path === open : undefined} onClick=${() => (text ? setOpen(f.path === open ? null : f.path) : outside(f))}>
             <${Icon} name=${iconOf(f)} size=${15} /><span>${f.name}</span><small>${formatBytes(f.size)}</small>
             ${pending.has(f.path) && html`<span class="file-pending" title="Waiting to upload from this device"><${Icon} name="upload" size=${12} /></span>`}

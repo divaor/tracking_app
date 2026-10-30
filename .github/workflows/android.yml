@@ -1,0 +1,46 @@
+# Builds the Android app (a debug APK, signed with a throwaway key) whenever its native side
+# changes, so a broken build shows before a release. Releases build the signed APK in
+# release.yml. Run it by hand from Actions → Android build to get an APK to try.
+name: Android build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'capacitor.config.json'
+      - 'package-lock.json'
+      - 'app/js/androidApp.js'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: npx cap sync android
+      - run: ./gradlew assembleDebug --no-daemon --stacktrace
+        working-directory: android
+      - name: Check what the APK holds
+        run: |
+          apk=$(ls android/app/build/outputs/apk/debug/*.apk)
+          for f in assets/public/index.html assets/public/js/androidApp.js assets/public/js/app.js assets/capacitor.config.json; do
+            unzip -l "$apk" "$f" > /dev/null || { echo "::error::$f is missing from the APK"; exit 1; }
+          done
+          ls -l "$apk"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tracker-android-debug
+          if-no-files-found: error
+          path: android/app/build/outputs/apk/debug/*.apk

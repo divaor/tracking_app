@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Files handed to other apps (an attachment opened with its app): copies in the app's cache. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="open" path="open/" />
+    <cache-path name="log" path="log-share/" />
+</paths>

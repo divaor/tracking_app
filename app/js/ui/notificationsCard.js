@@ -51,6 +51,50 @@ function DesktopNotifications({ prefs, setPrefs }) {
     </div>`;
 }
 
+// The Android app: web push does not reach an app, so it looks for changes itself while it is
+// closed (about every 15 minutes, Android's shortest period; Changes.java), and tells with a
+// notification; open, its sync tells at once.
+function AndroidNotifications({ prefs, setPrefs, actions }) {
+  const native = window.desktop.android.notifications;
+  const [state, setState] = useState(null);
+  const refresh = () => native.state().then(setState, () => setState(null));
+  useEffect(() => {
+    refresh();
+    // Back from the phone's settings: what was allowed there.
+    const onVisible = () => document.visibilityState === 'visible' && refresh();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+  const synced = isSyncConfigured() && !isLocal();
+  const allow = async () => {
+    const after = await native.ask().catch(() => null);
+    if (after?.allowed) setState(after);
+    else native.settings();
+  };
+  const checkNow = async () => {
+    try {
+      const { shown } = await native.check();
+      actions.toast(shown ? `${shown} change${shown === 1 ? '' : 's'} found: see the notification${shown === 1 ? '' : 's'}` : 'Nothing new from Claude or your other devices since the last look');
+    } catch (err) {
+      actions.toast(err.message, { kind: 'error' });
+    }
+    refresh();
+  };
+  return html`
+    <p class="muted">While the app is closed, it looks for what Claude and your other devices changed about every 15 minutes (the shortest Android allows) and tells you with a notification. While it is open, changes show at once.</p>
+    ${!synced && html`<p class="notice warn"><${Icon} name="alert" size=${16} /><span>Notifications come from changes in your data repo: set up GitHub sync first (Settings → Where your data is).</span></p>`}
+    <${Check} checked=${prefs.background} disabled=${!synced} label="Notify me while the app is closed" onChange=${(v) => (setPrefs({ background: v }), v && state && !state.allowed && allow())} />
+    ${synced && prefs.background && state && !state.allowed &&
+    html`<p class="notice warn"><${Icon} name="alert" size=${16} /><span>Notifications are off for Tracker on this phone.</span>
+      <button type="button" class="btn sm" onClick=${allow}>Allow notifications</button></p>`}
+    <${Categories} prefs=${prefs} onChange=${setPrefs} withDevices />
+    ${synced && prefs.background &&
+    html`<div class="form-actions">
+      <button type="button" class="btn sm" onClick=${checkNow}><${Icon} name="sync" size=${15} />Look now</button>
+    </div>
+    ${state?.last && html`<p class="muted small">Last looked ${new Date(state.last).toLocaleString()}.${state.error ? ` ${state.error}` : ''}</p>`}`}`;
+}
+
 function PushNotifications({ prefs, setPrefs, actions }) {
   const support = pushSupport();
   const [connectorUrl, setConnectorUrl] = useState(getSettings().connectorUrl);
@@ -155,8 +199,10 @@ export function NotificationsCard({ actions }) {
   };
   return html`<section class="settings-card" id="notifications">
     <h2><${Icon} name="bell" size=${18} />Notifications</h2>
-    ${window.desktop
-      ? html`<${DesktopNotifications} prefs=${prefs} setPrefs=${setPrefs} />`
-      : html`<${PushNotifications} prefs=${prefs} setPrefs=${setPrefs} actions=${actions} />`}
+    ${window.desktop?.android
+      ? html`<${AndroidNotifications} prefs=${prefs} setPrefs=${setPrefs} actions=${actions} />`
+      : window.desktop
+        ? html`<${DesktopNotifications} prefs=${prefs} setPrefs=${setPrefs} />`
+        : html`<${PushNotifications} prefs=${prefs} setPrefs=${setPrefs} actions=${actions} />`}
   </section>`;
 }

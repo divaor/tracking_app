@@ -1,10 +1,13 @@
 // Tells the user about changes that arrive through sync: native
-// notifications in the desktop app, a toast in the web app while it is open.
-// (Phones get push notifications from the connector instead; see push.js.)
+// notifications in the desktop app, a toast in the web app and the Android app
+// while they are open. (Phones get push notifications from the connector instead,
+// push.js; the Android app looks for changes itself while it is closed, Changes.java.)
 import { summarizeEvents } from './changes.js';
+import { isDesktopApp } from './platform.js';
 import { getSettings } from './settings.js';
 
-export const DEFAULT_NOTIFY = { desktop: true, documents: true, items: true, devices: false };
+// `background`: the Android app's checks while it is closed.
+export const DEFAULT_NOTIFY = { desktop: true, documents: true, items: true, devices: false, background: true };
 
 let showToast = null;
 let openItem = (id) => {
@@ -40,7 +43,7 @@ export function notifyChanges(events) {
   // Up to three separate notifications, otherwise one summary.
   const groups = wanted.length <= 3 ? wanted.map((e) => [e]) : [wanted];
 
-  if (window.desktop) {
+  if (isDesktopApp()) {
     if (prefs.desktop) for (const group of groups) systemNotification(summarizeEvents(group));
     return;
   }

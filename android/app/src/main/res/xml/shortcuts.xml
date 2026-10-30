@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app's icon: Quick add and a voice note (as the web app's shortcuts), and Send a log. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_new">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.divaor.tracker"
+            android:targetClass="com.divaor.tracker.MainActivity"
+            android:data="tracker-app://new" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="voice"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_voice">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.divaor.tracker"
+            android:targetClass="com.divaor.tracker.MainActivity"
+            android:data="tracker-app://voice" />
+    </shortcut>
+    <!-- When something goes wrong: the log, through the share sheet (LogActivity). -->
+    <shortcut
+        android:shortcutId="log"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_log"
+        android:shortcutLongLabel="@string/shortcut_log_long">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="com.divaor.tracker"
+            android:targetClass="com.divaor.tracker.LogActivity" />
+    </shortcut>
+</shortcuts>

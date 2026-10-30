@@ -4,6 +4,7 @@ import { findCommands, groupsOf, keysFor } from '../commands.js';
 import { renderMarkdown } from '../markdown.js';
 import { Segmented } from './components.js';
 import { Icon } from './icons.js';
+import { isDesktopApp } from '../platform.js';
 
 const TABS = [
   { id: 'commands', label: 'Commands and shortcuts' },
@@ -43,7 +44,7 @@ function SearchField({ value, onInput, placeholder, inputRef, onKeyDown }) {
 /** The cheat sheet: every command and what runs it, searchable; a click runs the command. */
 function CommandsTab({ query, setQuery, onRun }) {
   const mac = isMac();
-  const desktop = Boolean(window.desktop);
+  const desktop = isDesktopApp();
   const input = useRef(null);
   const list = useRef(null);
   useLayoutEffect(() => input.current?.focus(), []);

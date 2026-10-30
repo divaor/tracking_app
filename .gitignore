@@ -5,3 +5,4 @@ dist/
 Thumbs.db
 .wrangler/
 .dev.vars
+android-check/
