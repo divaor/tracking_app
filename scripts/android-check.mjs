@@ -204,7 +204,17 @@ try {
     screencap('shared-picture.png');
     await page.fill('.shared-dialog .shared-new input', 'Shared from the gallery');
     await page.click('.shared-dialog .shared-new button');
-    check('…a new item with the picture on it', await until(async () => (await modalText()).includes('Shared from the gallery') && (await modalText()).includes('tracker-check')));
+    // A picture shows as a thumbnail (its name only in its attributes): the item's files say what it holds.
+    const filesOf = () =>
+      page.evaluate(async () => {
+        const item = (await import('/js/store.js')).store.visible().find((i) => i.title === 'Shared from the gallery');
+        return { item: Boolean(item), files: item?.files.map((f) => `${f.name} ${f.size}`) ?? [], open: document.querySelector('.modal .item-title')?.textContent ?? '', thumbs: document.querySelectorAll('.modal .file-pictures img').length };
+      });
+    const made = await until(async () => {
+      const now = await filesOf();
+      return now.files.some((f) => f.startsWith('tracker-check')) && now.open === 'Shared from the gallery';
+    });
+    check('…a new item with the picture on it, opened', made, await filesOf());
     await closeAll();
   });
 
