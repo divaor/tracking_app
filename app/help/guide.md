@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 1.16.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 1.17.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -81,9 +81,23 @@ The connector then works in Claude on the web, desktop and phone, and in Claude 
 
 The home screen shows what needs attention: your **pinned** items, **due soon**, **in progress**, **up next**, your **reading list** and **recently completed** items, with a quick add at the top. Click any card to open it. Click the round status icon on a card to move it to the next status.
 
-With a model connected, the Overview can also **Plan my day** or **Review my week** (section 9).
+With a model connected, the Overview can also **Plan my day** or **Review my week**, and keep them (see [Your day's plan and your week's review](#your-days-plan-and-your-weeks-review)).
 
 The sidebar lists the categories, your projects and your most used tags, each with its count of open items. On a phone, the bottom bar switches between Home, Board, Items and Settings, the round button adds an item, and ☰ opens the sidebar.
+
+### Your day's plan and your week's review
+
+The **Your day** card on the Overview asks your model (section 9) to **Plan my day**: what to do first today and why, from your open items. Its **Week** tab does **Review my week**: what got done, what is stuck or overdue and what to focus on next.
+
+- **It is kept** with your data (a small file a day under `plans/`), so your other devices see it, and so does Claude. It says when and where it was made, and what changed since (*2 done, 1 added since*).
+- **Update** asks again with the plan and what changed since it was made: the items done, started and added since, and those overdue now. The model keeps what still holds and fits in what is new. Each update keeps the one before: **‹ ›** shows the earlier ones of the day, **Latest** goes back.
+- **By itself:** tick **Settings → Model → Make and update today's plan by itself** (off at first). The plan is then made the first time the app is open each day (from 6:00) and updated after you finish, start or add items, at most every 2 hours, while the app is open. Each one is a request to your model.
+- **Above List and Board** today's plan shows as a strip over the items, a few lines of it: click it to read it all, or **Update** it there. **×** hides it in that view (List and Board apart, on each device); **Today's plan** in the toolbar brings it back.
+- **No model?** Ask Claude with the connector: *"plan my day in my tracker"* (section 11). It is kept the same way, marked as made by Claude.
+
+### Days: looking back
+
+**Days** in the sidebar (or the calendar on the plan card) shows how much got done each day of the last four weeks, as bars; a dot under a bar means a plan was kept that day. Click a bar, step with **‹ ›** or pick a date to see that day: its plan and its week review (with their earlier versions), what got **done**, **started** and **added**, and the **comments** written, yours and Claude's. Each day has its own address (`#/days/2026-10-29`), and **Today** comes back.
 
 ## 4. Quick add
 
@@ -221,7 +235,7 @@ Connect a model of your own in **Settings → Model**, the same kinds as in Trac
 With a model on:
 
 - **Ask the model about this**, in every item: Summarize, Break into steps (tasks), Turn into a plan (ideas), **Draft my feedback** (documents, from their files too), Questions to ask, Risks and gaps, In English / In Spanish, or any question, with follow-ups. **Add to the notes** puts an answer (a checklist of steps, say) in the item; **Use as my feedback** fills your review of a document.
-- **Plan my day** / **Review my week** on the Overview: what to do first today, or what got done, what is stuck and what to focus on next.
+- **Plan my day** / **Review my week** on the Overview, kept and updated as the day goes, by itself if you like (see [Your day's plan and your week's review](#your-days-plan-and-your-weeks-review)).
 - **Quick add in plain language** (section 4).
 
 ## 10. Documents and reviews
@@ -254,6 +268,8 @@ In any Claude chat or Claude Code session with the Tracker connector on, just sa
 | "What's on my tracker?" / "What's left open?" | Summarizes counts, what's in progress, what's due and what's waiting for review. |
 | "Check my tracker for feedback on the proposal and revise it" | Reads your decision and feedback and sends a new version. |
 | "Check my tracker for comments" | Finds the items whose latest comment is yours, reads them, acts on them and replies in the comments. |
+| "Plan my day in my tracker" / "Update my plan, the parser is done" | Writes the day's plan (or the week's review) from your items and keeps it on the tracker, a new version each time: the Overview, the strip over List and Board and Days show it. |
+| "What did I get done this week?" | Reads the plans and reviews kept and what got done each day. |
 | "Save this to my editor as deploy-notes.md" / "Find the SQL I pasted about invoices in my editor files" | Saves, finds and reads your Tracker Editor files. |
 
 ### Links Claude gives you
@@ -335,6 +351,8 @@ On a Mac, use **Cmd** for **Ctrl**.
 | The model doesn't answer | Settings → Model → **Test and list models**. A local server must be running; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS`). With an AI provider: check the key and that the account has credit; a provider that refuses requests from web pages works from the desktop app. |
 | Claude doesn't see my comment | Claude reads your data repo: the device you commented on must be set up with GitHub sync and have synced (the badge says *Synced*). On a device that keeps its data on this computer, the connector can't reach it. |
 | A link from Claude opens the browser, not the app | Click **Open in the app** in the message the page shows (needs the desktop app 1.11 or later), or paste the link in the app's search box. |
+| The plan doesn't update by itself | It needs the setting on (Settings → Model), a model connected and the app open (in a browser, its tab in front); it waits 2 hours after the last plan and for an item done, started or added since. |
+| Days shows no plan for a day | Only plans made from 1.17 on are kept. On a device that keeps its data on this computer, Claude's plans don't reach it. |
 | A file shows an upload arrow | It is waiting to upload from that device (it was added offline, or the upload failed). It goes up with the next sync; until then other devices say it isn't there yet. |
 | "… is not in your data repo (yet)" when opening a file | It was attached on another device that hasn't synced since. Sync that device. |
 | A photo was made smaller and you wanted the original | Press **Keep full size** in the message, or attach it again and press it then. |

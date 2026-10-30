@@ -121,6 +121,18 @@ export function createGitHubClient({
       return (tree?.tree ?? []).filter((e) => e.type === 'blob').map((e) => ({ path: e.path, sha: e.sha }));
     },
 
+    /** A folder's entries ([{ name, path, sha, type }]), or null when it does not exist. */
+    async listDir(dirPath, ref) {
+      let data;
+      try {
+        data = await request('GET', `${repoPath}/contents/${encodePath(dirPath)}`, { query: { ref } });
+      } catch (err) {
+        if (err.status === 404) return null;
+        throw err;
+      }
+      return Array.isArray(data) ? data.map((e) => ({ name: e.name, path: e.path, sha: e.sha, type: e.type })) : null;
+    },
+
     async getBlobText(sha) {
       const blob = await request('GET', `${repoPath}/git/blobs/${sha}`);
       return blob.encoding === 'base64' ? decodeBase64(blob.content ?? '') : (blob.content ?? '');

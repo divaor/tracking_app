@@ -5,6 +5,7 @@ import { describeChanges } from '../app/js/changes.js';
 import { createEditorFiles } from './editor.js';
 import { bytesToBase64 } from '../app/js/github.js';
 import { idFromFragment, itemIdIn } from '../app/js/itemLinks.js';
+import { dayActivity, emptyPlans, parsePlans, PLAN_KINDS, planPath, serializePlans, withPlan } from '../app/js/plans.js';
 import {
   addCommentPatch,
   addDays,
@@ -23,6 +24,7 @@ import {
   KINDS,
   kindLabel,
   liveComments,
+  localDate,
   matchesQuery,
   mimeOf,
   normalizeItem,
@@ -53,6 +55,9 @@ export const MAX_READ_CHARS = 90_000;
 export const MAX_PICTURE_BYTES = 3_500_000;
 const SHOWN_PICTURES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const MAX_ATTEMPTS = 4;
+// get_plans reads at most this many days at once; texts are clipped when it reads several.
+export const MAX_PLAN_DAYS = 14;
+const PLAN_CLIP = 3000;
 
 export class TrackerError extends Error {}
 
@@ -178,6 +183,19 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
 
   const live = (items) => items.filter((i) => !i.deleted);
 
+  // A day's plans (plans/<month>/<day>.json, as the app keeps them).
+  async function plansOf(date) {
+    const file = await client.getFile(planPath(date), ref);
+    return { sha: file?.sha, plans: file ? parsePlans(file.text, date) : emptyPlans(date) };
+  }
+  const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && Number.isFinite(Date.parse(v));
+  // A plan as Claude reads it (nothing when there is none): the earlier versions too, or how many.
+  function planView(entry, { max = PLAN_CLIP, versions = false } = {}) {
+    if (!entry) return undefined;
+    const earlier = versions ? entry.versions.map((v) => ({ madeAt: v.at, by: v.by || undefined, text: clip(v.text, 1500) })) : entry.versions.length;
+    return { madeAt: entry.at, by: entry.by || undefined, text: clip(entry.text, max), ...(entry.versions.length ? { earlierVersions: earlier } : {}) };
+  }
+
   // Finds an item by id, or by its exact title when that is unambiguous.
   function resolve(items, key) {
     const wanted = String(key ?? '').trim();
@@ -212,9 +230,15 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
     }),
 
     async overview() {
-      const data = await load();
-      const items = live(data.items);
       const today = now().slice(0, 10);
+      const day = localDate(new Date(now()));
+      // The user's day may be a day either side of this server's: the newest plan of the last 24 hours.
+      const [data, ...days] = await Promise.all([load(), ...[1, 0, -1].map((n) => plansOf(addDays(day, n)).catch(() => null))]);
+      const since = Date.parse(now()) - 86_400_000;
+      const plan = days
+        .filter((d) => d?.plans.day && Date.parse(d.plans.day.at) > since)
+        .sort((a, b) => b.plans.day.at.localeCompare(a.plans.day.at))[0]?.plans;
+      const items = live(data.items);
       const counts = {};
       for (const t of TYPE_IDS) {
         const ofType = items.filter((i) => i.type === t);
@@ -223,6 +247,8 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       const open = items.filter((i) => i.status !== 'done');
       return {
         counts,
+        // The plan the user keeps for their day (made by their model in the app, or by you with save_plan).
+        latestPlan: plan ? { date: plan.date, ...planView(plan.day, { max: 1500 }) } : undefined,
         // What the user keeps on top of each project, whatever its status.
         pinned: pinnedFirst(sortItems(items.filter((i) => i.pinned))).slice(0, 30).map(summarize),
         // The user's latest comment on each, newest first: read the rest with get_item, reply with update_items comment.
@@ -245,6 +271,53 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
           .slice(0, 20)
           .map((p) => ({ name: p.name, area: p.area || undefined, open: p.open })),
       };
+    },
+
+    // Plans and week reviews kept by day, with what got done each day (days by this server's clock).
+    async plans({ date, days = 7 } = {}) {
+      const last = date ?? localDate(new Date(now()));
+      if (!isDay(last)) throw new TrackerError('date must be YYYY-MM-DD');
+      const count = Math.min(MAX_PLAN_DAYS, Math.max(1, Math.floor(Number(days) || 1)));
+      const dates = Array.from({ length: count }, (_, n) => addDays(last, -n));
+      const [data, ...kept] = await Promise.all([load(), ...dates.map((d) => plansOf(d).catch(() => ({ plans: emptyPlans(d) })))]);
+      const items = live(data.items);
+      const one = count === 1 ? { max: Infinity, versions: true } : {};
+      const brief = (i) => ({ id: i.id, title: i.title, ...(i.project ? { project: i.project } : {}) });
+      return {
+        days: dates.map((d, n) => {
+          const { plans } = kept[n];
+          const activity = dayActivity(items, d);
+          return {
+            date: d,
+            plan: planView(plans.day, one),
+            weekReview: planView(plans.week, one),
+            done: activity.done.slice(0, 30).map(brief),
+            started: activity.started.length || undefined,
+            added: activity.added.length || undefined,
+            comments: activity.comments.length || undefined,
+          };
+        }),
+      };
+    },
+
+    // A new version of the day's plan or the week's review; the one it replaces stays as an earlier version.
+    async savePlan({ kind = 'day', text, date } = {}) {
+      if (!PLAN_KINDS.includes(kind)) throw new TrackerError(`kind must be one of ${PLAN_KINDS.join(', ')}`);
+      if (typeof text !== 'string' || !text.trim()) throw new TrackerError('text is empty — pass the whole plan in Markdown.');
+      const day = date ?? localDate(new Date(now()));
+      if (!isDay(day)) throw new TrackerError('date must be YYYY-MM-DD');
+      const version = { text: text.trim(), at: now(), by: CLAUDE_AUTHOR, model: '' };
+      for (let attempt = 1; ; attempt++) {
+        const { sha, plans } = await plansOf(day);
+        const next = withPlan(plans, kind, version);
+        try {
+          if (!sha && branch) await client.ensureBranch(branch);
+          await client.putFile(planPath(day), { text: serializePlans(next), sha, branch: ref, message: `Tracker: ${kind === 'day' ? 'plan' : 'week review'} for ${day} (via ${device})` });
+          return { saved: { date: day, kind, ...planView(next[kind], { max: 200 }) } };
+        } catch (err) {
+          if (!isConflict(err) || attempt >= MAX_ATTEMPTS) throw err;
+        }
+      }
     },
 
     async listProjects() {

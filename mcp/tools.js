@@ -2,16 +2,17 @@
 // wording here is what lets Claude act on requests like "send this proposal
 // to my tracker" from any chat or Claude Code session.
 import { APP_VERSION } from '../app/js/version.js';
+import { MAX_PLAN_DAYS } from './tracker.js';
 import { AREAS, DECISIONS, KINDS, PRIORITIES, STATUSES, TYPE_IDS } from '../app/js/model.js';
 
 export const SERVER_INFO = { name: 'tracker', title: 'Tracker', version: APP_VERSION };
 
-export const INSTRUCTIONS = `Tracker is the user's personal tracker for tasks, ideas, Claude work and documents. They read and review it in the Tracker app on their computers and phone. Data lives in a private GitHub repo; every write is a commit.
+export const INSTRUCTIONS = `Tracker is the user's personal tracker for tasks, ideas, Claude work and documents. They use the Tracker app on their computers and phone. Data lives in a private GitHub repo; every write is a commit.
 
 Model
 - Item types: task, idea, claude (Claude work: Claude Code sessions, PRs, chats, artifacts), doc (things for the user to read or review).
 - Status: pending → in_progress → done (docs show as To read → Reading → Read).
-- Items can carry files (proposal.md, report.html, pictures…) kept in the repo; the user reads them in the app. read_file shows you a picture.
+- Items can carry files (proposal.md, report.html, pictures…) kept in the repo; read_file shows you a picture.
 - The user reviews docs by setting decision (approved | changes | rejected) and writing feedback.
 - Any item can have comments: the user's notes for you (feedback, questions, decisions) and your replies. awaitingReply marks an item whose latest comment is the user's.
 - Each item belongs to at most one project. Projects can be in area work or personal; the user filters by them. Tags are free-form labels; use them for the repositories an item touches.
@@ -23,10 +24,11 @@ How to handle requests
 - "Update tasks on my tracker", "mark X done", "add a task …" → list_items first to find existing items and avoid duplicates, then update_items / add_items. Batch several changes into one call.
 - "Log / track this Claude work" → add_items with type "claude", kind (code, chat, pr, artifact) and url = the session, PR or artifact link.
 - "What's on my tracker?" → get_overview. "Check my tracker for feedback / comments" → list_items with comments "unanswered" (docs: decision); read them with get_item, act, then reply with update_items comment (what you did or your answer).
-- "Pin / unpin X" → update_items pinned true / false (they come first in the app; list_items pinned true lists them).
+- "Pin / unpin X" → update_items pinned true / false (list_items pinned true lists them).
+- "My plan for today", "how did my week go" → get_overview (latestPlan) or get_plans; to make or update one, save_plan.
 
 Projects and tags
-- "For this conversation use project X (and tag with the repos you touch)" → remember it: pass project "X" on every add_items and send_document (and update_items when filing items), and add the names of the repositories involved as tags (in Claude Code: the git repository you are working in; a proposal spanning several repos gets one tag per repo).
+- "For this conversation use project X (and tag with the repos you touch)" → remember it: pass project "X" on every add_items and send_document (and update_items when filing items), and add the names of the repositories involved as tags (in Claude Code: the git repository you work in; one tag per repo).
 - Call list_projects before your first write to reuse the exact existing project and tag spellings. If the project does not exist, create it with save_project (area work or personal; ask if unclear). New tags are created simply by using them.
 - Without such an instruction, set project only when it is obvious (e.g. an existing project named after the repo).
 
@@ -40,7 +42,7 @@ Conventions
 - Set url to the most relevant link (Claude session, PR, artifact) when you know it.
 - Keep titles short and specific; put details in notes (Markdown, checklists with "- [ ]").
 - Due dates are YYYY-MM-DD. Reuse existing tags instead of near-duplicates.
-- Never delete items unless the user explicitly asks. After a write, tell the user what changed and include the item link if one is returned.`;
+- Never delete items unless the user explicitly asks. After a write, tell the user what changed and give the item link when one is returned.`;
 
 const str = (description) => ({ type: 'string', description });
 const enumOf = (values, description) => ({ type: 'string', enum: values, description });
@@ -70,7 +72,7 @@ export function createTools(getTracker) {
     {
       name: 'get_overview',
       title: 'Tracker overview',
-      description: 'Summary of the tracker: counts per type and status, pinned items, comments waiting for your reply (with the latest comment), items in progress, items due within 7 days, documents waiting for review, and recent review decisions with feedback.',
+      description: 'Summary of the tracker: the plan the user keeps for today (latestPlan), counts per type and status, pinned items, comments waiting for your reply (with the latest comment), items in progress, items due within 7 days, documents waiting for review, and recent review decisions with feedback.',
       inputSchema: { type: 'object', properties: {} },
       annotations: readOnly,
       run: run((t) => t.overview()),
@@ -240,6 +242,36 @@ export function createTools(getTracker) {
       },
       annotations: write,
       run: run((t, a) => t.sendDocument(a)),
+    },
+    {
+      name: 'get_plans',
+      title: 'Plans and past days',
+      description: 'The day plans and week reviews the user keeps on the tracker (made in the app or with save_plan, updated during the day; earlier versions kept), and what got done, started and added each day. One day (days 1) comes with the whole texts and the earlier versions; several days with the texts shortened.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          date: str('The last day, YYYY-MM-DD. Default: today.'),
+          days: { type: 'integer', minimum: 1, maximum: MAX_PLAN_DAYS, description: 'How many days, back from date. Default 7.' },
+        },
+      },
+      annotations: readOnly,
+      run: run((t, a) => t.plans(a)),
+    },
+    {
+      name: 'save_plan',
+      title: 'Save a plan',
+      description: 'Keep a plan for the user\'s day (kind day) or a review of their week (kind week) on the tracker, where the app shows it on the Overview, above List and Board, and under Days. Saving again for the same day makes a new version; the earlier one is kept. Read get_overview or get_plans first, so an update builds on the plan there.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          kind: enumOf(['day', 'week'], 'day: the plan for the day (default); week: a review of the week.'),
+          text: str('The whole plan in Markdown: short, a list of what to do first and why.'),
+          date: str('The day it is for, YYYY-MM-DD. Default: today; pass the user\'s own date when you know it.'),
+        },
+        required: ['text'],
+      },
+      annotations: write,
+      run: run((t, a) => t.savePlan(a)),
     },
     {
       name: 'list_editor_files',

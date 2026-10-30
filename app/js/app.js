@@ -33,10 +33,12 @@ import { ItemWindow, WindowDock } from './ui/itemWindows.js';
 import { clampRect, fullRect, nextRect, tileRects } from './windowLayout.js';
 import { appItemLink, idFromFragment, itemIdIn, WEB_APP_URL } from './itemLinks.js';
 import { HelpDialog } from './ui/help.js';
-import { askForPlan } from './ui/assist.js';
+import { makePlan, usePlanAuto } from './ui/plans.js';
+import { DaysView } from './ui/days.js';
+import { cachedPlans } from './planStore.js';
 import { SettingsView } from './ui/settingsView.js';
 
-const VIEWS = ['home', 'board', 'list', 'projects', 'settings'];
+const VIEWS = ['home', 'board', 'list', 'days', 'projects', 'settings'];
 
 function parseHash() {
   const [view, type, status] = location.hash.replace(/^#\/?/, '').split('/');
@@ -44,10 +46,13 @@ function parseHash() {
     view: VIEWS.includes(view) ? view : 'home',
     type: TYPE_IDS.includes(type) ? type : 'all',
     status: STATUSES.includes(status) ? status : 'all',
+    // Days: #/days/2026-10-28 (none: today).
+    day: view === 'days' && /^\d{4}-\d{2}-\d{2}$/.test(type ?? '') ? type : '',
   };
 }
 
-export function hrefFor({ view, type = 'all', status = 'all' }) {
+export function hrefFor({ view, type = 'all', status = 'all', day = '' }) {
+  if (view === 'days') return day ? `#/days/${day}` : '#/days';
   const parts = [view];
   if (type !== 'all' || status !== 'all') parts.push(type);
   if (status !== 'all') parts.push(status);
@@ -67,6 +72,8 @@ function viewTitle(route) {
       return 'Settings';
     case 'projects':
       return 'Projects & tags';
+    case 'days':
+      return 'Days';
     default:
       return 'Overview';
   }
@@ -126,6 +133,7 @@ function Sidebar({ route, items, projects, scope, query, onProject, onTag, sync,
       ${link({ view: 'home' }, 'Overview', 'home')}
       ${link({ view: 'board' }, 'Board', 'board')}
       ${link({ view: 'list' }, 'All items', 'list', open.length)}
+      ${link({ view: 'days' }, 'Days', 'calendar')}
       <div class="nav-section">Categories</div>
       ${TYPES.map((t) => link({ view: categoryView, type: t.id }, t.plural, t.id, open.filter((i) => i.type === t.id).length, `type-${t.id}`))}
       <div class="nav-section nav-section-row">Projects<a href="#/projects" class="nav-manage" title="Manage projects and tags">Manage</a></div>
@@ -405,6 +413,8 @@ export function App() {
   const projects = useMemo(() => projectList(items, projectRecords), [items, projectRecords]);
   const byKey = useMemo(() => new Map(projects.map((p) => [p.key, p])), [projects]);
   const scopedItems = useMemo(() => items.filter((i) => matchesScope(i, scope, byKey)), [items, scope, byKey]);
+  // Today's plan made and updated by itself (setting `planAuto`).
+  usePlanAuto({ items: scopedItems, today, on: Boolean(settings.planAuto) });
   // Viewing a single project: new items go into it.
   const defaultProject = scope.length === 1 && scope[0].startsWith('project:') ? (byKey.get(scope[0].slice(8))?.name ?? '') : '';
 
@@ -608,6 +618,7 @@ export function App() {
     'go-claude': () => go({ view: 'list', type: 'claude' }),
     'go-docs': () => go({ view: 'list', type: 'doc' }),
     'go-projects': () => go({ view: 'projects' }),
+    'go-days': () => go({ view: 'days' }),
     settings: () => go({ view: 'settings' }),
     search: () => searchRef.current?.focus(),
     'clear-search': () => setQuery(''),
@@ -642,7 +653,7 @@ export function App() {
     }
     if (!scopedItems.length) return toast('Nothing to plan yet: add some items first');
     go({ view: 'home' });
-    askForPlan(kind);
+    makePlan(kind, { items: scopedItems, today, update: Boolean(cachedPlans(today)?.[kind]) });
   };
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
@@ -832,11 +843,13 @@ export function App() {
 
   let view;
   if (route.view === 'board') {
-    view = html`<${BoardView} items=${filtered} type=${route.type} onType=${(type) => navigate({ type })} actions=${actions} today=${today} keepPinned=${keepPinned} />`;
+    view = html`<${BoardView} items=${filtered} planItems=${scopedItems} type=${route.type} onType=${(type) => navigate({ type })} actions=${actions} today=${today} keepPinned=${keepPinned} />`;
   } else if (route.view === 'list') {
-    view = html`<${ListView} items=${filtered} type=${route.type} status=${route.status} query=${query} keepPinned=${keepPinned}
+    view = html`<${ListView} items=${filtered} planItems=${scopedItems} type=${route.type} status=${route.status} query=${query} keepPinned=${keepPinned}
       onType=${(type) => navigate({ type })} onStatus=${(status) => navigate({ status })}
       sort=${settings.sort} onSort=${(sort) => saveSettings({ sort })} actions=${actions} today=${today} />`;
+  } else if (route.view === 'days') {
+    view = html`<${DaysView} items=${scopedItems} today=${today} day=${route.day} actions=${actions} />`;
   } else if (route.view === 'projects') {
     view = html`<${ProjectsView} items=${items} projects=${projects} actions=${actions} />`;
   } else if (route.view === 'settings') {

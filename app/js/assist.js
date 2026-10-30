@@ -191,14 +191,35 @@ export function planItems(items, { kind = 'day', today, max = 40 }) {
   return { done: [], open: [...sortItems(open.filter(pressing)), ...sortItems(open.filter((i) => !pressing(i)))].slice(0, max) };
 }
 
-/** Messages for a plan of the day ('day') or a review of the week ('week'). */
-export function planMessages(items, { kind = 'day', today }) {
+const clock = (iso) => new Date(iso).toTimeString().slice(0, 5);
+
+/**
+ * Messages for a plan of the day ('day') or a review of the week ('week'). With `previous` (the
+ * plan made earlier today, { text, at }) and `changes` (changesSince it), it asks for that plan updated.
+ */
+export function planMessages(items, { kind = 'day', today, previous = null, changes = null }) {
   const { done, open } = planItems(items, { kind, today });
-  const ask =
+  let ask =
     kind === 'week'
       ? 'Write my weekly review: what got done, what is stuck or overdue, and what to focus on next week (at most 5 points). Refer to items by their title.'
       : 'Suggest a realistic plan for today: what to do first and why, in at most 6 bullets. Put overdue and due-today items first, keep in-progress work moving, and say what can wait. Refer to items by their title.';
-  const parts = [`Today is ${weekday(today)} ${today}.`];
+  if (previous) {
+    ask =
+      kind === 'week'
+        ? 'Update my weekly review below with what changed since it was written: keep what still holds, add what got done or stuck since. At most 5 points. Refer to items by their title.'
+        : 'Update my plan for the rest of today with what changed since it was made: mark what got done, keep what still holds, fit in what is new, and say what can wait. At most 6 bullets. Refer to items by their title.';
+  }
+  const parts = [`Today is ${weekday(today)} ${today}${previous ? `, now ${clock(new Date().toISOString())}` : ''}.`];
+  if (previous) {
+    parts.push(`The ${kind === 'week' ? 'review' : 'plan'} from ${clock(previous.at)}:\n${previous.text.trim()}`);
+    const since = [
+      ['Done since then', changes?.done],
+      ['Started since then', changes?.started],
+      ['Added since then', changes?.added],
+      ['Overdue now', changes?.overdue],
+    ].filter(([, list]) => list?.length);
+    parts.push(since.length ? since.map(([title, list]) => `${title}:\n${list.map((i) => line(i, today)).join('\n')}`).join('\n\n') : 'Nothing changed in the items since then.');
+  }
   if (kind === 'week') parts.push(`Done in the last 7 days:\n${done.length ? done.map((i) => line(i, today)).join('\n') : '(nothing)'}`);
   parts.push(`Open items:\n${open.length ? open.map((i) => line(i, today)).join('\n') : '(none)'}`);
   return [

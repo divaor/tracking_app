@@ -31,5 +31,6 @@ export async function readQuickAdd(input, context) {
 export const askAboutItem = (action, item, documents, { history = [], signal, onToken, onState } = {}) =>
   chat({ messages: itemMessages(action, item, documents, history), purpose: 'ask', signal, onToken, onState });
 
-/** A plan for today ('day') or a review of the week ('week'), streamed. */
-export const planWith = (items, { kind, today, signal, onToken, onState }) => chat({ messages: planMessages(items, { kind, today }), purpose: 'plan', signal, onToken, onState });
+/** A plan for today ('day') or a review of the week ('week'), streamed; with `previous` and `changes`, that one updated. */
+export const planWith = (items, { kind, today, previous, changes, signal, onToken, onState }) =>
+  chat({ messages: planMessages(items, { kind, today, previous, changes }), purpose: 'plan', signal, onToken, onState });

@@ -54,6 +54,10 @@ export function ModelCard({ actions }) {
       <${Segmented} options=${CONNECTIONS} value=${connection} onChange=${setConnection} label="Connection" />
     </div>
     ${connection === 'async' ? html`<${AsyncModelForm} actions=${actions} />` : connection === 'api' ? html`<${ApiModelForm} actions=${actions} />` : html`<${OpenAiModelForm} actions=${actions} />`}
+    <label class="field checkbox span-2">
+      <input type="checkbox" checked=${Boolean(settings.planAuto)} onChange=${(e) => saveSettings({ planAuto: e.currentTarget.checked })} />
+      <span>Make and update today's plan by itself<small>The first time the app is open each day (from 6:00), then after you finish, start or add items, at most every 2 hours, while the app is open. Each one is a request to your model.</small></span>
+    </label>
   </${Card}>`;
 }
 

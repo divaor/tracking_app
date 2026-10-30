@@ -35,6 +35,9 @@ export const DEFAULT_SETTINGS = {
   pinnedPastFilters: false,
   // The sidebar lists every project and tag (else the first ones, with "N more").
   sidebarAll: { projects: false, tags: false },
+  // Today's plan made and updated by itself (ui/plans.js usePlanAuto), and where its strip is hidden.
+  planAuto: false,
+  planStripHidden: { list: false, board: false },
   // In a browser on a computer: links to items not on this device go to the desktop app (tracker-app://).
   openItemsInApp: false,
   // Claude connector address, used for push notifications.

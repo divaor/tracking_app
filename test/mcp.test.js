@@ -48,12 +48,14 @@ test('initialize, tools/list and prompts follow the MCP shape', async () => {
     'delete_items',
     'get_item',
     'get_overview',
+    'get_plans',
     'list_editor_files',
     'list_items',
     'list_projects',
     'read_editor_file',
     'read_file',
     'save_editor_file',
+    'save_plan',
     'save_project',
     'search_editor_files',
     'send_document',
@@ -483,4 +485,55 @@ test('an item is found by its link or part of its id too', async () => {
   assert.equal((await call('get_item', { id: id.slice(-10) })).data.id, id, 'part of its id');
   assert.equal((await call('get_item', { id: `https://me.github.io/tracking_app/#/item/${id}` })).data.id, id, 'its link');
   assert.equal((await call('get_item', { id: 'zzzzzz9' })).isError, true);
+});
+
+test('plans: save_plan keeps versions, the overview shows the latest, get_plans looks back by day', async () => {
+  const { call, github } = setup();
+  await call('add_items', { items: [{ title: 'Ship the parser', status: 'done' }, { title: 'Write the docs' }] });
+  const { localDate } = await import('../app/js/model.js');
+  const today = localDate();
+  const path = `plans/${today.slice(0, 7)}/${today}.json`;
+  assert.equal((await call('get_overview')).data.latestPlan, undefined);
+
+  const first = await call('save_plan', { text: '- First **the parser**' });
+  assert.equal(first.isError, false, first.text);
+  assert.equal(first.data.saved.date, today);
+  assert.equal(first.data.saved.kind, 'day');
+  const kept = JSON.parse(github.read(path));
+  assert.equal(kept.day.by, 'Claude');
+  assert.match(kept.day.text, /First/);
+  assert.match((await call('get_overview')).data.latestPlan.text, /First/);
+
+  // The app saved a version meanwhile (another device): kept under the next one.
+  const { serializePlans, withPlan } = await import('../app/js/plans.js');
+  const fromApp = withPlan({ ...kept, versions: undefined }, 'day', { text: '- From the app', at: new Date(Date.now() + 1000).toISOString(), by: 'Test PC', model: 'm' });
+  github.write(path, serializePlans(fromApp));
+  await call('save_plan', { text: '- Then the docs' });
+  const one = (await call('get_plans', { days: 1 })).data.days;
+  assert.equal(one.length, 1);
+  assert.match(one[0].plan.text, /Then the docs/);
+  assert.deepEqual(one[0].plan.earlierVersions.map((v) => v.by), ['Test PC', 'Claude']);
+  assert.deepEqual(one[0].done.map((i) => i.title), ['Ship the parser']);
+  assert.equal(one[0].added, 2);
+
+  await call('save_plan', { kind: 'week', text: 'A good week: the parser shipped.' });
+  const week = (await call('get_plans', {})).data.days;
+  assert.equal(week.length, 7);
+  assert.equal(week[0].weekReview.text, 'A good week: the parser shipped.');
+  assert.equal(week[0].plan.earlierVersions, 2, 'several days: the versions counted');
+  assert.equal(week[1].plan, undefined);
+  assert.equal(week[1].date < today, true);
+
+  // A plan for another day; bad input.
+  await call('save_plan', { date: '2026-01-05', text: 'Old day' });
+  assert.match((await call('get_plans', { date: '2026-01-05', days: 1 })).data.days[0].plan.text, /Old day/);
+  assert.equal((await call('get_plans', { days: 99 })).data.days.length, 14);
+  assert.equal((await call('save_plan', { kind: 'month', text: 'x' })).isError, true);
+  assert.equal((await call('save_plan', { text: '  ' })).isError, true);
+  assert.equal((await call('save_plan', { text: 'x', date: 'tomorrow' })).isError, true);
+  assert.equal((await call('get_plans', { date: '30/10/2026' })).isError, true);
+  // An unreadable plans file is never overwritten.
+  github.write(path, '{ not json');
+  await call('get_plans', { days: 1 });
+  assert.equal(github.read(path), '{ not json');
 });

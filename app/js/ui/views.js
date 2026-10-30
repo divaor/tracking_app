@@ -4,7 +4,7 @@ import { addDays, pinnedFirst, SORTS, sortItems, STATUSES, statusLabel, TYPES } 
 import { formatLongToday, greeting } from '../format.js';
 import { Icon, StatusIcon } from './icons.js';
 import { EmptyState, ItemCard, ItemRow, QuickAdd, Segmented, TypeFilter } from './components.js';
-import { PlanCard } from './assist.js';
+import { PlanCard, PlanStrip, PlanStripToggle } from './plans.js';
 
 const DONE_LIMIT = 25;
 
@@ -134,7 +134,7 @@ function typeCounts(items) {
 const addPlaceholder = (type) =>
   ({ task: 'Add a task…', idea: 'Capture an idea…', claude: 'Add Claude work…', doc: 'Add a document to read…' })[type];
 
-export function BoardView({ items, type, onType, actions, today, keepPinned = false }) {
+export function BoardView({ items, planItems = items, type, onType, actions, today, keepPinned = false }) {
   const [dropTarget, setDropTarget] = useState(null);
   const [showAllDone, setShowAllDone] = useState(false);
   const newType = type === 'all' ? 'task' : type;
@@ -144,7 +144,9 @@ export function BoardView({ items, type, onType, actions, today, keepPinned = fa
   return html`<div class="board-view">
     <div class="toolbar">
       <${TypeFilter} value=${type} onChange=${onType} counts=${typeCounts(items)} />
+      <${PlanStripToggle} view="board" />
     </div>
+    <${PlanStrip} view="board" items=${planItems} today=${today} />
     <${QuickAdd} type=${newType} placeholder=${addPlaceholder(newType)} onAdd=${(value) => actions.quickAdd(value, { type: newType })} />
     <div class="board">
       ${STATUSES.map((status) => {
@@ -187,7 +189,7 @@ export function BoardView({ items, type, onType, actions, today, keepPinned = fa
   </div>`;
 }
 
-export function ListView({ items, type, status, onType, onStatus, sort, onSort, actions, today, query, keepPinned = false }) {
+export function ListView({ items, planItems = items, type, status, onType, onStatus, sort, onSort, actions, today, query, keepPinned = false }) {
   const ofType = type === 'all' ? items : items.filter((i) => i.type === type);
   const matching = status === 'all' ? ofType : ofType.filter((i) => i.status === status);
   // Pinned items that match come first, by project; with `pinnedPastFilters`, all pinned items do.
@@ -202,7 +204,9 @@ export function ListView({ items, type, status, onType, onStatus, sort, onSort, 
   return html`<div class="list-view">
     <div class="toolbar">
       <${TypeFilter} value=${type} onChange=${onType} counts=${typeCounts(items)} />
+      <${PlanStripToggle} view="list" />
     </div>
+    <${PlanStrip} view="list" items=${planItems} today=${today} />
     <div class="toolbar">
       <${Segmented} options=${statusOptions} value=${status} onChange=${onStatus} label="Status" small />
       <label class="sort">

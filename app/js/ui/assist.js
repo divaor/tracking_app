@@ -1,14 +1,14 @@
 import { html, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { actionsFor, appendToNotes } from '../assist.js';
-import { askAboutItem, modelReady, planWith } from '../assistant.js';
+import { askAboutItem, modelReady } from '../assistant.js';
 import { loadFileText } from '../files.js';
 import { renderMarkdown } from '../markdown.js';
-import { fileKind } from '../model.js';
+import { fileKind, isTextAttachment } from '../model.js';
 import { Icon } from './icons.js';
 
-// The text of an item's attached files the model can read (not pictures).
+// The text of an item's attached files the model can read (not pictures, PDFs or other documents).
 async function documentsOf(item) {
-  const readable = item.files.filter((f) => fileKind(f.name) !== 'svg').slice(0, 4);
+  const readable = item.files.filter((f) => isTextAttachment(f) && fileKind(f.name) !== 'svg').slice(0, 4);
   const texts = await Promise.all(readable.map((f) => loadFileText(f).then((text) => ({ name: f.name, text }), () => null)));
   return texts.filter(Boolean);
 }
@@ -98,62 +98,5 @@ export function ItemAssistant({ item, actions }) {
         placeholder=${conv?.status === 'done' ? 'Ask a follow-up…' : item.type === 'doc' ? 'Ask about this document…' : 'Ask anything about it…'} />
       <button type="submit" class="btn primary sm" disabled=${!question.trim() || conv?.status === 'asking'} aria-label="Ask"><${Icon} name="send" size=${14} /></button>
     </form>
-  </section>`;
-}
-
-// A plan asked for from Help or the menu, taken by the Overview's card once it is shown.
-let wantedPlan = null;
-export function askForPlan(kind) {
-  wantedPlan = kind;
-  window.dispatchEvent(new Event('tracker:plan'));
-}
-
-/** Overview: the model's plan for today, or a review of the week, from your open (and lately done) items. */
-export function PlanCard({ items, today }) {
-  const [state, setState] = useState(null); // { kind, text, status, error }
-  const controller = useRef(null);
-  const card = useRef(null);
-  const runRef = useRef(null);
-  const ready = modelReady() && items.length > 0;
-  useEffect(() => () => controller.current?.abort(), []);
-  useEffect(() => {
-    if (!ready) return undefined;
-    const take = () => {
-      if (!wantedPlan) return;
-      const kind = wantedPlan;
-      wantedPlan = null;
-      runRef.current(kind);
-      card.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    };
-    take();
-    window.addEventListener('tracker:plan', take);
-    return () => window.removeEventListener('tracker:plan', take);
-  }, [ready]);
-  if (!ready) return null;
-  const run = (runRef.current = async (kind) => {
-    controller.current?.abort();
-    const signal = (controller.current = new AbortController()).signal;
-    let out = '';
-    setState({ kind, text: '', status: 'asking' });
-    try {
-      const reply = await planWith(items, { kind, today, signal, onToken: (t) => setState((s) => s && { ...s, text: (out += t) }) });
-      setState({ kind, text: reply || out, status: 'done' });
-    } catch (err) {
-      if (err?.name === 'AbortError') return setState(null);
-      setState({ kind, text: out, status: 'error', error: err.message });
-    }
-  });
-  return html`<section class="plan-card" aria-label="Plan with the model" ref=${card}>
-    <div class="plan-head">
-      <h2><${Icon} name="sparkle" size=${17} />${state?.kind === 'week' ? 'Your week' : 'Your day'}</h2>
-      <span class="spacer" />
-      <button type="button" class="btn sm ${state?.kind === 'day' ? 'primary' : ''}" disabled=${state?.status === 'asking'} onClick=${() => run('day')}>Plan my day</button>
-      <button type="button" class="btn sm ${state?.kind === 'week' ? 'primary' : ''}" disabled=${state?.status === 'asking'} onClick=${() => run('week')}>Review my week</button>
-      ${state && html`<button type="button" class="icon-btn sm" aria-label="Close" onClick=${() => (controller.current?.abort(), setState(null))}><${Icon} name="x" size=${16} /></button>`}
-    </div>
-    ${!state && html`<p class="muted small">The model suggests what to do first today, or reviews what got done this week and what is stuck.</p>`}
-    ${state?.text && html`<div class="markdown plan-text" dangerouslySetInnerHTML=${{ __html: renderMarkdown(state.text) }} />`}
-    ${state?.status === 'asking' && !state.text && html`<p class="muted small"><${Icon} name="sync" size=${14} /> Thinking…</p>`}
-    ${state?.status === 'error' && html`<p class="notice error"><${Icon} name="alert" size=${15} />${state.error}</p>`}
   </section>`;
 }
