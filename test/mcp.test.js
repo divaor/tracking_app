@@ -223,6 +223,16 @@ test('long files are paged to stay within tool output limits', async () => {
   assert.match(detail.data.files[0].truncated, /read_file with offset/);
 });
 
+test('read_file works with deleted items in the data (tombstones have no files)', async () => {
+  const { call } = setup();
+  const gone = await call('add_items', { items: [{ title: 'Gone soon' }] });
+  await call('delete_items', { ids: [gone.data.added[0].id] });
+  const sent = await call('send_document', { title: 'Notes', kind: 'report', content: '# Hello', filename: 'notes.md' });
+  const read = await call('read_file', { path: sent.data.file.path });
+  assert.equal(read.isError, false, read.text);
+  assert.equal(read.data.content, '# Hello');
+});
+
 test('uses the configured branch, creating it on first write', async () => {
   const { call, github } = setup({ TRACKER_BRANCH: 'tracker' });
   const sent = await call('send_document', { title: 'On a branch', kind: 'other', content: 'hello' });

@@ -454,7 +454,7 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
     async readFile(filePath, offset = 0) {
       const p = String(filePath ?? '').replace(/^\/+/, '');
       if (!p.startsWith(`${dir}/`) || p.split('/').includes('..')) throw new TrackerError(`Only files under ${dir}/ can be read. Use the paths listed in an item's files.`);
-      const record = (await load()).items.flatMap((i) => i.files).find((f) => f.path === p) ?? { path: p, name: p.split('/').pop() };
+      const record = live((await load()).items).flatMap((i) => i.files ?? []).find((f) => f.path === p) ?? { path: p, name: p.split('/').pop() };
       if (!isTextAttachment(record)) return tracker.readNotText(record);
       const file = await client.getFile(p, ref);
       if (!file) throw new TrackerError(`File not found: ${p}`);
