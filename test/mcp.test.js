@@ -475,3 +475,12 @@ test('pictures on an item come to Claude as pictures; other files that are not t
   const plain = await call('get_item', { id });
   assert.deepEqual(plain.data.files.map((f) => f.kind), ['image', 'pdf']);
 });
+
+test('an item is found by its link or part of its id too', async () => {
+  const { call } = setup();
+  const added = await call('add_items', { items: [{ title: 'Fix the boiler' }, { title: 'Call the plumber' }] });
+  const [{ id }] = added.data.added;
+  assert.equal((await call('get_item', { id: id.slice(-10) })).data.id, id, 'part of its id');
+  assert.equal((await call('get_item', { id: `https://me.github.io/tracking_app/#/item/${id}` })).data.id, id, 'its link');
+  assert.equal((await call('get_item', { id: 'zzzzzz9' })).isError, true);
+});

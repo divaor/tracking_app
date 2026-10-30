@@ -24,7 +24,7 @@ Personal tracker for tasks, ideas, Claude work and documents. Electron on deskto
   - `protocol.js` handles JSON-RPC and Streamable HTTP; `tools.js` holds the tools, prompts and the server instructions Claude sees (keep the instructions under 4,096 characters); `tracker.js` does the repo reads and writes, reusing `app/js/model.js` and `github.js`.
   - Entry points: `worker.js` (Cloudflare), `http.js`, `stdio.js`.
   - Documents go to `files/<date>-<slug>-<id6>/<name>` in the data repo; items reference them in `files`. The user's review lives in `decision` and `feedback`.
-  - Files that are not text (`isTextAttachment` false) are never read as text: `read_file` returns a picture (png/jpeg/gif/webp up to `MAX_PICTURE_BYTES`) as an MCP image block (a result's `mcpContent` goes out as it is, `protocol.js`), others only described (`notTextNote`); `get_item` gives each file its `kind`.
+  - Files that are not text (`isTextAttachment` false) are never read as text: `read_file` returns a picture (png/jpeg/gif/webp up to `MAX_PICTURE_BYTES`) as an MCP image block (a result's `mcpContent` goes out as it is, `protocol.js`), others only described (`notTextNote`); `get_item` gives each file its `kind`. Items are found by id, exact title, a link (`itemIdIn`) or part of the id (`idFromFragment`).
   - Tool results must stay small (`MAX_READ_CHARS`); `read_file` pages through long files.
   - `editor.js` gives Claude the Tracker Editor files (`*_editor_file(s)` tools): `editor/index.json` at the repo root lists records, the text is in `editor/files/<id>/<safeName(name)>`.
     - Keep its record fields, `safeName` and `serializeEditorIndex` in step with the editor's `app/js/model.js`. Records keep fields the connector does not know.

@@ -4,6 +4,7 @@
 import { describeChanges } from '../app/js/changes.js';
 import { createEditorFiles } from './editor.js';
 import { bytesToBase64 } from '../app/js/github.js';
+import { idFromFragment, itemIdIn } from '../app/js/itemLinks.js';
 import {
   addCommentPatch,
   addDays,
@@ -187,6 +188,10 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
     const byTitle = alive.filter((i) => i.title.toLowerCase() === wanted.toLowerCase());
     if (byTitle.length === 1) return byTitle[0];
     if (byTitle.length > 1) throw new TrackerError(`Several items are titled “${wanted}”; use the id instead (${byTitle.map((i) => i.id).join(', ')}).`);
+    // A link to the item, or part of its id (as the user may paste back what you gave them).
+    const linked = itemIdIn(wanted) ?? idFromFragment(wanted, alive.map((i) => i.id));
+    const byPart = linked && alive.find((i) => i.id === linked);
+    if (byPart) return byPart;
     throw new TrackerError(`No item with id or title “${wanted}”. Use list_items to find it.`);
   }
 
