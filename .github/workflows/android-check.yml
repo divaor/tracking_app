@@ -1,0 +1,58 @@
+# Runs the Android app in an emulator and checks, in its real WebView and with adb, what a
+# desktop browser cannot stand in for: the bridge to the phone, secrets, a model server on the
+# computer next to the phone, the phone's voices, Share → Tracker, links, Back, opening and
+# saving files, and the change notifications while the app is closed (scripts/android-check.mjs).
+# Run it by hand from Actions → Android check. Its APK is a debug build with WebView debugging
+# on, for this check only: the release's setting stays off.
+name: Android check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  webview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # An older WebView (Android 14's own) and a recent one.
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [34, 36]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: npm install --no-save playwright-core@1.56.1
+      - name: WebView debugging on (this build only)
+        run: |
+          node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('capacitor.config.json'));c.android.webContentsDebuggingEnabled=true;fs.writeFileSync('capacitor.config.json',JSON.stringify(c,null,2))"
+      - run: npx cap sync android
+      - run: ./gradlew assembleDebug --no-daemon --stacktrace
+        working-directory: android
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: node scripts/android-check.mjs $(ls android/app/build/outputs/apk/debug/*.apk)
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: android-check-api${{ matrix.api-level }}
+          if-no-files-found: ignore
+          path: android-check/
