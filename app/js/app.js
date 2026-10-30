@@ -35,6 +35,8 @@ import { appItemLink, idFromFragment, itemIdIn, WEB_APP_URL } from './itemLinks.
 import { HelpDialog } from './ui/help.js';
 import { makePlan, usePlanAuto } from './ui/plans.js';
 import { DaysView } from './ui/days.js';
+import { ListenBar, setListenNotice } from './ui/listen.js';
+import { stopReading, toggleReading } from './reader.js';
 import { cachedPlans } from './planStore.js';
 import { SettingsView } from './ui/settingsView.js';
 
@@ -384,6 +386,7 @@ export function App() {
   };
   const toastRef = useRef(toast);
   toastRef.current = toast;
+  setListenNotice((message) => toastRef.current(message, { kind: 'error' }));
   // Local mode, and Tracker Editor moved the data on this device to GitHub: offer to follow it.
   useEffect(() => {
     movedTo().then(
@@ -619,6 +622,10 @@ export function App() {
     'go-docs': () => go({ view: 'list', type: 'doc' }),
     'go-projects': () => go({ view: 'projects' }),
     'go-days': () => go({ view: 'days' }),
+    'item-listen': () => (modalRef.current || document.activeElement?.closest?.('.item-window') ? window.dispatchEvent(new Event('item:listen')) : toast('Open an item, then Listen (L) reads it to you.')),
+    'listen-pause': () => toggleReading(),
+    'listen-stop': () => stopReading(),
+    'listen-settings': () => (go({ view: 'settings' }), scrollToWhenShown('read-aloud')),
     settings: () => go({ view: 'settings' }),
     search: () => searchRef.current?.focus(),
     'clear-search': () => setQuery(''),
@@ -908,6 +915,7 @@ export function App() {
     ${help &&
     html`<${HelpDialog} tab=${help.tab} query=${help.query} onTab=${(tab) => setHelp((helpRef.current = { ...help, tab }))} onClose=${() => closeHelp()}
       onRun=${modal ? null : (command) => closeHelp(() => actionsRef.current.command(command.id))} />`}
+    <${ListenBar} />
     <${Toasts} toasts=${toasts} onDismiss=${dismissToast} />
     ${fileDrag &&
     html`<div class="drop-overlay"><div><${Icon} name="upload" size=${40} /><p>Drop Markdown files to add them to your reading list</p></div></div>`}

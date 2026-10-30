@@ -7,6 +7,7 @@ import { renderMarkdown } from '../markdown.js';
 import { attachmentKind, fileKind, formatBytes, isTextAttachment, toggleChecklistItem } from '../model.js';
 import { store } from '../store.js';
 import { Icon } from './icons.js';
+import { ListenButton, sourceOf } from './listen.js';
 import { EditorLink, Segmented } from './components.js';
 
 const MIME = { markdown: 'text/markdown', html: 'text/html', svg: 'image/svg+xml', text: 'text/plain' };
@@ -37,6 +38,7 @@ function FileView({ file, onSaved, onError, onRemove }) {
   // sha last stored in the repo, `wanted` what the reader shows. One save at a
   // time, always of the latest text, so quick ticks coalesce.
   const sync = useRef({ sha: '', saved: null, wanted: null, busy: false });
+  const viewRef = useRef(null);
 
   useEffect(() => {
     const s = sync.current;
@@ -97,13 +99,17 @@ function FileView({ file, onSaved, onError, onRemove }) {
   // Sandboxed with no permissions: the artifact's scripts, forms and links stay inert.
   else body = html`<iframe class="file-frame" sandbox="" srcdoc=${state.text} title=${file.name} referrerpolicy="no-referrer" />`;
 
-  return html`<div class="file-view">
+  // Listen: the document as shown (Markdown, or a text file as it is), from where it is scrolled to.
+  const readable = state.status === 'ready' && ((mode === 'preview' && kind === 'markdown') || (mode === 'source' && kind === 'text'));
+  return html`<div class="file-view" ref=${viewRef}>
     <div class="file-toolbar">
       ${kind !== 'text' &&
       html`<${Segmented} small label="View" value=${mode} onChange=${setMode}
         options=${[{ id: 'preview', label: 'Preview', icon: 'eye' }, { id: 'source', label: 'Source', icon: 'doc' }]} />`}
       ${kind === 'html' && mode === 'preview' && html`<span class="muted small">Scripts are disabled in the preview.</span>`}
       <span class="spacer" />
+      ${readable && html`<${ListenButton} readKey=${`file:${file.path}`} name=${file.name} title="Listen to this document, the sentence marked as it goes"
+        source=${() => sourceOf(viewRef.current?.querySelector('.file-markdown, .file-source'))} />`}
       <${EditorLink} route=${{ kind: 'repo', path: file.path }} className="btn ghost sm" title="Edit this file in Tracker Editor; your changes come back here">
         <${Icon} name="code" size=${15} />Edit in editor
       </${EditorLink}>

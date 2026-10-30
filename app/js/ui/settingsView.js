@@ -12,6 +12,7 @@ import { Icon } from './icons.js';
 import { Segmented, SyncBadge } from './components.js';
 import { NotificationsCard } from './notificationsCard.js';
 import { ModelCard, QuickAddCard } from './modelCard.js';
+import { ReadAloudCard } from './readAloudCard.js';
 
 const SETUP_PREFIX = 'tracker-setup:';
 const SYNC_FIELDS = ['owner', 'repo', 'branch', 'path', 'device', 'autoSync'];
@@ -391,6 +392,7 @@ export function SettingsView({ sync, actions, items, installPrompt, onInstall, t
     <${EditorCard} />
     <${ModelCard} actions=${actions} />
     <${QuickAddCard} />
+    <${ReadAloudCard} settings=${getSettings()} actions=${actions} />
     <${NotificationsCard} actions=${actions} />
     <${Card} title="Appearance" icon="eye">
       <${Segmented} label="Theme" value=${theme} onChange=${(t) => saveSettings({ theme: t })}

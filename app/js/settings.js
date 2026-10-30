@@ -67,12 +67,29 @@ export const DEFAULT_SETTINGS = {
   smartAdd: true,
   // Dictation into quick add (phones): a BCP 47 language, '' = the device's.
   dictationLang: '',
+  // Listening (as in Tracker Editor, reader.js): the device's voices (a voice URI, '' = the best one
+  // for the text's language) or a speech server with an OpenAI-compatible API, and the speed.
+  tts: {
+    engine: 'device',
+    voice: '',
+    // An Android app's text-to-speech engine (a package), '' = the phone's preferred one.
+    androidEngine: '',
+    rate: 1,
+    // otherVoices: voices for other languages, as "es=ef_dora, pt=pf_dora" (Kokoro voices speak one language each).
+    // The server's API key is a secret (TTS_KEY_SECRET), sent only to the origin it was saved for (`keyOrigin`).
+    server: { baseUrl: 'http://localhost:8880/v1', apiKey: '', keyOrigin: '', model: 'kokoro', voice: 'af_heart', otherVoices: 'es=ef_dora, pt=pf_dora', instructions: '' },
+  },
 };
 
 let settings = { ...DEFAULT_SETTINGS };
 try {
   const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}');
-  settings = { ...DEFAULT_SETTINGS, ...saved, llm: { ...DEFAULT_SETTINGS.llm, ...saved.llm, webhook: { ...DEFAULT_SETTINGS.llm.webhook, ...saved.llm?.webhook } } };
+  settings = {
+    ...DEFAULT_SETTINGS,
+    ...saved,
+    llm: { ...DEFAULT_SETTINGS.llm, ...saved.llm, webhook: { ...DEFAULT_SETTINGS.llm.webhook, ...saved.llm?.webhook } },
+    tts: { ...DEFAULT_SETTINGS.tts, ...saved.tts, server: { ...DEFAULT_SETTINGS.tts.server, ...saved.tts?.server } },
+  };
   // Installs from before local mode that sync with GitHub stay on it.
   if (!saved.storage) settings = { ...settings, storage: saved.owner && saved.repo ? 'github' : 'local' };
 } catch {
@@ -84,7 +101,12 @@ const listeners = new Set();
 export const getSettings = () => settings;
 
 export function saveSettings(patch) {
-  settings = { ...settings, ...patch, llm: { ...settings.llm, ...patch.llm, webhook: { ...settings.llm.webhook, ...patch.llm?.webhook } } };
+  settings = {
+    ...settings,
+    ...patch,
+    llm: { ...settings.llm, ...patch.llm, webhook: { ...settings.llm.webhook, ...patch.llm?.webhook } },
+    tts: { ...settings.tts, ...patch.tts, server: { ...settings.tts.server, ...patch.tts?.server } },
+  };
   try {
     localStorage.setItem(KEY, JSON.stringify(settings));
   } catch {
@@ -131,8 +153,18 @@ export async function setToken(value) {
 }
 
 // Other secrets (the model service's API key and webhook secret, the API key of each model
-// connection: providers.js), kept like the token.
-export const SECRET_NAMES = ['llm-api-key', 'llm-webhook-secret', ...LLM_KEY_SECRETS];
+// connection: providers.js, the speech server's key), kept like the token.
+export const TTS_KEY_SECRET = 'tts-server-key';
+export const SECRET_NAMES = ['llm-api-key', 'llm-webhook-secret', ...LLM_KEY_SECRETS, TTS_KEY_SECRET];
+
+/** The origin of a server address ('' when it is not one). */
+export function originOf(url) {
+  try {
+    return new URL(String(url ?? '').trim()).origin;
+  } catch {
+    return '';
+  }
+}
 const secretCache = new Map();
 
 export async function getSecret(name) {

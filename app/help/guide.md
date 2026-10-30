@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 1.17.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 1.18.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -94,6 +94,7 @@ The **Your day** card on the Overview asks your model (section 9) to **Plan my d
 - **By itself:** tick **Settings → Model → Make and update today's plan by itself** (off at first). The plan is then made the first time the app is open each day (from 6:00) and updated after you finish, start or add items, at most every 2 hours, while the app is open. Each one is a request to your model.
 - **Above List and Board** today's plan shows as a strip over the items, a few lines of it: click it to read it all, or **Update** it there. **×** hides it in that view (List and Board apart, on each device); **Today's plan** in the toolbar brings it back.
 - **No model?** Ask Claude with the connector: *"plan my day in my tracker"* (section 11). It is kept the same way, marked as made by Claude.
+- **Listen** to it: the speaker on the card, the strip or in Days (see [Listen](#listen)).
 
 ### Days: looking back
 
@@ -162,6 +163,20 @@ Press the pencil (or **E**) to edit, or the pin (or **P**) to pin it (section 6)
 - **Tags** are chips: type one and press Enter (Backspace in an empty field removes the last one). Suggestions come from tags you already use.
 - **Documents:** paste text, use **Import file**, or drop Markdown files onto the window to add them to your reading list.
 - Save with **Ctrl+Enter** (**Cmd+Enter** on a Mac); **Esc** closes (and asks before dropping unsaved changes). Deleting an item or marking it done shows an **Undo** button for a few seconds. Saving changes only what you changed, so an edit made meanwhile somewhere else stays.
+
+### Listen
+
+The speaker in an open item's bar (or **L**) reads it to you: the title, the notes, the document open in it and the comments, each with who wrote it. It reads what the item shows, not its buttons, fields or dates; code is announced, not read.
+
+- **The sentence being read is marked**, and the item scrolls to keep it in view.
+- It starts at the title, or where you have scrolled to, or with the words you selected.
+- **The player** at the bottom: **◀ ▶** the sentence before or after, **play/pause**, the speed (**1×**, click for faster), the voice, and **×** to stop. The speaker in the item pauses and goes on too.
+- Reading stops when you close the item or start editing it. Each item window reads on its own (desktop).
+- **Plans and documents:** the speaker on the Overview's plan card, the strip above List and Board and the plans in **Days** reads that plan or review; **Listen** in a document's bar (Markdown or text files in an item) reads only that document.
+- **The voice:** **Settings → Read aloud**, the same as in Tracker Editor:
+  - **This device:** the voices of your phone or computer, the most natural one for the text's language unless you pick one. The list shows them by name, accent and voice (female or male), the text's language first; ▶ plays one. How human it sounds depends on the voices installed (the card says how to get better ones).
+  - **Speech server:** natural voices from **Kokoro** on your computer (free, nothing leaves it) or **OpenAI** (with your key), or another server with an OpenAI-compatible API. Its key stays in this device's secure storage and goes only to that server. In a browser, a server on your computer is reachable only from that computer; the desktop app also reaches one elsewhere on your network.
+- With a speech server, your phone's or computer's media controls (lock screen, keyboard keys) pause and skip too.
 
 ### Find in an item
 
@@ -328,6 +343,7 @@ Press **F1** or **?** to open Help: **Commands and shortcuts** lists everything 
 | **E** | Edit the open item |
 | **P** | Pin or unpin the open item |
 | **C** | Comment on the open item |
+| **L** | Listen to the open item (again: pause or go on) |
 | **W** | Open the open item in a window (desktop) |
 | **Ctrl+click** · middle-click | Open an item in a window (desktop) |
 | **Ctrl+Enter** | Save the item |
@@ -351,6 +367,8 @@ On a Mac, use **Cmd** for **Ctrl**.
 | The model doesn't answer | Settings → Model → **Test and list models**. A local server must be running; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS`). With an AI provider: check the key and that the account has credit; a provider that refuses requests from web pages works from the desktop app. |
 | Claude doesn't see my comment | Claude reads your data repo: the device you commented on must be set up with GitHub sync and have synced (the badge says *Synced*). On a device that keeps its data on this computer, the connector can't reach it. |
 | A link from Claude opens the browser, not the app | Click **Open in the app** in the message the page shows (needs the desktop app 1.11 or later), or paste the link in the app's search box. |
+| Listen says it cannot read aloud, or nothing is heard | The browser has no voices: try another browser (Edge and Chrome have good ones), install voices (Settings → Read aloud says how), or use a speech server. |
+| "Could not reach the speech server" | Kokoro (or your server) isn't running, or the address is wrong. In a browser, a server at `localhost` works only on that computer; use the desktop app, or an https server like OpenAI. |
 | The plan doesn't update by itself | It needs the setting on (Settings → Model), a model connected and the app open (in a browser, its tab in front); it waits 2 hours after the last plan and for an item done, started or added since. |
 | Days shows no plan for a day | Only plans made from 1.17 on are kept. On a device that keeps its data on this computer, Claude's plans don't reach it. |
 | A file shows an upload arrow | It is waiting to upload from that device (it was added offline, or the upload failed). It goes up with the next sync; until then other devices say it isn't there yet. |

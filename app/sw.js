@@ -1,6 +1,6 @@
 // Offline support: precache the app shell, then serve network-first so updates
 // show up immediately when online. GitHub API calls are never intercepted.
-const CACHE = 'tracker-v1.17.0';
+const CACHE = 'tracker-v1.18.0';
 const ASSETS = [
   './',
   'index.html',
@@ -22,6 +22,7 @@ const ASSETS = [
   'js/changes.js',
   'js/commands.js',
   'js/devices.js',
+  'js/docSpeech.js',
   'js/editorLinks.js',
   'js/files.js',
   'js/localRepo.js',
@@ -43,7 +44,9 @@ const ASSETS = [
   'js/planStore.js',
   'js/push.js',
   'js/quickAddPage.js',
+  'js/reader.js',
   'js/settings.js',
+  'js/speech.js',
   'js/store.js',
   'js/sync.js',
   'js/syncManager.js',
@@ -60,12 +63,17 @@ const ASSETS = [
   'js/ui/itemFind.js',
   'js/ui/itemModal.js',
   'js/ui/itemWindows.js',
+  'js/ui/listen.js',
   'js/ui/modelCard.js',
   'js/ui/notificationsCard.js',
   'js/ui/plans.js',
   'js/ui/projects.js',
+  'js/ui/readAlong.js',
+  'js/ui/readAloud.js',
+  'js/ui/readAloudCard.js',
   'js/ui/settingsView.js',
   'js/ui/views.js',
+  'js/ui/voicePicker.js',
   'vendor/anthropic.js',
   'vendor/marked.js',
   'vendor/preact-htm.js',

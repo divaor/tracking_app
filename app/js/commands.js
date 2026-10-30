@@ -4,7 +4,7 @@
 // commands that exist only there. Rows with `run: false` are things done in place: they
 // show `keys`, `code` (what to type) or `how`. Pure, so the Node tests can check it.
 
-export const COMMAND_GROUPS = ['Items', 'Go to', 'Search and filter', 'In an item', 'Item windows', 'Quick add', 'The model', 'App'];
+export const COMMAND_GROUPS = ['Items', 'Go to', 'Search and filter', 'In an item', 'Item windows', 'Quick add', 'The model', 'Listen', 'App'];
 
 /** [{ id, group, label, keys?, desktop?, mac?, only?, code?, how?, hint?, run? }] */
 export const COMMAND_LIST = [
@@ -44,6 +44,7 @@ export const COMMAND_LIST = [
   { id: 'item-attach', group: 'In an item', label: 'Attach files or pictures to the open item', how: 'Attach under the notes, drop files on the item, or paste a picture', run: false, hint: 'Pictures show in the item; PDFs and documents open with their program or in Tracker Editor' },
   { id: 'item-pictures', group: 'In an item', label: 'Go through an item’s pictures (shown large)', keys: '← →', run: false, hint: 'Click a picture first; Esc closes it' },
   { id: 'item-find', group: 'In an item', label: 'Find in the open item (its notes, the file shown, comments): Enter next, Shift+Enter previous', keys: 'Mod+F · /', run: false, hint: 'Or the magnifier in the item’s bar; opened from a search, it finds those words' },
+  { id: 'item-listen', group: 'In an item', label: 'Listen to the open item: its title, notes, the document shown and the comments, the sentence marked as it goes', keys: 'L', hint: 'Or the speaker in the item’s bar; from where it is scrolled to, or the selection' },
   { id: 'item-pin', group: 'In an item', label: 'Pin or unpin the open item (it comes first in the lists it shows in, and on the Overview)', keys: 'P', run: false, hint: 'Or the pin on a pinned item' },
   { id: 'item-comment', group: 'In an item', label: 'Comment on the open item (for Claude, or a note); Ctrl+Enter posts it', keys: 'C', run: false, hint: 'Claude reads the comments of any item through the connector' },
   { id: 'item-save', group: 'In an item', label: 'Save', keys: 'Mod+Enter', run: false },
@@ -75,6 +76,13 @@ export const COMMAND_LIST = [
   { id: 'plan-day', group: 'The model', label: 'Plan my day' },
   { id: 'plan-week', group: 'The model', label: 'Review my week' },
   { id: 'model-settings', group: 'The model', label: 'Connect a model (Ollama, LM Studio or a service)' },
+
+  { id: 'listen-pause', group: 'Listen', label: 'Pause or go on reading aloud' },
+  { id: 'listen-stop', group: 'Listen', label: 'Stop reading aloud' },
+  { id: 'listen-skip', group: 'Listen', label: 'The sentence before or after', how: 'The ◀ ▶ in the player at the bottom', run: false },
+  { id: 'listen-plan', group: 'Listen', label: 'Listen to today’s plan or the week’s review', how: 'The speaker on the plan (the Overview, above List and Board, Days)', run: false },
+  { id: 'listen-document', group: 'Listen', label: 'Listen to a document attached to an item', how: 'Listen in the document’s bar', run: false },
+  { id: 'listen-settings', group: 'Listen', label: 'Choose the voice and speed, or a speech server (Kokoro, OpenAI)', hint: 'Settings → Read aloud' },
 
   { id: 'help', group: 'App', label: 'Help: commands and shortcuts', keys: 'F1 · ?' },
   { id: 'help-guide', group: 'App', label: 'The guide' },

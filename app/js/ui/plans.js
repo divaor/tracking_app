@@ -8,6 +8,7 @@ import { changedSince, changesSince, describeChanges, emptyPlans, planVersions }
 import { cachedPlans, loadPlans, onPlans, savePlan } from '../planStore.js';
 import { getSettings, saveSettings } from '../settings.js';
 import { Icon } from './icons.js';
+import { ListenButton, sourceOf } from './listen.js';
 
 const LABELS = { day: { title: 'Your day', make: 'Plan my day', update: 'Update', name: 'plan' }, week: { title: 'Your week', make: 'Review my week', update: 'Update', name: 'review' } };
 // Updates by themselves: at most this often, and after this hour for the first plan of the day.
@@ -133,6 +134,7 @@ export function PlanBody({ entry, streaming = null, clamp = false }) {
 export function PlanCard({ items, today }) {
   const plans = usePlans(today);
   const run = useRunningPlan();
+  const card = useRef(null);
   const [kind, setKind] = useState(() => (plans.week && !plans.day ? 'week' : 'day'));
   const ready = modelReady() && items.length > 0;
   // A plan being written for this day shows here, on its tab.
@@ -144,7 +146,8 @@ export function PlanCard({ items, today }) {
   const entry = plans[kind];
   const label = LABELS[kind];
   const ask = (update) => makePlan(kind, { items, today, update });
-  return html`<section class="plan-card" aria-label="Plan with the model">
+  const asking = writing?.kind === kind && writing.status === 'asking';
+  return html`<section class="plan-card" aria-label="Plan with the model" ref=${card}>
     <div class="plan-head">
       <h2><${Icon} name="sparkle" size=${17} />${label.title}</h2>
       <div class="plan-tabs" role="tablist" aria-label="Plan or review">
@@ -159,6 +162,8 @@ export function PlanCard({ items, today }) {
         ? html`<button type="button" class="btn sm" onClick=${stopPlan}><${Icon} name="stop" size=${14} />Stop</button>`
         : html`<button type="button" class="btn sm ${entry ? '' : 'primary'}" title=${entry ? `Ask again with what changed since ${clock(entry.at)}` : ''} onClick=${() => ask(Boolean(entry))}>
             <${Icon} name=${entry ? 'sync' : 'sparkle'} size=${14} />${entry ? label.update : label.make}</button>`)}
+      ${entry && !asking && html`<${ListenButton} readKey=${`plan:${today}:${kind}`} name=${kind === 'day' ? 'Today’s plan' : 'This week’s review'} label=${false} className="icon-btn sm"
+        title=${`Listen to ${kind === 'day' ? 'the plan' : 'the review'}`} source=${() => sourceOf(card.current?.querySelector('.plan-text'), { fromStart: true })} />`}
       <a class="icon-btn sm" href="#/days" title="Past days: plans, what got done" aria-label="Past days"><${Icon} name="calendar" size=${16} /></a>
     </div>
     ${writing?.kind === kind && writing.status === 'asking'
@@ -179,13 +184,14 @@ export function PlanStrip({ view, items, today }) {
   const plans = usePlans(today);
   const run = useRunningPlan();
   const [open, setOpen] = useState(false);
+  const strip = useRef(null);
   const hidden = Boolean(getSettings().planStripHidden?.[view]);
   const entry = plans.day;
   const writing = run && run.date === today && run.kind === 'day' ? run : null;
   const ready = modelReady() && items.length > 0;
   if (hidden || (!entry && !writing && !ready)) return null;
   const hide = () => saveSettings({ planStripHidden: { ...getSettings().planStripHidden, [view]: true } });
-  return html`<section class="plan-strip ${open ? 'open' : ''}" aria-label="Today's plan">
+  return html`<section class="plan-strip ${open ? 'open' : ''}" aria-label="Today's plan" ref=${strip}>
     <div class="plan-strip-head">
       <button type="button" class="plan-strip-toggle" aria-expanded=${open} onClick=${() => setOpen(!open)} disabled=${!entry && !writing}>
         <${Icon} name="sparkle" size=${15} /><strong>Today's plan</strong>
@@ -199,6 +205,8 @@ export function PlanStrip({ view, items, today }) {
         ? html`<button type="button" class="btn ghost sm" onClick=${stopPlan}><${Icon} name="stop" size=${13} />Stop</button>`
         : html`<button type="button" class="btn ghost sm" onClick=${() => (setOpen(true), makePlan('day', { items, today, update: Boolean(entry) }))}>
             <${Icon} name=${entry ? 'sync' : 'sparkle'} size=${13} />${entry ? 'Update' : 'Plan my day'}</button>`)}
+      ${entry && writing?.status !== 'asking' && html`<${ListenButton} readKey=${`plan:${today}:day:${view}`} name="Today’s plan" label=${false} className="icon-btn sm"
+        title="Listen to the plan" before=${() => setOpen(true)} source=${() => sourceOf(strip.current?.querySelector('.plan-text'), { fromStart: true })} />`}
       <button type="button" class="icon-btn sm" title="Hide it here (the toolbar's Today's plan shows it again)" aria-label="Hide today's plan" onClick=${hide}><${Icon} name="x" size=${15} /></button>
     </div>
     ${writing?.status === 'asking'

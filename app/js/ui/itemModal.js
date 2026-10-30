@@ -28,6 +28,8 @@ import { ProjectChip, TagInput } from './projects.js';
 import { FilesPanel, useFileDrop } from './fileViewer.js';
 import { ItemAssistant } from './assist.js';
 import { FindBar } from './itemFind.js';
+import { ITEM_NOT_READ, ListenButton, listen, sourceOf } from './listen.js';
+import { getReaderState, stopReading } from '../reader.js';
 
 const NOTES_PLACEHOLDER = {
   task: 'Details, links, or a checklist:\n- [ ] first step\n- [ ] second step',
@@ -459,6 +461,14 @@ export function ItemPanel({
     const n = frame === 'modal' ? '' : `-${++panelSeq}`;
     return { title: `modal-title${n}`, form: `item-form${n}`, projects: `project-options${n}` };
   }, []);
+  // Listen (L): the item as shown, from its title (or from where it is scrolled to, or the selection).
+  const readKey = `item:${ids.title}`;
+  const readSource = () => sourceOf(dialogRef.current, { scroller: bodyRef.current, notRead: ITEM_NOT_READ });
+  const listenHere = () => item && listen(readKey, item.title || 'Untitled', readSource);
+  // Editing replaces what is read.
+  useEffect(() => {
+    if (editing && getReaderState().key === readKey) stopReading();
+  }, [editing]);
 
   const startEdit = () => {
     const d = toDraft(item);
@@ -518,6 +528,7 @@ export function ItemPanel({
     else if (editing && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save();
     else if (!editing && plainKey(e, 'e')) startEdit();
     else if (!editing && plainKey(e, 'p')) actions.togglePin(item);
+    else if (!editing && plainKey(e, 'l')) listenHere();
     else if (!editing && (plainKey(e, '/') || ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'f'))) openFind();
     else if (!editing && onPopOut && plainKey(e, 'w')) popOut();
     else if (!editing && plainKey(e, 'c')) {
@@ -532,7 +543,13 @@ export function ItemPanel({
   useEffect(() => {
     const onFind = () => !editing && (frame === 'modal' || dialogRef.current?.contains(document.activeElement)) && openFind();
     window.addEventListener('item:find', onFind);
-    return () => window.removeEventListener('item:find', onFind);
+    // The command Listen: the dialog, or the window that has the focus.
+    const onListen = () => !editing && (frame === 'modal' || dialogRef.current?.contains(document.activeElement)) && listenHere();
+    window.addEventListener('item:listen', onListen);
+    return () => {
+      window.removeEventListener('item:find', onFind);
+      window.removeEventListener('item:listen', onListen);
+    };
   });
   // A layout effect, so the keys work the moment the dialog shows (also when a link replaces its item).
   useLayoutEffect(() => {
@@ -557,7 +574,9 @@ export function ItemPanel({
           : html`<${TypeBadge} type=${item.type} kind=${item.kind} />`}
         <span class="spacer" />
         ${!editing &&
-        html`<button type="button" class="icon-btn ${find !== null ? 'on' : ''}" title="Find in this item (Ctrl+F)" aria-label="Find in this item"
+        html`<${ListenButton} readKey=${readKey} name=${item.title || 'Untitled'} source=${readSource} label=${false} className="icon-btn" size=${18}
+            title="Listen (L): read it aloud, the sentence marked as it goes" />
+          <button type="button" class="icon-btn ${find !== null ? 'on' : ''}" title="Find in this item (Ctrl+F)" aria-label="Find in this item"
             aria-pressed=${find !== null} onClick=${() => (find === null ? openFind() : closeFind())}><${Icon} name="search" /></button>
           <${HeadMenu} />
           <button type="button" class="icon-btn pin-toggle ${item.pinned ? 'on' : ''}" title=${item.pinned ? 'Unpin (P)' : 'Pin to the top of its project (P)'}
