@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 2.0.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 2.1.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -220,6 +220,7 @@ Any item can carry files: photos, screenshots, PDFs, Word, Excel and PowerPoint 
 - Files are kept with your data, next to Claude's documents (`files/` in your data repo, or the data on this device), so every device and Claude see them. A file added without a connection shows an upload arrow and goes up with the next sync.
 - The bin on a file (or in the large picture) removes it from the item, with **Undo**. Its versions stay in the data repo's history.
 - Lists and board cards show 📎 and how many files an item has. File names count in search.
+- **Claude can attach them too**: ask it to attach a screenshot, a chart or a PDF to an item (section 11).
 
 ### Comments
 
@@ -299,6 +300,7 @@ In any Claude chat or Claude Code session with the Tracker connector on, just sa
 | "Update tasks on my tracker: the login fix is done" | Finds the items and changes their status, notes or dates. |
 | "Pin the release checklist in my tracker" / "Unpin it" | Pins or unpins items, so they stay on top of their project (section 6). |
 | "Log this session as Claude work on my tracker" | Adds a Claude work item with a link to the session or PR. |
+| "Attach this screenshot to the checkout task in my tracker" | Attaches the picture (or a PDF or any file up to 10 MB) to the item, shown like your own. From Claude Code it sends files from your computer (a screenshot it took, a chart it made); in a chat, files from a public link. A file of the same name is replaced. |
 | "For this conversation use project Platform in my tracker and tag with the repos you touch" | Files everything it adds or sends under Platform and tags each item with the repositories involved, creating them if needed. |
 | "What's on my tracker?" / "What's left open?" | Summarizes counts, what's in progress, what's due and what's waiting for review. |
 | "Check my tracker for feedback on the proposal and revise it" | Reads your decision and feedback and sends a new version. |
@@ -330,7 +332,7 @@ Tracker Editor (https://github.com/divaor/tracker-editor) is the companion text 
 
 You can be notified when:
 
-- Claude sends a **document to review** (or a new version), or stores a file.
+- Claude sends a **document to review** (or a new version), or **attaches** a picture or file to an item.
 - Claude **adds, updates, completes or deletes** items, or **answers in the comments** (the notification shows the start of its comment).
 - On the desktop, an item changes **on one of your other devices**, for example a task you completed on your phone.
 

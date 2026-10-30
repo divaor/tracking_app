@@ -7,6 +7,7 @@ import { createMcpServer } from './protocol.js';
 import { createHttpHandler } from './router.js';
 import { createTracker } from './tracker.js';
 import { createTools, INSTRUCTIONS, PROMPTS, SERVER_INFO } from './tools.js';
+import { createUploads } from './uploads.js';
 
 export function readConfig(env = {}) {
   const [owner = '', repo = ''] = String(env.TRACKER_REPO ?? '').trim().split('/');
@@ -79,8 +80,9 @@ export function createServerFromEnv(env, { fetchImpl, defer = (p) => p.catch((er
     const onChange = (events) => {
       if (notifier && events.length) defer(notifier.notify(events));
     };
-    return createTracker({ client: github(), ...config, onChange });
+    return createTracker({ client: github(), ...config, onChange, fetchImpl });
   };
-  const handle = createMcpServer({ info: SERVER_INFO, instructions: INSTRUCTIONS, tools: createTools(getTracker), prompts: PROMPTS });
-  return { config, handle, notifier, http: createHttpHandler({ handle, config, notifier, oauthStore, fetchImpl }) };
+  const uploads = config.secret.length >= 16 ? createUploads({ secret: config.secret, store: oauthStore }) : null;
+  const handle = createMcpServer({ info: SERVER_INFO, instructions: INSTRUCTIONS, tools: createTools(getTracker, { uploads }), prompts: PROMPTS });
+  return { config, handle, notifier, http: createHttpHandler({ handle, config, notifier, oauthStore, fetchImpl, uploads, getTracker }) };
 }

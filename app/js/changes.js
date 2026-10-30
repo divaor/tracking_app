@@ -10,6 +10,11 @@ const newComments = (item, old) => {
   const seen = new Set((old?.comments ?? []).map((c) => c.id));
   return liveComments(item).filter((c) => !seen.has(c.id));
 };
+/** Files on `item` that `old` did not have (by path). */
+const newFiles = (item, old) => {
+  const had = new Set((old?.files ?? []).map((f) => f.path));
+  return (item.files ?? []).filter((f) => !had.has(f.path));
+};
 const isReviewDoc = (item) => item.type === 'doc' && ((item.files ?? []).length > 0 || ['proposal', 'artifact'].includes(item.kind));
 
 /**
@@ -45,8 +50,12 @@ export function describeChanges(before, after, { self = '' } = {}) {
       const last = added.at(-1);
       const author = last.by === CLAUDE_AUTHOR ? CLAUDE_AUTHOR : last.by || who;
       events.push({ ...base, category: 'items', title: `${author} commented on “${clip(item.title, 60)}”`, body: clip(last.text.replace(/\s+/g, ' ')) });
-    } else if (fileSignature(item) !== fileSignature(old) && (item.files ?? []).length) {
+    } else if (fileSignature(item) !== fileSignature(old) && (item.files ?? []).length && isReviewDoc(item)) {
       events.push({ ...base, category: 'documents', title: 'New version ready to review', body: item.title });
+    } else if (newFiles(item, old).length) {
+      const added = newFiles(item, old);
+      const what = added.length === 1 ? `“${clip(added[0].name, 60)}”` : `${added.length} files`;
+      events.push({ ...base, category: 'items', title: `${who} attached ${what} to a ${noun(item)}`, body: item.title });
     } else if (item.status !== old.status) {
       events.push({ ...base, category: 'items', title: `${who} marked a ${noun(item)} ${statusLabel(item.status, item.type).toLowerCase()}`, body: item.title });
     } else if ((item.decision ?? '') !== (old.decision ?? '') && item.decision) {

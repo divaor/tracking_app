@@ -2,6 +2,7 @@
 // file as the app (through the shared model), plus attached files stored in
 // the data repo. Every write is a commit; conflicting writes are retried.
 import { describeChanges } from '../app/js/changes.js';
+import { decodeBase64, download, looksLikeText, MAX_ATTACH_BYTES, typeFor, withExtension } from './attach.js';
 import { createEditorFiles } from './editor.js';
 import { bytesToBase64 } from '../app/js/github.js';
 import { idFromFragment, itemIdIn } from '../app/js/itemLinks.js';
@@ -19,6 +20,7 @@ import {
   createItem,
   DECISIONS,
   deleteProjectIn,
+  filesFolder,
   formatBytes,
   isTextAttachment,
   KINDS,
@@ -131,8 +133,9 @@ const notTextNote = (f) =>
     archive: 'An archive (zip…): it cannot be read here.',
   })[attachmentKind(f)] ?? 'Not a text file: it cannot be read here.';
 
-export function createTracker({ client, path = 'tracker.json', branch = '', filesDir = 'files', device = 'Claude', appUrl = '', editorUrl = '', now = nowIso, onChange = () => {} }) {
+export function createTracker({ client, path = 'tracker.json', branch = '', filesDir = 'files', device = 'Claude', appUrl = '', editorUrl = '', now = nowIso, onChange = () => {}, fetchImpl }) {
   const ref = branch || undefined;
+  const fetchFile = fetchImpl ?? ((...args) => fetch(...args));
   const dir = filesDir.replace(/^\/+|\/+$/g, '') || 'files';
 
   async function load() {
@@ -178,6 +181,21 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       if (err.status !== 404 && err.status !== 422) throw err;
       if (!branch || !(await client.ensureBranch(branch))) throw err;
       return { ...(await write()), replaced: Boolean(existing) };
+    }
+  }
+
+  // Bytes at filePath (a picture, a PDF…): replacing the version `sha`, or what is there already
+  // (a file left in the folder when it was taken off its item). Returns the new version's sha.
+  async function writeBytes(filePath, bytes, sha, message) {
+    const put = (version) => client.putFileBytes(filePath, { bytes, sha: version, branch: ref, message });
+    try {
+      return (await put(sha)).sha;
+    } catch (err) {
+      if (err.status === 404 && branch && (await client.ensureBranch(branch))) return (await put(sha)).sha;
+      if (!isConflict(err)) throw err;
+      const folder = filePath.split('/').slice(0, -1).join('/');
+      const there = (await client.listDir(folder, ref))?.find((e) => e.path === filePath)?.sha ?? (await client.getFileBytes(filePath, ref))?.sha;
+      return (await put(there)).sha;
     }
   }
 
@@ -537,6 +555,47 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
         return items.map((i) => (targets.has(i.id) ? tombstone(i, at, CLAUDE_AUTHOR) : i));
       }, `Tracker: delete ${ids.length === 1 ? 'an item' : `${ids.length} items`} (via ${device})`);
       return { deleted: removed.map((i) => ({ id: i.id, title: i.title })) };
+    },
+
+    /** The item `key` names (id, title, link or part of the id): its id and title. */
+    async findItem(key) {
+      const item = resolve((await load()).items, key);
+      return { id: item.id, title: item.title, link: link(item.id) };
+    },
+
+    /**
+     * Attaches bytes to an item as the app does (in its folder; pictures shown as pictures),
+     * replacing a file of the same name there. Its status and review stay as they are.
+     */
+    async attachBytes(itemKey, name, bytes, { type = '' } = {}) {
+      const filename = safeFileName(name, '');
+      if (!filename || !/\.[A-Za-z0-9]{1,8}$/.test(filename)) throw new TrackerError('A file name with an extension is needed, e.g. screenshot.png.');
+      if (!bytes?.length) throw new TrackerError('The file is empty.');
+      if (bytes.length > MAX_ATTACH_BYTES) throw new TrackerError(`The file is ${formatBytes(bytes.length)}; the limit is ${formatBytes(MAX_ATTACH_BYTES)}.`);
+      const target = resolve((await load()).items, itemKey);
+      const at = now();
+      const filePath = `${filesFolder(target, dir, at.slice(0, 10))}/${filename}`;
+      const before = target.files.find((f) => f.path === filePath);
+      const message = `Tracker: attach ${filename} to “${target.title}” (via ${device})`;
+      const sha = await writeBytes(filePath, bytes, before?.sha || undefined, message);
+      const kind = attachmentKind({ name: filename });
+      const file = { path: filePath, name: filename, size: bytes.length, sha: sha ?? '', addedAt: at, type: typeFor(filename, type), ...(kind === 'text' && !looksLikeText(bytes) ? { binary: true } : {}) };
+      let saved = null;
+      await commit((items) => {
+        const current = live(items).find((i) => i.id === target.id);
+        if (!current) throw new TrackerError(`“${target.title}” was deleted meanwhile; the file stays in the repo at ${filePath}.`);
+        saved = applyPatch(current, { files: [...current.files.filter((f) => f.path !== filePath), file], updatedBy: CLAUDE_AUTHOR }, at);
+        return items.map((i) => (i.id === current.id ? saved : i));
+      }, message);
+      return { item: withLink(saved), file: { path: filePath, name: filename, kind: attachmentKind(file), size: formatBytes(bytes.length), replaced: Boolean(before) } };
+    },
+
+    /** attach_file with the bytes given: downloaded from source_url, or content_base64. */
+    async attachFile({ item_id: itemKey, filename, source_url: sourceUrl, content_base64: base64 } = {}) {
+      if (sourceUrl && base64) throw new TrackerError('Pass source_url or content_base64, not both.');
+      resolve((await load()).items, itemKey);
+      const got = base64 ? decodeBase64(base64) : await download(sourceUrl, fetchFile);
+      return tracker.attachBytes(itemKey, withExtension(filename || got.name, got.type), got.bytes, { type: got.type });
     },
 
     // Saves a document as a file in the repo and files it on the tracker:

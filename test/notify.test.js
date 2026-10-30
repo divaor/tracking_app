@@ -88,6 +88,16 @@ test('describeChanges names what changed and who changed it', () => {
   ]);
   const version = applyPatch(doc, { files: [{ path: 'files/x/p.md', sha: 'b' }], updatedBy: CLAUDE_AUTHOR });
   assert.equal(describeChanges([doc], [version])[0].title, 'New version ready to review');
+  // Files on other items are attached, not versions to review.
+  const shot = applyPatch(task, { files: [{ path: 'files/y/screen.png', name: 'screen.png', sha: 'c' }], updatedBy: CLAUDE_AUTHOR });
+  assert.deepEqual(
+    describeChanges([task], [shot]).map((e) => [e.category, e.title, e.body]),
+    [['items', 'Claude attached “screen.png” to a task', 'Ship it']],
+  );
+  const two = applyPatch(task, { files: [{ path: 'files/y/a.png', sha: 'c' }, { path: 'files/y/b.pdf', sha: 'd' }], updatedBy: 'Phone' });
+  assert.equal(describeChanges([task], [two])[0].title, 'Phone attached 2 files to a task');
+  const replaced = applyPatch(shot, { files: [{ path: 'files/y/screen.png', name: 'screen.png', sha: 'e' }], updatedBy: CLAUDE_AUTHOR });
+  assert.equal(describeChanges([shot], [replaced])[0].title, 'Claude updated a task');
   assert.equal(describeChanges([task], [tombstone(task, t0, 'Work PC')])[0].title, 'Work PC deleted a task');
   assert.deepEqual(describeChanges([task], [applyPatch(task, { title: 'x', updatedBy: 'Laptop' })], { self: 'Laptop' }), [], 'own changes are skipped');
   assert.equal(summarizeEvents(events).title, 'Claude: 2 changes');

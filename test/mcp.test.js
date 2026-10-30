@@ -45,6 +45,7 @@ test('initialize, tools/list and prompts follow the MCP shape', async () => {
   const { tools } = (await rpc('tools/list')).result;
   assert.deepEqual(tools.map((t) => t.name).sort(), [
     'add_items',
+    'attach_file',
     'delete_items',
     'get_item',
     'get_overview',

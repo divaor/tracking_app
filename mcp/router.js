@@ -4,8 +4,11 @@
 //   /mcp/<secret>        same, for clients that can only take a URL (legacy)
 //   /.well-known/…, /register, /authorize, /token   OAuth (see oauth.js)
 //   /push/config, /push/test                       push notifications
+//   /upload/<token>      a file's bytes for attach_file (PUT, curl -T; the token is the permission)
 import { createGitHubClient } from '../app/js/github.js';
+import { MAX_ATTACH_BYTES } from './attach.js';
 import { createOAuth } from './oauth.js';
+import { UPLOAD_PATH } from './uploads.js';
 
 const TRUSTED_ORIGIN = /^https:\/\/([a-z0-9-]+\.)*(claude\.ai|claude\.com|anthropic\.com)$|^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
@@ -34,7 +37,7 @@ async function mcpPost(request, handle) {
   return json(Array.isArray(body) ? responses : responses[0]);
 }
 
-export function createHttpHandler({ handle, config, notifier = null, oauthStore = null, fetchImpl }) {
+export function createHttpHandler({ handle, config, notifier = null, oauthStore = null, fetchImpl, uploads = null, getTracker = null }) {
   return async function serve(request) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, '') || '/';
@@ -44,6 +47,8 @@ export function createHttpHandler({ handle, config, notifier = null, oauthStore 
     if (request.method === 'OPTIONS' && !path.startsWith('/mcp')) return new Response(null, { status: 204, headers: CORS });
     if (path === '/' && request.method === 'GET') return plain('Tracker MCP connector. Add this address + /mcp to Claude as a custom connector.\n', 200);
     if (!secret || secret.length < 16) return plain('MCP_SECRET is not configured (use at least 16 characters).\n', 500);
+
+    if (path.startsWith(UPLOAD_PATH)) return upload(request, path.slice(UPLOAD_PATH.length));
 
     const oauth = createOAuth({ secret, issuer, redirectHosts: config.redirectHosts, store: oauthStore });
 
@@ -91,8 +96,31 @@ export function createHttpHandler({ handle, config, notifier = null, oauthStore 
     }
 
     if (request.method !== 'POST') return plain('Method not allowed\n', 405, { Allow: 'POST' });
-    return mcpPost(request, handle);
+    return mcpPost(request, (message) => handle(message, { baseUrl: issuer }));
   };
+
+  // A file sent to an upload link from attach_file: attached to the link's item under its name.
+  async function upload(request, token) {
+    if (request.method !== 'PUT' && request.method !== 'POST') return json({ ok: false, error: 'Send the file with PUT (curl -T <file> <link>).' }, 405, { Allow: 'PUT, POST' });
+    if (!uploads || !getTracker) return json({ ok: false, error: 'Uploads are not available on this connector.' }, 404);
+    let claims;
+    try {
+      claims = await uploads.open(token);
+    } catch (err) {
+      return json({ ok: false, error: err.message }, err.status ?? 401);
+    }
+    const tooBig = { ok: false, error: `The file is over the limit of ${MAX_ATTACH_BYTES / 1024 / 1024} MB.` };
+    if (Number(request.headers.get('content-length')) > MAX_ATTACH_BYTES) return json(tooBig, 413);
+    const bytes = new Uint8Array(await request.arrayBuffer());
+    if (bytes.length > MAX_ATTACH_BYTES) return json(tooBig, 413);
+    try {
+      const result = await (await getTracker()).attachBytes(claims.item, claims.name, bytes, { type: request.headers.get('content-type') ?? '' });
+      await claims.spend();
+      return json({ ok: true, ...result });
+    } catch (err) {
+      return json({ ok: false, error: err?.message ?? String(err) }, err?.status >= 500 ? 502 : 400);
+    }
+  }
 
   // Sends a test notification. The app proves it may do so with the GitHub
   // token it already uses for the data repository.

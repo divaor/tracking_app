@@ -32,6 +32,8 @@ devices.json                                     phones/browsers that want push 
 files/2026-10-20-offline-sync-proposal-1a2b3c/   one folder per document
   proposal.md                                    the file Claude sent
   mockup.html                                    more files or later versions
+files/2026-10-30-checkout-page-4d5e6f/           an item's pictures and files (the app's and Claude's)
+  checkout.png                                   a screenshot Claude attached
 ```
 
 Every change is a git commit, for example `Tracker: add proposal “Offline sync” (via Claude)`, so you can see and undo anything Claude did. Sending a new version of a file overwrites it, and the old version stays in the git history.
@@ -179,6 +181,7 @@ Tools:
 - **`update_items`**: changes status, fields and tags, can append notes, records review fields, and adds Claude's comment (`comment`).
 - **`delete_items`**: only used when you explicitly ask.
 - **`send_document`**: saves a proposal or artifact as a file and files it as a doc, or adds a new version to an existing doc.
+- **`attach_file`**: attaches a picture, PDF or any other file (up to 10 MB) to an item, as the app does: downloaded from a public https link (`source_url`), given as base64 (`content_base64`, small files), or, with neither, through an upload link that a shell sends the file to (in Claude Code: `curl -sS -T screenshot.png '<link>'`). A file of the same name on the item is replaced.
 - **`list_editor_files`**, **`search_editor_files`**, **`read_editor_file`**, **`save_editor_file`**: your Tracker Editor files (`editor/index.json` and `editor/files/<id>/<name>` in the data repo). Search covers the 60 most recently changed files. Saving creates a file or replaces its text, name, project or tags; the editor picks it up on its next sync. Files encrypted in the editor are never read or changed.
 
 Prompts (slash commands in Claude Code): `use_project`, `send_proposal`, `update_tracker`, `check_feedback`.
@@ -194,6 +197,7 @@ HTTP endpoints:
 | `/register`, `/authorize`, `/token` | OAuth. |
 | `/push/config` | Public key for push subscriptions (used by the app). |
 | `/push/test` | Sends a test notification. The app authenticates with its GitHub token, and the connector checks that it can access the data repo. |
+| `/upload/<token>` | A file for `attach_file` (PUT, the raw bytes). The token is the permission: signed with a key from `MCP_SECRET`, for one item and one file name, good for 15 minutes, and with `OAUTH_KV` usable once. |
 
 ## Security notes
 
@@ -202,6 +206,7 @@ HTTP endpoints:
   - Redirect targets are limited to Claude and localhost unless you add more.
 - **Rotating** `MCP_SECRET` revokes every token at once.
 - **Push privacy:** notifications are end-to-end encrypted to each device (Web Push, RFC 8291). Push services only see when a notification was sent, not what it says.
+- **Downloads for `attach_file`** go only to public https addresses (not localhost, private networks or link-local addresses such as cloud metadata; each redirect is checked again), carry no credentials, and stop at 10 MB.
 - **Limited reach.** The connector can only touch the data file, `devices.json`, the `files/` folder and the editor's `editor/` folder of the one repository its token allows. Scripts in HTML artifacts never run in the app's preview.
 - **Easy to undo.** Claude is told never to delete without you asking, and every change is a revertible commit.
 

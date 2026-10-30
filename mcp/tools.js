@@ -2,47 +2,50 @@
 // wording here is what lets Claude act on requests like "send this proposal
 // to my tracker" from any chat or Claude Code session.
 import { APP_VERSION } from '../app/js/version.js';
+import { MAX_ATTACH_BYTES } from './attach.js';
 import { MAX_PLAN_DAYS } from './tracker.js';
-import { AREAS, DECISIONS, KINDS, PRIORITIES, STATUSES, TYPE_IDS } from '../app/js/model.js';
+import { UPLOAD_MINUTES } from './uploads.js';
+import { AREAS, DECISIONS, KINDS, PRIORITIES, STATUSES, TYPE_IDS, safeFileName } from '../app/js/model.js';
 
 export const SERVER_INFO = { name: 'tracker', title: 'Tracker', version: APP_VERSION };
 
-export const INSTRUCTIONS = `Tracker is the user's personal tracker for tasks, ideas, Claude work and documents. They use the Tracker app on their computers and phone. Data lives in a private GitHub repo; every write is a commit.
+export const INSTRUCTIONS = `Tracker is the user's personal tracker for tasks, ideas, Claude work and documents, used in the Tracker app on their computers and phone. Every write is a commit to a private GitHub repo.
 
 Model
 - Item types: task, idea, claude (Claude work: Claude Code sessions, PRs, chats, artifacts), doc (things for the user to read or review).
 - Status: pending → in_progress → done (docs show as To read → Reading → Read).
-- Items can carry files (proposal.md, report.html, pictures…) kept in the repo; read_file shows you a picture.
+- Items can carry files (proposal.md, report.html, pictures…) kept in the repo; read_file shows you a picture, attach_file adds one.
 - The user reviews docs by setting decision (approved | changes | rejected) and writing feedback.
 - Any item can have comments: the user's notes for you (feedback, questions, decisions) and your replies. awaitingReply marks an item whose latest comment is the user's.
-- Each item belongs to at most one project. Projects can be in area work or personal; the user filters by them. Tags are free-form labels; use them for the repositories an item touches.
+- Each item belongs to at most one project. Projects are in area work or personal; the user filters by them. Tags are free-form; use them for the repositories an item touches.
 
 How to handle requests
 - "Send (this) proposal / plan / design to my tracker" → send_document with kind "proposal", the COMPLETE proposal as Markdown in content, and a 2–4 sentence summary. Do not send a shortened version.
 - "Send (this) artifact / file / report / README / doc to my tracker" → send_document with the matching kind, the complete file content, and a filename with the right extension (dashboard.html, notes.md, script.py…).
-- A revised version of something already on the tracker → send_document with item_id (and the same filename to replace it); this puts it back in the user's review queue.
-- "Update tasks on my tracker", "mark X done", "add a task …" → list_items first to find existing items and avoid duplicates, then update_items / add_items. Batch several changes into one call.
+- A revised version of something on the tracker → send_document with item_id (the same filename replaces it); it goes back to the user's review queue.
+- "Update tasks on my tracker", "mark X done", "add a task …" → list_items first to avoid duplicates, then update_items / add_items. Batch changes into one call.
 - "Log / track this Claude work" → add_items with type "claude", kind (code, chat, pr, artifact) and url = the session, PR or artifact link.
 - "What's on my tracker?" → get_overview. "Check my tracker for feedback / comments" → list_items with comments "unanswered" (docs: decision); read them with get_item, act, then reply with update_items comment (what you did or your answer).
 - "Pin / unpin X" → update_items pinned true / false (list_items pinned true lists them).
+- "Attach this screenshot / picture / file to X" → attach_file (in Claude Code: its upload link with curl).
 - "My plan for today", "how did my week go" → get_overview (latestPlan) or get_plans; to make or update one, save_plan.
 
 Projects and tags
 - "For this conversation use project X (and tag with the repos you touch)" → remember it: pass project "X" on every add_items and send_document (and update_items when filing items), and add the names of the repositories involved as tags (in Claude Code: the git repository you work in; one tag per repo).
-- Call list_projects before your first write to reuse the exact existing project and tag spellings. If the project does not exist, create it with save_project (area work or personal; ask if unclear). New tags are created simply by using them.
+- Call list_projects before your first write to reuse the exact project and tag spellings. A new project: save_project (area work or personal; ask if unclear). New tags are created by using them.
 - Without such an instruction, set project only when it is obvious (e.g. an existing project named after the repo).
 
 Tracker Editor files
-- The user's text editor (Tracker Editor) keeps notes, snippets and drafts in the same repo. They are not tracker items; use the *_editor_file(s) tools.
+- The user's text editor (Tracker Editor) keeps notes, snippets and drafts in the same repo. Not tracker items: use the *_editor_file(s) tools.
 - "Save this to my editor" → save_editor_file with a name with extension (notes.md, query.sql…) and the COMPLETE text; project and tags as for items.
-- "Find X in my editor files", "what did I paste about Y" → search_editor_files, then read_editor_file. To change a file, read it, then save_editor_file with its id and the full new text.
+- "Find X in my editor files", "what did I paste about Y" → search_editor_files, then read_editor_file. To change one, read it, then save_editor_file with its id and the full new text.
 - Encrypted files cannot be read or changed here; tell the user to open them in the editor.
 
 Conventions
 - Set url to the most relevant link (Claude session, PR, artifact) when you know it.
 - Keep titles short and specific; put details in notes (Markdown, checklists with "- [ ]").
 - Due dates are YYYY-MM-DD. Reuse existing tags instead of near-duplicates.
-- Never delete items unless the user explicitly asks. After a write, tell the user what changed and give the item link when one is returned.`;
+- Never delete items unless the user explicitly asks. After a write, tell the user what changed and give the item link when there is one.`;
 
 const str = (description) => ({ type: 'string', description });
 const enumOf = (values, description) => ({ type: 'string', enum: values, description });
@@ -63,8 +66,23 @@ const ITEM_FIELDS = {
   pinned: { type: 'boolean', description: 'Pinned items come first in the app (on the overview, and at the top of any list or filter they match). Only when the user asks to pin or unpin.' },
 };
 
-export function createTools(getTracker) {
-  const run = (fn) => async (args) => fn(await getTracker(), args);
+export function createTools(getTracker, { uploads = null } = {}) {
+  const run = (fn) => async (args, context) => fn(await getTracker(), args, context);
+
+  // attach_file without bytes: a link for a shell to send the file to (Claude Code: curl -T).
+  async function uploadLink(t, a, context) {
+    const name = safeFileName(a.filename, '');
+    if (!name || !/\.[A-Za-z0-9]{1,8}$/.test(name)) throw new Error('Give filename (with its extension, e.g. screenshot.png) for the upload link.');
+    if (!uploads || !context?.baseUrl) throw new Error('Upload links need the connector over HTTP. Pass source_url (a public https link) or content_base64 instead.');
+    const item = await t.findItem(a.item_id);
+    const { url, expiresAt } = await uploads.link(context.baseUrl, { item: item.id, name });
+    return {
+      upload: { url, expiresAt, command: `curl -sS -T <path of the file> '${url}'` },
+      item,
+      file: name,
+      note: `Send the file to url within ${UPLOAD_MINUTES} minutes with the command (PUT, the raw bytes). Its answer says where it was attached; a file of the same name on the item is replaced. If this shell cannot reach the url, pass content_base64 instead for a small file.`,
+    };
+  }
   const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
   const write = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
 
@@ -242,6 +260,23 @@ export function createTools(getTracker) {
       },
       annotations: write,
       run: run((t, a) => t.sendDocument(a)),
+    },
+    {
+      name: 'attach_file',
+      title: 'Attach a picture or file to an item',
+      description: `Attach a picture, screenshot, PDF or any other file to an existing item; the user sees it in the item (pictures as pictures, documents to open). A file of the same name on the item is replaced. Give the bytes one of three ways: source_url (a public https link the connector downloads), content_base64 (small files only), or neither: the result is an upload link (valid ${UPLOAD_MINUTES} minutes) to send the file to from a shell, e.g. in Claude Code: curl -sS -T screenshot.png '<link>'. Up to ${MAX_ATTACH_BYTES / 1024 / 1024} MB (larger files: the user attaches them in the app). For a document to review, use send_document.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          item_id: str('The item (id, exact title, link or part of the id). Add it with add_items first if it does not exist.'),
+          filename: str('File name with extension, e.g. login-screen.png, invoice.pdf. Needed for an upload link or base64; from source_url it defaults to the link\'s name.'),
+          source_url: str('A public https address of the file to download (a picture on the web, a raw GitHub file…).'),
+          content_base64: str('The file\'s bytes in base64 (a data: URL works too). Only for small files; in a shell, use the upload link.'),
+        },
+        required: ['item_id'],
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+      run: run((t, a, context) => (a.source_url || a.content_base64 ? t.attachFile(a) : uploadLink(t, a, context))),
     },
     {
       name: 'get_plans',

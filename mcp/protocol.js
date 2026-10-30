@@ -10,7 +10,8 @@ export function createMcpServer({ info, instructions, tools, prompts = [] }) {
   const toolsByName = new Map(tools.map((t) => [t.name, t]));
   const promptsByName = new Map(prompts.map((p) => [p.name, p]));
 
-  return async function handle(message) {
+  // `context` comes from the transport: { baseUrl } when it is HTTP (attach_file's upload links).
+  return async function handle(message, context = {}) {
     if (!message || typeof message !== 'object' || Array.isArray(message) || message.jsonrpc !== '2.0') {
       return fail(message?.id ?? null, -32600, 'Invalid request');
     }
@@ -36,7 +37,7 @@ export function createMcpServer({ info, instructions, tools, prompts = [] }) {
         const tool = toolsByName.get(params.name);
         if (!tool) return fail(id, -32602, `Unknown tool: ${params.name}`);
         try {
-          const result = await tool.run(params.arguments ?? {});
+          const result = await tool.run(params.arguments ?? {}, context);
           // A result with its own content (a picture for Claude to look at) goes as it is.
           if (Array.isArray(result?.mcpContent)) return ok(id, { content: result.mcpContent });
           const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
