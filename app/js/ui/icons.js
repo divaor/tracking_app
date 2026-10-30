@@ -55,6 +55,15 @@ const PATHS = {
   maximize: () => html`<rect x="5" y="5" width="14" height="14" rx="2" />`,
   restore: () => html`<rect x="4" y="8" width="12" height="12" rx="2" /><path d="M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2" />`,
   columns: () => html`<rect x="3" y="4" width="7" height="16" rx="2" /><rect x="14" y="4" width="7" height="16" rx="2" />`,
+  image: () => html`<rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="m21 16-5-5-9 9" />`,
+  camera: () => html`<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" /><circle cx="12" cy="13.5" r="3.5" />`,
+  pdf: () => html`<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /><path d="M8.5 16v-4h1.2a1.2 1.2 0 0 1 0 2.4H8.5M13 16v-4h.8a2 2 0 0 1 0 4zM17 12h-1.5v4M15.5 14H17" />`,
+  sheet: () => html`<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M8 12h8v6H8zM8 15h8M12 12v6" />`,
+  media: () => html`<rect x="3" y="5" width="18" height="14" rx="2" /><path d="m10 9 5 3-5 3z" />`,
+  archive: () => html`<rect x="3" y="4" width="18" height="5" rx="1" /><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4" />`,
+  chevronLeft: () => html`<path d="m15 6-6 6 6 6" />`,
+  chevronRight: () => html`<path d="m9 6 6 6-6 6" />`,
+  zoom: () => html`<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5M11 8v6M8 11h6" />`,
 };
 
 export function Icon({ name, size = 18, class: cls = '' }) {

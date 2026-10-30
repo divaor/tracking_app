@@ -37,6 +37,8 @@ export function createMcpServer({ info, instructions, tools, prompts = [] }) {
         if (!tool) return fail(id, -32602, `Unknown tool: ${params.name}`);
         try {
           const result = await tool.run(params.arguments ?? {});
+          // A result with its own content (a picture for Claude to look at) goes as it is.
+          if (Array.isArray(result?.mcpContent)) return ok(id, { content: result.mcpContent });
           const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
           return ok(id, { content: [{ type: 'text', text }] });
         } catch (err) {

@@ -53,3 +53,23 @@ test('search finds an item by its id, or part of it', () => {
   assert.ok(matchesQuery(item, 'mvgtsb4u'));
   assert.ok(!matchesQuery(item, 'mvnxdag2'));
 });
+
+test('idFromFragment: part of an id opens the one item that holds it', async () => {
+  const { idFromFragment } = await import('../app/js/itemLinks.js');
+  const ids = ['mvtquqbr-27e83a7b66f4622d', 'mvu8fw93-7ddb8811a897aa77', 'mvt37e9v-37c2ac6e00e24b96'];
+  assert.equal(idFromFragment('27e83a7b', ids), ids[0]);
+  assert.equal(idFromFragment('  27E83A7B66F4  ', ids), ids[0], 'case and spaces');
+  assert.equal(idFromFragment('mvtquqbr', ids), ids[0], 'the time half, letters only');
+  assert.equal(idFromFragment('mvtquqbr-27e8…', ids), ids[0], 'cut off with an ellipsis');
+  assert.equal(idFromFragment('`7ddb8811`', ids), ids[1], 'in backticks');
+  assert.equal(idFromFragment('mvt', ids), null, 'too short');
+  assert.equal(idFromFragment('mvt37e', ids), ids[2]);
+  assert.equal(idFromFragment('37', ids), null);
+  assert.equal(idFromFragment('ac6e00e2', ids), ids[2]);
+  assert.equal(idFromFragment('e8', ids), null);
+  assert.equal(idFromFragment('quqbr2', ids), null, 'in no id');
+  assert.equal(idFromFragment('tquqbr', ids), null, 'letters only and not a whole half: a word, not an id');
+  assert.equal(idFromFragment('7e', ['aaaaaa-7e0000', 'bbbbbb-7e1111']), null);
+  assert.equal(idFromFragment('aa7e00', ['aa7e00-1', 'aa7e00-2']), null, 'several hold it');
+  assert.equal(idFromFragment('two words', ids), null);
+});

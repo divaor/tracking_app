@@ -3,9 +3,11 @@
 // the data repo. Every write is a commit; conflicting writes are retried.
 import { describeChanges } from '../app/js/changes.js';
 import { createEditorFiles } from './editor.js';
+import { bytesToBase64 } from '../app/js/github.js';
 import {
   addCommentPatch,
   addDays,
+  attachmentKind,
   applyPatch,
   AREAS,
   awaitsClaude,
@@ -16,10 +18,12 @@ import {
   DECISIONS,
   deleteProjectIn,
   formatBytes,
+  isTextAttachment,
   KINDS,
   kindLabel,
   liveComments,
   matchesQuery,
+  mimeOf,
   normalizeItem,
   nowIso,
   parseData,
@@ -44,6 +48,9 @@ import {
 export const MAX_FILE_BYTES = 2 * 1024 * 1024;
 // Keeps results well inside Claude's tool-output limits; read_file pages through longer files.
 export const MAX_READ_CHARS = 90_000;
+// Pictures up to this size are shown to Claude as pictures (what Claude reads in one image).
+export const MAX_PICTURE_BYTES = 3_500_000;
+const SHOWN_PICTURES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const MAX_ATTEMPTS = 4;
 
 export class TrackerError extends Error {}
@@ -108,6 +115,16 @@ const clip = (text, max) => (text.length > max ? `${text.slice(0, max)}…` : te
 
 // `onChange` receives notification events (see app/js/changes.js) after each
 // successful write; the server uses it to send push notifications.
+// What Claude is told about a file it cannot read as text.
+const notTextNote = (f) =>
+  ({
+    image: 'A picture: read_file shows it.',
+    pdf: 'A PDF: it cannot be read here; the user opens it in the tracker or Tracker Editor.',
+    document: 'A document (Word, Excel, PowerPoint, OpenDocument…): it cannot be read here; the user opens it in the tracker.',
+    media: 'Audio or video: it cannot be read here.',
+    archive: 'An archive (zip…): it cannot be read here.',
+  })[attachmentKind(f)] ?? 'Not a text file: it cannot be read here.';
+
 export function createTracker({ client, path = 'tracker.json', branch = '', filesDir = 'files', device = 'Claude', appUrl = '', editorUrl = '', now = nowIso, onChange = () => {} }) {
   const ref = branch || undefined;
   const dir = filesDir.replace(/^\/+|\/+$/g, '') || 'files';
@@ -176,7 +193,7 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
   const link = (id) => (appUrl ? `${appUrl.replace(/#.*$/, '').replace(/\/?$/, '/')}#/item/${id}` : undefined);
   const withLink = (item) => ({ ...summarize(item), link: link(item.id) });
 
-  return {
+  const tracker = {
     // Tracker Editor files, in the same repo; projects use the tracker's spelling.
     editor: createEditorFiles({
       client,
@@ -313,10 +330,15 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
         result.comments = comments.map(commentView);
         if (awaitsClaude(item)) result.awaitingReply = true;
       }
+      result.files = item.files.map((f) => ({ ...f, kind: attachmentKind(f) }));
       if (includeFiles) {
         let budget = MAX_READ_CHARS;
         result.files = [];
         for (const f of item.files) {
+          if (!isTextAttachment(f)) {
+            result.files.push({ ...f, kind: attachmentKind(f), content: undefined, note: notTextNote(f) });
+            continue;
+          }
           const file = await client.getFile(f.path, ref);
           if (!file) {
             result.files.push({ ...f, missing: true });
@@ -331,9 +353,31 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       return result;
     },
 
+    /** A picture as a picture (for Claude to look at), up to MAX_PICTURE_BYTES; other files described. */
+    async readNotText(record) {
+      const kind = attachmentKind(record);
+      const type = mimeOf(record);
+      if (kind === 'image' && SHOWN_PICTURES.includes(type)) {
+        const got = record.sha ? { bytes: await client.getBlobBytes(record.sha).catch(() => null) } : await client.getFileBytes(record.path, ref);
+        if (!got?.bytes) throw new TrackerError(`File not found: ${record.path}`);
+        if (got.bytes.length <= MAX_PICTURE_BYTES) {
+          return {
+            mcpContent: [
+              { type: 'text', text: JSON.stringify({ path: record.path, name: record.name, kind, size: formatBytes(got.bytes.length) }) },
+              { type: 'image', data: bytesToBase64(got.bytes), mimeType: type },
+            ],
+          };
+        }
+        return { path: record.path, name: record.name, kind, size: formatBytes(got.bytes.length), note: `Too large to show here (over ${formatBytes(MAX_PICTURE_BYTES)}): the user sees it in the tracker.` };
+      }
+      return { path: record.path, name: record.name, kind, size: formatBytes(record.size ?? 0), note: notTextNote(record) };
+    },
+
     async readFile(filePath, offset = 0) {
       const p = String(filePath ?? '').replace(/^\/+/, '');
       if (!p.startsWith(`${dir}/`) || p.split('/').includes('..')) throw new TrackerError(`Only files under ${dir}/ can be read. Use the paths listed in an item's files.`);
+      const record = (await load()).items.flatMap((i) => i.files).find((f) => f.path === p) ?? { path: p, name: p.split('/').pop() };
+      if (!isTextAttachment(record)) return tracker.readNotText(record);
       const file = await client.getFile(p, ref);
       if (!file) throw new TrackerError(`File not found: ${p}`);
       const start = Math.min(Math.max(Number(offset) || 0, 0), file.text.length);
@@ -468,4 +512,5 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       return { created: false, replacedFile: written.replaced, item: withLink(saved), file: { path: filePath, size: formatBytes(size) } };
     },
   };
+  return tracker;
 }

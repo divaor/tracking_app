@@ -11,7 +11,7 @@ export const INSTRUCTIONS = `Tracker is the user's personal tracker for tasks, i
 Model
 - Item types: task, idea, claude (Claude work: Claude Code sessions, PRs, chats, artifacts), doc (things for the user to read or review).
 - Status: pending → in_progress → done (docs show as To read → Reading → Read).
-- Docs can carry files (proposal.md, report.html, …) stored in the repo; the user reads them in the app.
+- Items can carry files (proposal.md, report.html, pictures…) kept in the repo; the user reads them in the app. read_file shows you a picture.
 - The user reviews docs by setting decision (approved | changes | rejected) and writing feedback.
 - Any item can have comments: the user's notes for you (feedback, questions, decisions) and your replies. awaitingReply marks an item whose latest comment is the user's.
 - Each item belongs to at most one project. Projects can be in area work or personal; the user filters by them. Tags are free-form labels; use them for the repositories an item touches.
@@ -144,7 +144,7 @@ export function createTools(getTracker) {
     {
       name: 'read_file',
       title: 'Read a tracker file',
-      description: 'Read a file attached to a tracker item, by the path listed in the item\'s files. Long files come in pages: pass nextOffset from the previous result as offset.',
+      description: 'Read a file attached to a tracker item, by the path listed in the item\'s files. Long files come in pages: pass nextOffset from the previous result as offset. A picture (png, jpg, gif, webp) comes back as the picture itself, for you to look at; other files that are not text (PDFs, documents) are only described.',
       inputSchema: {
         type: 'object',
         properties: {

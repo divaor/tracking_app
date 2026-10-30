@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld('desktop', {
     open: () => ipcRenderer.invoke('quick:open'),
     take: () => ipcRenderer.invoke('quick:take'),
   },
+  // An item's file opened with the program set for its type (a copy in a temporary folder).
+  openFile: (name, bytes) => ipcRenderer.invoke('file:open', name, bytes),
   showWindow: () => ipcRenderer.invoke('window:show'),
   getRunInBackground: () => ipcRenderer.invoke('background:get'),
   setRunInBackground: (value) => ipcRenderer.invoke('background:set', Boolean(value)),

@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 
-const KEY = /^(meta|ref\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*|(?:blob|tree|commit)\/[0-9a-f]{40})$/;
+const KEY = /^(meta|ref\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*|(?:blob|bin|tree|commit)\/[0-9a-f]{40})$/;
 const LOCK_STALE_MS = 10000;
 const LOCK_WAIT_MS = 10000;
 const POINTER = 'Tracker data.json';
@@ -159,11 +159,11 @@ function createLocalStore(dir) {
     async del(key) {
       await fsp.rm(fileOf(dir, key), { force: true });
     },
-    /** [{ key, time }] under a prefix: 'ref/', 'blob/', 'tree/', 'commit/'. */
+    /** [{ key, time }] under a prefix: 'ref/', 'blob/', 'bin/', 'tree/', 'commit/'. */
     async list(prefix) {
       const kind = prefix.split('/')[0];
       if (kind === 'ref') return (await walk(path.join(dir, 'refs'))).map((f) => ({ key: `ref/${f.rel.join('/')}`, time: f.time }));
-      if (!['blob', 'tree', 'commit'].includes(kind)) return [];
+      if (!['blob', 'bin', 'tree', 'commit'].includes(kind)) return [];
       return (await walk(path.join(dir, 'objects', kind))).map((f) => ({ key: `${kind}/${f.rel.join('')}`, time: f.time })).filter((e) => e.key.startsWith(prefix));
     },
   };

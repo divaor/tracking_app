@@ -1933,7 +1933,7 @@ button.project-chip:hover {
 }
 
 /* Direct children only: Markdown headings inside a file stay headings. */
-.files-panel > h3,
+.files-head > h3,
 .comments > h3,
 .review-panel > h3 {
   display: flex;
@@ -1952,13 +1952,88 @@ button.project-chip:hover {
   margin-bottom: 10px;
 }
 
+/* The head: Files, its count, then Photo and Attach; with no files, a hint and the buttons alone. */
+.files-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-bottom: 10px;
+}
+
+.files-head > h3 {
+  margin: 0;
+}
+
+.files-head .spacer {
+  flex: 1;
+}
+
+.files-panel.empty .files-head {
+  margin-bottom: 0;
+}
+
+.files-hint {
+  min-width: 0;
+}
+
+/* Pictures as small versions; a click shows one large. */
+.file-pictures {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.file-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-3);
+  cursor: zoom-in;
+}
+
+.file-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.file-thumb:hover,
+.file-thumb:focus-visible {
+  border-color: var(--accent);
+}
+
+.file-pending {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--warn) 18%, var(--surface));
+  color: var(--warn);
+}
+
+.file-thumb .file-pending {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+}
+
+/* A file: its name (read it here, or open it with its program), then editor, download and remove. */
 .file-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   max-width: 100%;
   min-height: 34px;
-  padding: 5px 11px;
+  padding: 0 4px 0 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -1967,21 +2042,164 @@ button.project-chip:hover {
   font-weight: 550;
 }
 
-.file-chip span {
+.file-chip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 32px;
+  padding: 5px 7px 5px 11px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.file-chip:not(:has(.icon-btn)) {
+  padding-right: 0;
+}
+
+.file-chip-main span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.file-chip small {
+.file-chip-main small {
   color: var(--text-3);
   font-weight: 500;
+}
+
+.file-chip .icon-btn {
+  width: 28px;
+  height: 28px;
 }
 
 .file-chip.active {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--text);
+}
+
+/* A picture over the window: its bar, the picture (fit, or full size to scroll), ‹ › between them. */
+.picture-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: rgb(10 12 16 / 0.92);
+  color: #f4f4f5;
+}
+
+.picture-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px calc(8px) 16px;
+  padding-top: max(8px, env(safe-area-inset-top));
+}
+
+.picture-bar .icon-btn {
+  color: #f4f4f5;
+}
+
+.picture-bar .icon-btn:hover,
+.picture-bar .icon-btn.on {
+  background: rgb(255 255 255 / 0.14);
+}
+
+.picture-bar .spacer {
+  flex: 1;
+}
+
+.picture-bar .muted {
+  color: #a1a1aa;
+}
+
+.picture-name {
+  overflow: hidden;
+  min-width: 0;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picture-stage {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 0 12px 12px;
+}
+
+.picture-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+
+.picture-stage.zoomed {
+  place-items: start center;
+  overflow: auto;
+}
+
+.picture-stage.zoomed img {
+  max-width: none;
+  max-height: none;
+  cursor: zoom-out;
+}
+
+.picture-nav {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 64px;
+  border: 0;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.08);
+  color: #f4f4f5;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.picture-nav:hover {
+  background: rgb(255 255 255 / 0.18);
+}
+
+.picture-nav.prev {
+  left: 10px;
+}
+
+.picture-nav.next {
+  right: 10px;
+}
+
+/* Files dragged over an open item: they attach to it. */
+.modal.dropping-files {
+  position: relative;
+}
+
+.drop-files-hint {
+  position: absolute;
+  inset: 8px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 3px dashed var(--accent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 650;
+  pointer-events: none;
 }
 
 .file-view {

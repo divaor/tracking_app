@@ -132,6 +132,9 @@ export function cleanFiles(files) {
       size: Number.isFinite(f.size) ? f.size : 0,
       sha: text(f.sha),
       addedAt: isoOr(f.addedAt, ''),
+      // Only written when known: the MIME type of a file added in the app, and that it is not text.
+      ...(typeof f.type === 'string' && /^[\w.+-]+\/[\w.+-]+$/.test(f.type) ? { type: f.type } : {}),
+      ...(f.binary === true ? { binary: true } : {}),
     });
   }
   return out;
@@ -898,6 +901,60 @@ export function fileKind(name) {
   const ext = text(name).split('.').pop().toLowerCase();
   for (const [kind, list] of Object.entries(EXTENSIONS)) if (list.includes(ext)) return kind;
   return 'text';
+}
+
+// What an attachment is, by its name's extension (pictures, PDFs, documents… are not text);
+// `binary` on the record marks a file whose name says text but whose bytes are not.
+const ATTACHMENT_KINDS = {
+  image: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'ico', 'svg', 'heic', 'heif', 'tif', 'tiff'],
+  pdf: ['pdf'],
+  document: ['docx', 'doc', 'docm', 'dotx', 'xlsx', 'xls', 'xlsm', 'pptx', 'ppt', 'odt', 'ods', 'odp', 'rtf', 'epub', 'fb2', 'pages', 'numbers', 'key'],
+  media: ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'flac', 'mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi', '3gp'],
+  archive: ['zip', '7z', 'rar', 'gz', 'tgz', 'tar', 'bz2', 'xz', 'zst'],
+  binary: ['exe', 'dll', 'msi', 'apk', 'aab', 'dmg', 'iso', 'bin', 'so', 'jar', 'class', 'psd', 'ai', 'sketch', 'fig', 'ttf', 'otf', 'woff', 'woff2', 'db', 'sqlite', 'pyc', 'o'],
+};
+const extensionOf = (name) => (/\.([^./\\]+)$/.exec(text(name))?.[1] ?? '').toLowerCase();
+
+/** 'image', 'pdf', 'document', 'media', 'archive', 'binary' or 'text'. */
+export function attachmentKind(file) {
+  const ext = extensionOf(file?.name || file?.path);
+  for (const [kind, list] of Object.entries(ATTACHMENT_KINDS)) if (list.includes(ext)) return kind;
+  return file?.binary ? 'binary' : 'text';
+}
+
+/** Whether an attachment is text: read in the item, edited in the editor (an SVG picture is text too). */
+export const isTextAttachment = (file) => attachmentKind(file) === 'text' || extensionOf(file?.name || file?.path) === 'svg';
+
+const MIME_TYPES = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', avif: 'image/avif', bmp: 'image/bmp', ico: 'image/x-icon',
+  svg: 'image/svg+xml', heic: 'image/heic', heif: 'image/heif', tif: 'image/tiff', tiff: 'image/tiff', pdf: 'application/pdf',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', ppt: 'application/vnd.ms-powerpoint',
+  odt: 'application/vnd.oasis.opendocument.text', ods: 'application/vnd.oasis.opendocument.spreadsheet', odp: 'application/vnd.oasis.opendocument.presentation',
+  rtf: 'application/rtf', epub: 'application/epub+zip', zip: 'application/zip', mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', ogg: 'audio/ogg',
+  mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', md: 'text/markdown', markdown: 'text/markdown', txt: 'text/plain', csv: 'text/csv',
+  json: 'application/json', html: 'text/html', htm: 'text/html', xml: 'application/xml',
+};
+
+/** The MIME type of an attachment: the one recorded, else by its extension (text/plain for other text). */
+export const mimeOf = (file) => file?.type || MIME_TYPES[extensionOf(file?.name || file?.path)] || (attachmentKind(file) === 'text' ? 'text/plain' : 'application/octet-stream');
+
+/** The folder of an item's files in the data repo: where it has some, else files/<day>-<title>-<end of id> (as the connector makes it). */
+export function filesFolder(item, dir = 'files', today = new Date().toISOString().slice(0, 10)) {
+  const own = item.files?.find((f) => f.path.startsWith(`${dir}/`) && f.path.split('/').length === 3);
+  return own ? own.path.split('/').slice(0, -1).join('/') : `${dir}/${today}-${slugify(item.title)}-${item.id.slice(-6)}`;
+}
+
+/** A path in `folder` for a file named `name` that none of `taken` has ("photo.jpg", then "photo-2.jpg"). */
+export function freeFilePath(folder, name, taken) {
+  const safe = safeFileName(name, 'file');
+  const dot = safe.lastIndexOf('.');
+  const [stem, ext] = dot > 0 ? [safe.slice(0, dot), safe.slice(dot)] : [safe, ''];
+  for (let n = 1; ; n++) {
+    const p = `${folder}/${n === 1 ? safe : `${stem}-${n}${ext}`}`;
+    if (!taken.has(p)) return p;
+  }
 }
 
 export function formatBytes(bytes) {

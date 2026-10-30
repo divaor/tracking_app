@@ -27,6 +27,15 @@ export function createFakeGitHub({ owner = 'me', repo = 'data', defaultBranch = 
       return branches.has(name) ? reply(200, { name }) : reply(404, { message: 'Branch not found' });
     }
     if (u.pathname.startsWith(`${base}/git/ref/heads/`)) return reply(200, { object: { sha: `head-${version}` } });
+    if (u.pathname.startsWith(`${base}/git/blobs/`) && method === 'GET') {
+      const sha = u.pathname.slice(`${base}/git/blobs/`.length);
+      for (const files of branches.values()) {
+        for (const file of files.values()) {
+          if (file.sha === sha) return reply(200, { sha, encoding: 'base64', content: (file.bytes ?? Buffer.from(file.text)).toString('base64') });
+        }
+      }
+      return reply(404, { message: 'Not Found' });
+    }
     if (u.pathname === `${base}/git/refs` && method === 'POST') {
       const body = JSON.parse(init.body);
       const name = body.ref.replace('refs/heads/', '');
@@ -38,7 +47,8 @@ export function createFakeGitHub({ owner = 'me', repo = 'data', defaultBranch = 
       if (method === 'GET') {
         const file = branches.get(u.searchParams.get('ref') ?? defaultBranch)?.get(path);
         if (!file) return reply(404, { message: 'Not Found' });
-        return reply(200, { type: 'file', sha: file.sha, size: Buffer.byteLength(file.text), content: Buffer.from(file.text).toString('base64') });
+        const bytes = file.bytes ?? Buffer.from(file.text);
+        return reply(200, { type: 'file', sha: file.sha, size: bytes.length, content: bytes.toString('base64') });
       }
       if (method === 'PUT') {
         const body = JSON.parse(init.body);
@@ -54,7 +64,8 @@ export function createFakeGitHub({ owner = 'me', repo = 'data', defaultBranch = 
         if (current && !body.sha) return reply(422, { message: '"sha" wasn\'t supplied.' });
         if (current && body.sha !== current.sha) return reply(409, { message: 'sha mismatch' });
         const sha = `sha-${++version}`;
-        files.set(path, { text: Buffer.from(body.content, 'base64').toString('utf8'), sha });
+        const bytes = Buffer.from(body.content, 'base64');
+        files.set(path, { text: bytes.toString('utf8'), bytes, sha });
         commits.push({ path, message: body.message, branch: body.branch ?? defaultBranch });
         return reply(current ? 200 : 201, { content: { sha, path }, commit: { sha: `commit-${version}` } });
       }
@@ -82,6 +93,13 @@ export function createFakeGitHub({ owner = 'me', repo = 'data', defaultBranch = 
     write(path, text, branch = defaultBranch) {
       branches.get(branch).set(path, { text, sha: `sha-${++version}` });
     },
+    /** Puts bytes (a picture…) at `path`; returns its sha. */
+    writeBytes(path, bytes, branch = defaultBranch) {
+      const sha = `sha-${++version}`;
+      branches.get(branch).set(path, { text: Buffer.from(bytes).toString('utf8'), bytes: Buffer.from(bytes), sha });
+      return sha;
+    },
+    readBytes: (path, branch = defaultBranch) => branches.get(branch)?.get(path)?.bytes,
     failNextPut(path, status, beforeFail) {
       failures.push({ path, status, beforeFail });
     },

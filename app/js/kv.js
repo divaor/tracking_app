@@ -58,6 +58,14 @@ export async function kvSet(key, value) {
   }
 }
 
+export async function kvDel(key) {
+  try {
+    await run('readwrite', (s) => s.delete(key));
+  } catch {
+    localStorage.removeItem(LS_PREFIX + key);
+  }
+}
+
 // Ask the browser not to evict our data under storage pressure (mobile).
 export function requestPersistence() {
   navigator.storage?.persist?.().catch(() => {});

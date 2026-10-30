@@ -25,7 +25,7 @@ import { webItemLink, WEB_APP_URL } from '../itemLinks.js';
 import { Icon } from './icons.js';
 import { DecisionBadge, EditorLink, PriorityMark, ProjectsContext, Segmented, TypeBadge } from './components.js';
 import { ProjectChip, TagInput } from './projects.js';
-import { FilesPanel } from './fileViewer.js';
+import { FilesPanel, useFileDrop } from './fileViewer.js';
 import { ItemAssistant } from './assist.js';
 import { FindBar } from './itemFind.js';
 
@@ -307,7 +307,7 @@ function ViewBody({ item, actions, today, onEdit, bodyRef, onScroll }) {
       : !item.files.length &&
         html`<p class="muted no-notes">No ${item.type === 'doc' ? 'content' : 'notes'} yet. <button type="button" class="btn link" onClick=${onEdit}>Add some</button></p>`}
 
-    ${item.files.length > 0 && html`<${FilesPanel} item=${item} actions=${actions} />`}
+    <${FilesPanel} item=${item} actions=${actions} />
     ${isReviewable(item) && html`<${ReviewPanel} item=${item} actions=${actions} />`}
     <${Comments} key=${item.id} item=${item} actions=${actions} />
     <${ItemAssistant} item=${item} actions=${actions} />
@@ -541,11 +541,13 @@ export function ItemPanel({
     return () => document.removeEventListener('keydown', onKey);
   });
 
+  // Files dropped on the item, or pictures pasted into it, are attached (a new item has nowhere to keep them yet).
+  const drop = useFileDrop(isNew ? null : item, actions);
   const type = editing ? draft.type : item.type;
   const Root = frame === 'window' ? 'section' : 'div';
   const frameClass = frame === 'window' ? 'item-window' : 'modal';
-  return html`<${Root} ...${rootProps}
-    class="${frameClass} type-${type} ${editing ? 'editing' : 'viewing'} ${type === 'doc' && !editing ? 'reader' : ''} ${rootProps.class ?? ''}"
+  return html`<${Root} ...${rootProps} ...${drop.props}
+    class="${frameClass} type-${type} ${editing ? 'editing' : 'viewing'} ${type === 'doc' && !editing ? 'reader' : ''} ${drop.dropping ? 'dropping-files' : ''} ${isNew ? 'new-item' : ''} ${rootProps.class ?? ''}"
     role="dialog" aria-modal=${frame === 'modal' ? 'true' : undefined} aria-labelledby=${ids.title} tabindex="-1" ref=${dialogRef}
     onKeyDown=${frame === 'window' ? (e) => onKey(e) && e.stopPropagation() : undefined}>
     <div class="item-top ${scrolled ? 'scrolled' : ''}">
@@ -594,6 +596,7 @@ export function ItemPanel({
       <button type="button" class="btn" onClick=${requestClose}>Cancel</button>
       <button type="submit" form=${ids.form} class="btn primary" title="Save (Ctrl+Enter)">${isNew ? 'Add' : 'Save'}</button>
     </footer>`}
+    ${drop.dropping && html`<div class="drop-files-hint" aria-hidden="true"><${Icon} name="paperclip" size=${22} />Drop to attach to this item</div>`}
     ${children}
   </${Root}>`;
 }

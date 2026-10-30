@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 1.15.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 1.16.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -118,6 +118,7 @@ Filter by type and status, and sort by priority, due date and more (*Smart* list
 - **Each result shows where it matched**: the words are marked in its title, and when they are not all in the title, the passage that has them shows under it, with where it is from (**Notes**, **Comment**, **Claude**, **Feedback**, **File**, **Link**).
 - **Open a result** and it opens finding those words: they are marked in the item and it scrolls to the first one (see [Find in an item](#find-in-an-item)).
 - **Paste a link to an item** (the ones Claude gives, `…/#/item/…`) **or its ID** in the search box to open that item.
+- **Part of an ID works too**: paste a piece Claude gave you (`27e83a7b`, `mvtquqbr`, `mvtquqbr-27e8…`, 6 characters or more), or type it and press **Enter**, and the item it belongs to opens. While you type, the list shows the items whose ID has it.
 - Click a **tag** in the sidebar or on an item to see everything with that tag (the sidebar marks the tag searched for). Click a **project chip** to show that project.
 - The sidebar lists the first 12 projects and tags; **N more** shows all of them (and **Fewer** the first ones again). Each device remembers it.
 
@@ -157,6 +158,19 @@ Press the pencil (or **E**) to edit, or the pin (or **P**) to pin it (section 6)
 - **Esc** closes the bar (a second **Esc** closes the item). Opening an item from a search fills the bar with the words searched for.
 - It keeps up with the item: a file that finishes loading, or a comment that arrives, is searched too. Text in an HTML file's preview isn't searched (its **Source** view is).
 - Each item window has its own (desktop).
+
+### Files and pictures
+
+Any item can carry files: photos, screenshots, PDFs, Word, Excel and PowerPoint files, notes, anything up to 25 MB each.
+
+- **Attach** under the notes picks files. You can also **drop** files on an open item, or **paste** a picture (a screenshot, an image copied from a page). On a phone, **Photo** takes one with the camera.
+- **Pictures** show as small versions; a click shows one large. **←** and **→** go through them, the magnifier shows it at full size, **Esc** closes it (the item stays open). Download, open with its program (desktop app) or remove it from there.
+- **Text files** (Markdown, txt, CSV, code…) read inside the item; **Edit in editor** opens them in Tracker Editor.
+- **PDFs and documents** are chips with their type and size. A click opens one with its program in the desktop app (a copy, so changes there don't come back); in a browser it downloads. **Open in editor** (the `</>` button) shows a PDF, Word or other document as it looks in Tracker Editor. Programs and scripts are never opened.
+- **Photos over 4 MB are made smaller** (2,560 pixels on the long side) so your data repo doesn't fill up with phone photos. The message says so; **Keep full size** puts the original back.
+- Files are kept with your data, next to Claude's documents (`files/` in your data repo, or the data on this device), so every device and Claude see them. A file added without a connection shows an upload arrow and goes up with the next sync.
+- The bin on a file (or in the large picture) removes it from the item, with **Undo**. Its versions stay in the data repo's history.
+- Lists and board cards show 📎 and how many files an item has. File names count in search.
 
 ### Comments
 
@@ -218,6 +232,7 @@ Documents Claude sends arrive under **Docs**, with the file attached and a short
 - **HTML artifacts** are shown in a safe preview with scripts turned off.
 - **Source** shows the raw file, and **Download** saves it.
 - **Edit in editor** opens the file in Tracker Editor; your edits come back here.
+- Pictures, PDFs and documents you attach yourself work the same on any item: see [Files and pictures](#files-and-pictures).
 
 ### Review
 
@@ -246,8 +261,10 @@ In any Claude chat or Claude Code session with the Tracker connector on, just sa
 Claude links to items as `https://divaor.github.io/tracking_app/#/item/<ID>`:
 
 - **On your phone**, or in a browser where your data syncs, the link opens the item.
-- **In the desktop app**, paste the link (or the ID) in the search box.
+- **In the desktop app**, paste the link, the ID or part of it in the search box.
 - **In a browser on your computer that doesn't sync your data** (the link opens there, not in the desktop app), the page offers **Open in the app**: the desktop app opens the item. The browser may ask once to allow it (tick *Always allow*); after that, such links go to the app straight away. Turn that off in **Settings → Use it everywhere → Open item links in the desktop app**.
+
+Claude sees the files on an item and can look at the pictures (a screenshot of a problem, a photo of a whiteboard): ask *"look at the screenshot on the kitchen leak task"*. It cannot read PDFs or Word files through the tracker.
 
 Claude only deletes items when you explicitly ask. It never reads or changes files you encrypted in Tracker Editor. Every change it makes is a commit in your data repo, so anything can be undone from the repo history.
 
@@ -255,7 +272,7 @@ Claude only deletes items when you explicitly ask. It never reads or changes fil
 
 Tracker Editor (https://github.com/divaor/tracker-editor) is the companion text editor: many files open in tabs, synced to the same data repo with the same projects and tags.
 
-- Items sent from the editor get **Open in editor**, and attached files get **Edit in editor**.
+- Items sent from the editor get **Open in editor**, attached text files get **Edit in editor**, and PDFs and documents get **Open in editor** (shown as they look; Tracker Editor 0.34 or later).
 - Set its address in **Settings → Tracker Editor** (blank = the default web app). The desktop app opens these links in the editor's desktop app when it is installed.
 
 ## 13. Notifications
@@ -318,6 +335,10 @@ On a Mac, use **Cmd** for **Ctrl**.
 | The model doesn't answer | Settings → Model → **Test and list models**. A local server must be running; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS`). With an AI provider: check the key and that the account has credit; a provider that refuses requests from web pages works from the desktop app. |
 | Claude doesn't see my comment | Claude reads your data repo: the device you commented on must be set up with GitHub sync and have synced (the badge says *Synced*). On a device that keeps its data on this computer, the connector can't reach it. |
 | A link from Claude opens the browser, not the app | Click **Open in the app** in the message the page shows (needs the desktop app 1.11 or later), or paste the link in the app's search box. |
+| A file shows an upload arrow | It is waiting to upload from that device (it was added offline, or the upload failed). It goes up with the next sync; until then other devices say it isn't there yet. |
+| "… is not in your data repo (yet)" when opening a file | It was attached on another device that hasn't synced since. Sync that device. |
+| A photo was made smaller and you wanted the original | Press **Keep full size** in the message, or attach it again and press it then. |
+| Open in editor shows a PDF as strange text | Update Tracker Editor to 0.34 or later. |
 | Search doesn't find a phrase | Words without quotes are found apart, anywhere in the item; `"in quotes"` they must be next to each other, as written. A phrase is never found across two parts (the title and the notes, two comments). |
 | The phone app shows an old version | Close it completely and open it again while online. It updates itself on the next start. |
 

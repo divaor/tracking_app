@@ -2,12 +2,13 @@
 // the same files (tracker.json, editor/index.json, editor/files/…, files/…) in a
 // small git-like store, with the calls the two apps' sync code makes to GitHub
 // (github.js), so that code runs unchanged. Blobs are kept by their git blob sha
-// (the same as GitHub's for the same text), trees as changes from the tree
+// (the same as GitHub's for the same content: `blob/` holds text, `bin/` other
+// files such as pictures, in base64), trees as changes from the tree
 // before them, branch heads move by compare-and-swap. A backend keeps the
 // objects: a folder through the desktop app's main process, IndexedDB in the
 // browser, memory in the tests. Pure, so the Node tests can import it. The
 // tracker and the editor keep the same copy of this file.
-import { GitHubError } from './github.js';
+import { base64ToBytes, bytesToBase64, GitHubError } from './github.js';
 
 const DEFAULT_BRANCH = 'main';
 // A full tree every so many changes, so reading one never walks far.
@@ -21,9 +22,9 @@ export const KEEP_DAYS = 180;
 // Objects younger than this are never removed (another app may be in the middle of a sync).
 const GRACE_MS = 24 * 60 * 60 * 1000;
 
-/** The git blob sha of a text: sha1("blob <bytes>\0" + text). */
-export async function blobSha(text) {
-  const body = new TextEncoder().encode(text);
+/** The git blob sha of a text or of bytes: sha1("blob <length>\0" + content). */
+export async function blobSha(content) {
+  const body = typeof content === 'string' ? new TextEncoder().encode(content) : content;
   const header = new TextEncoder().encode(`blob ${body.length}\0`);
   const bytes = new Uint8Array(header.length + body.length);
   bytes.set(header);
@@ -123,6 +124,14 @@ export function createLocalRepo(backend, { now = () => new Date().toISOString() 
     return sha;
   }
 
+  async function storeBytes(bytes) {
+    const sha = await blobSha(bytes);
+    if (!(await hasBlob(sha))) await backend.put(`bin/${sha}`, bytesToBase64(bytes));
+    return sha;
+  }
+
+  const hasBlob = async (sha) => (await backend.get(`blob/${sha}`)) !== null || (await backend.get(`bin/${sha}`)) !== null;
+
   async function writeTree(baseId, set, del) {
     const id = newId();
     const base = baseId ? await json(`tree/${baseId}`) : null;
@@ -158,6 +167,22 @@ export function createLocalRepo(backend, { now = () => new Date().toISOString() 
     return out;
   }
 
+  /** Creates or replaces one file with the blob `store()` writes; `sha` must be the current one (409 otherwise, 422 when it exists and none is given). */
+  async function putContent(filePath, store, { sha, branch, message }) {
+    const name = branch || (await defaultBranch());
+    for (let attempt = 0; attempt < TRIES; attempt++) {
+      if (attempt) await pause(attempt);
+      const tip = await head(name);
+      const current = tip ? (await readTree((await readCommit(tip)).tree)).get(filePath) : undefined;
+      if (sha && current !== sha) throw new GitHubError(`“${filePath}” does not match ${sha} (409).`, 409);
+      if (!sha && current) throw new GitHubError(`“${filePath}” exists and no sha was given (422).`, 422);
+      const blob = await store();
+      const commit = await commitOn(name, tip, { [filePath]: blob }, [], message);
+      if (commit) return { sha: blob, commit };
+    }
+    throw new GitHubError('The data on this device kept changing; try again (409).', 409);
+  }
+
   const client = {
     local: true,
 
@@ -185,8 +210,26 @@ export function createLocalRepo(backend, { now = () => new Date().toISOString() 
 
     async getBlobText(sha) {
       const text = await backend.get(`blob/${sha}`);
+      if (text !== null) return text;
+      const b64 = await backend.get(`bin/${sha}`);
+      if (b64 === null) throw notFound('A file version');
+      return new TextDecoder().decode(base64ToBytes(b64));
+    },
+
+    /** A file version's bytes (a picture, a PDF… or a text's). */
+    async getBlobBytes(sha) {
+      const b64 = await backend.get(`bin/${sha}`);
+      if (b64 !== null) return base64ToBytes(b64);
+      const text = await backend.get(`blob/${sha}`);
       if (text === null) throw notFound('A file version');
-      return text;
+      return new TextEncoder().encode(text);
+    },
+
+    /** { sha, bytes } of a file at a ref, or null when it does not exist. */
+    async getFileBytes(filePath, ref) {
+      const map = await treeAt(ref);
+      const sha = map?.get(filePath);
+      return sha ? { sha, bytes: await client.getBlobBytes(sha) } : null;
     },
 
     /** Every file at a ref: [{ path, sha }] (empty when there is nothing yet). */
@@ -222,6 +265,9 @@ export function createLocalRepo(backend, { now = () => new Date().toISOString() 
       return out;
     },
 
+    /** Stores bytes as a file version (to point a tree at): its sha. */
+    createBlobBytes: (bytes) => storeBytes(bytes),
+
     /** A tree from `baseTree` plus changes: { path, content } writes, { path, sha } points at a blob, { path, sha: null } deletes. */
     async createTree(baseTree, changes) {
       const set = {};
@@ -229,7 +275,7 @@ export function createLocalRepo(backend, { now = () => new Date().toISOString() 
       for (const change of changes) {
         if (change.content !== undefined) set[change.path] = await storeBlob(change.content);
         else if (change.sha) {
-          if ((await backend.get(`blob/${change.sha}`)) === null) throw new GitHubError(`A file version for “${change.path}” is missing (422).`, 422);
+          if (!(await hasBlob(change.sha))) throw new GitHubError(`A file version for “${change.path}” is missing (422).`, 422);
           set[change.path] = change.sha;
         } else del.push(change.path);
       }
@@ -257,18 +303,12 @@ export function createLocalRepo(backend, { now = () => new Date().toISOString() 
 
     /** Creates or replaces one file; `sha` must be the current one (409 otherwise, 422 when it exists and none is given). */
     async putFile(filePath, { text, sha, branch, message }) {
-      const name = branch || (await defaultBranch());
-      for (let attempt = 0; attempt < TRIES; attempt++) {
-        if (attempt) await pause(attempt);
-        const tip = await head(name);
-        const current = tip ? (await readTree((await readCommit(tip)).tree)).get(filePath) : undefined;
-        if (sha && current !== sha) throw new GitHubError(`“${filePath}” does not match ${sha} (409).`, 409);
-        if (!sha && current) throw new GitHubError(`“${filePath}” exists and no sha was given (422).`, 422);
-        const blob = await storeBlob(text);
-        const commit = await commitOn(name, tip, { [filePath]: blob }, [], message);
-        if (commit) return { sha: blob, commit };
-      }
-      throw new GitHubError('The data on this device kept changing; try again (409).', 409);
+      return putContent(filePath, () => storeBlob(text), { sha, branch, message });
+    },
+
+    /** putFile for bytes (a picture, a PDF…). */
+    async putFileBytes(filePath, { bytes, sha, branch, message }) {
+      return putContent(filePath, () => storeBytes(bytes), { sha, branch, message });
     },
 
     async deleteFile(filePath, { sha, branch, message }) {
@@ -342,9 +382,9 @@ export function createLocalRepo(backend, { now = () => new Date().toISOString() 
         }
       };
       for (const id of commits) await markTree((await json(`commit/${id}`))?.tree);
-      const keep = { commit: commits, tree: treeIds, blob: blobs };
+      const keep = { commit: commits, tree: treeIds, blob: blobs, bin: blobs };
       let removed = 0;
-      for (const kind of ['commit', 'tree', 'blob']) {
+      for (const kind of ['commit', 'tree', 'blob', 'bin']) {
         for (const { key, time } of await backend.list(`${kind}/`)) {
           if (keep[kind].has(key.slice(kind.length + 1)) || nowMs - time < GRACE_MS) continue;
           await backend.del(key);

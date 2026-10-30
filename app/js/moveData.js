@@ -8,6 +8,18 @@
 // Kept by each app's sync from its own records: never copied over the other side's.
 const MERGED_BY_SYNC = ['editor/index.json'];
 
+// A file copies as text when its bytes are UTF-8 without NULs (a BOM kept), else as bytes (pictures, PDFs…).
+function asChange(path, bytes) {
+  if (!bytes.includes(0)) {
+    try {
+      return { path, content: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes) };
+    } catch {
+      // not text
+    }
+  }
+  return { path, bytes };
+}
+
 /**
  * Copies `from` into `to` (github.js or localRepo.js clients). `mergeTracker(theirs,
  * ours)` returns tracker.json's merged text (it throws when theirs cannot be read,
@@ -21,7 +33,7 @@ export async function moveData({ from, to, fromBranch = '', toBranch = '', track
     if (MERGED_BY_SYNC.includes(path) || path === fromTrackerPath || path === toTrackerPath) continue;
     // There already (the same text, or one changed there: its own history keeps both).
     if (theirs.has(path)) continue;
-    changes.push({ path, content: await from.getBlobText(sha) });
+    changes.push(asChange(path, await from.getBlobBytes(sha)));
     onProgress(changes.length);
   }
   let tracker = false;
@@ -49,12 +61,14 @@ async function write(client, branch, changes, message) {
       if (!tip) {
         // An empty repository: its first commit goes through the Contents API.
         const [first, ...others] = changes;
-        await client.putFile(first.path, { text: first.content, branch: branch || undefined, message });
+        await putOne(client, branch, first, message);
         tip = await client.getBranchHead(name);
         rest = others;
         if (!rest.length) return;
       }
-      const tree = await client.createTree(await client.getCommitTree(tip), rest.map(({ path, content }) => ({ path, content })));
+      const entries = [];
+      for (const { path, content, bytes } of rest) entries.push(bytes ? { path, sha: await client.createBlobBytes(bytes) } : { path, content });
+      const tree = await client.createTree(await client.getCommitTree(tip), entries);
       const commit = await client.createCommit(message, tree, [tip]);
       try {
         await client.updateBranch(name, commit);
@@ -65,5 +79,8 @@ async function write(client, branch, changes, message) {
     }
     throw new Error('The data kept changing while it was being moved; try again.');
   }
-  for (const { path, content, sha } of changes) await client.putFile(path, { text: content, sha, branch: branch || undefined, message });
+  for (const change of changes) await putOne(client, branch, change, message);
 }
+
+const putOne = (client, branch, { path, content, bytes, sha }, message) =>
+  bytes ? client.putFileBytes(path, { bytes, sha, branch: branch || undefined, message }) : client.putFile(path, { text: content, sha, branch: branch || undefined, message });

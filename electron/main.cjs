@@ -144,6 +144,49 @@ ipcMain.on('data:watch', (event) => {
   }
 });
 
+// ---- An item's file opened with its program ----
+// The page hands the bytes and the name; a copy goes to a folder of its own under the system's
+// temporary folder (kept a week) and opens with the program set for its type. Programs, scripts
+// and shortcuts are never opened (a page could otherwise write one and run it), as in Tracker Editor.
+const RUNNABLE = new Set(
+  'exe com bat cmd ps1 psm1 psd1 ps1xml vbs vbe js jse mjs cjs wsf wsh wsc msi msp mst scr hta cpl jar lnk url website reg inf pif application appref-ms gadget msc scf sct shb shs ws xbap vb vba sh bash zsh fish csh ksh command tool app pkg mpkg action workflow scpt applescript osx deb rpm appimage desktop run bin elf out py pyw pyc pyz pl rb php lua tcl ahk au3 xll xlam docm dotm xlsm xltm pptm potm ppam sldm library-ms settingcontent-ms diagcab chm jnlp appx appxbundle msix msixbundle ade adp mde accde mda search-ms searchconnector-ms theme themepack deskthemepack iqy slk mof ins isp'.split(' '),
+);
+const OPENED_DIR = () => path.join(app.getPath('temp'), 'Tracker files');
+function openableName(name) {
+  const base = String(name ?? '').split(/[\\/]/).pop().replace(/[\u0000-\u001f<>:"|?*]+/g, '').replace(/^[. ]+|[. ]+$/g, '').slice(0, 120);
+  const ext = /\.([^.]+)$/.exec(base)?.[1]?.toLowerCase();
+  if (!ext || RUNNABLE.has(ext)) throw new Error(`${base || 'This file'} is a program, a script or has no type: the tracker does not open those. Download it instead.`);
+  return /^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i.test(base) ? `_${base}` : base;
+}
+ipcMain.handle('file:open', appOnly(async (name, bytes) => {
+  const safe = openableName(name);
+  if (!(bytes instanceof Uint8Array) || bytes.length > 64 * 1024 * 1024) throw new Error('Not a file');
+  const dir = path.join(OPENED_DIR(), crypto.randomBytes(6).toString('hex'));
+  await fs.promises.mkdir(dir, { recursive: true });
+  const file = path.join(dir, safe);
+  await fs.promises.writeFile(file, bytes);
+  const error = await shell.openPath(file);
+  if (error) throw new Error(error);
+}));
+// Copies opened more than a week ago go.
+function tidyOpenedFiles() {
+  const root = OPENED_DIR();
+  const old = Date.now() - 7 * 86400000;
+  fs.promises
+    .readdir(root, { withFileTypes: true })
+    .then((entries) =>
+      Promise.all(
+        entries
+          .filter((e) => e.isDirectory())
+          .map(async (e) => {
+            const dir = path.join(root, e.name);
+            if ((await fs.promises.stat(dir)).mtimeMs < old) await fs.promises.rm(dir, { recursive: true, force: true });
+          }),
+      ),
+    )
+    .catch(() => {});
+}
+
 ipcMain.handle('window:show', (event) => {
   if (!fromApp(event)) throw new Error('Not allowed');
   showWindow();
@@ -641,6 +684,7 @@ app.on('open-url', (event, url) => {
 });
 
 app.whenReady().then(() => {
+  tidyOpenedFiles();
   protocol.handle('app', (request) => {
     const { pathname } = new URL(request.url);
     const relative = decodeURIComponent(pathname === '/' ? '/index.html' : pathname);

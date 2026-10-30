@@ -4,13 +4,14 @@
 // fast-forwards, like on GitHub.
 import { createHash } from 'node:crypto';
 
-const gitSha = (text) => {
-  const body = Buffer.from(text, 'utf8');
+// Of a text or of bytes (pictures…), as git makes it.
+const gitSha = (content) => {
+  const body = Buffer.isBuffer(content) || content instanceof Uint8Array ? Buffer.from(content) : Buffer.from(content, 'utf8');
   return createHash('sha1').update(`blob ${body.length}\0`).update(body).digest('hex');
 };
 
 export function createFakeGitHub({ owner = 'me', repo = 'data', defaultBranch = 'main', token = 'good-token', empty = false } = {}) {
-  const blobs = new Map(); // sha → text
+  const blobs = new Map(); // sha → Buffer
   const trees = new Map(); // sha → Map(path → blob sha)
   const commits = new Map(); // sha → { tree, parents, message, date }
   let clock = Date.parse('2026-10-01T09:00:00Z'); // commit dates, a minute apart
@@ -23,9 +24,9 @@ export function createFakeGitHub({ owner = 'me', repo = 'data', defaultBranch = 
   const base = `/repos/${owner}/${repo}`;
   const reply = (status, body) => new Response(body === undefined ? '' : JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-  function addBlob(text) {
-    const sha = gitSha(text);
-    blobs.set(sha, text);
+  function addBlob(content) {
+    const sha = gitSha(content);
+    blobs.set(sha, typeof content === 'string' ? Buffer.from(content, 'utf8') : Buffer.from(content));
     return sha;
   }
 
@@ -75,8 +76,11 @@ export function createFakeGitHub({ owner = 'me', repo = 'data', defaultBranch = 
       return c ? reply(200, { sha: m[1], tree: { sha: c.tree }, parents: c.parents.map((sha) => ({ sha })) }) : reply(404, { message: 'Not Found' });
     }
     if ((m = rest.match(/^\/git\/blobs\/(\w+)$/)) && method === 'GET') {
-      const text = blobs.get(m[1]);
-      return text === undefined ? reply(404, { message: 'Not Found' }) : reply(200, { sha: m[1], encoding: 'base64', content: Buffer.from(text).toString('base64') });
+      const bytes = blobs.get(m[1]);
+      return bytes === undefined ? reply(404, { message: 'Not Found' }) : reply(200, { sha: m[1], encoding: 'base64', content: bytes.toString('base64') });
+    }
+    if (rest === '/git/blobs' && method === 'POST') {
+      return reply(201, { sha: addBlob(body.encoding === 'base64' ? Buffer.from(body.content, 'base64') : body.content) });
     }
     if ((m = rest.match(/^\/git\/trees\/(\w+)$/)) && method === 'GET') {
       const files = trees.get(m[1]);
@@ -151,13 +155,13 @@ export function createFakeGitHub({ owner = 'me', repo = 'data', defaultBranch = 
           }
           return entries.size ? reply(200, [...entries.values()]) : reply(404, { message: 'Not Found' });
         }
-        return reply(200, { type: 'file', path, sha, size: Buffer.byteLength(blobs.get(sha)), content: Buffer.from(blobs.get(sha)).toString('base64') });
+        return reply(200, { type: 'file', path, sha, size: blobs.get(sha).length, content: blobs.get(sha).toString('base64') });
       }
       if (method === 'PUT') {
         const branch = body.branch ?? defaultBranch;
         const current = resolve(branch)?.get(path);
         if (current && body.sha !== current) return reply(409, { message: 'sha mismatch' });
-        const commit = commitFiles(branch, { [path]: Buffer.from(body.content, 'base64').toString('utf8') }, body.message);
+        const commit = commitFiles(branch, { [path]: Buffer.from(body.content, 'base64') }, body.message);
         return reply(current ? 200 : 201, { content: { sha: resolve(branch).get(path), path }, commit: { sha: commit } });
       }
     }
@@ -172,6 +176,11 @@ export function createFakeGitHub({ owner = 'me', repo = 'data', defaultBranch = 
     gitSha,
     /** Text of a file at the tip of a branch (undefined when missing). */
     read: (path, branch = defaultBranch) => {
+      const sha = resolve(branch)?.get(path);
+      return sha ? blobs.get(sha).toString('utf8') : undefined;
+    },
+    /** The bytes of a file at the tip of a branch (undefined when missing). */
+    readBytes: (path, branch = defaultBranch) => {
       const sha = resolve(branch)?.get(path);
       return sha ? blobs.get(sha) : undefined;
     },

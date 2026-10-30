@@ -438,3 +438,40 @@ test('comments on any item: Claude reads the unanswered ones and replies', async
   await call('update_items', { updates: [{ id: quiet.id, comments: [] }] });
   assert.equal(items().find((i) => i.id === quiet.id).comments.length, 2);
 });
+
+test('pictures on an item come to Claude as pictures; other files that are not text are described', async () => {
+  const { call, rpc, github } = setup();
+  const added = await call('add_items', { items: [{ title: 'Broken layout', type: 'task' }] });
+  const id = added.data.added[0].id;
+  // A picture and a PDF attached in the app (their records in tracker.json, their bytes in the repo).
+  const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex');
+  const pdf = Buffer.from('%PDF-1.7\nâãÏÓ\n', 'latin1');
+  const folder = `files/2026-10-30-broken-layout-${id.slice(-6)}`;
+  const pngSha = github.writeBytes(`${folder}/screen.png`, png);
+  const pdfSha = github.writeBytes(`${folder}/report.pdf`, pdf);
+  const doc = JSON.parse(github.read('tracker.json'));
+  const item = doc.items.find((i) => i.id === id);
+  item.files = [
+    { path: `${folder}/screen.png`, name: 'screen.png', size: png.length, sha: pngSha, addedAt: '2026-10-30T10:00:00.000Z', type: 'image/png' },
+    { path: `${folder}/report.pdf`, name: 'report.pdf', size: pdf.length, sha: pdfSha, addedAt: '2026-10-30T10:00:00.000Z' },
+  ];
+  github.write('tracker.json', JSON.stringify(doc));
+
+  const picture = await rpc('tools/call', { name: 'read_file', arguments: { path: `${folder}/screen.png` } });
+  const [about, image] = picture.result.content;
+  assert.equal(JSON.parse(about.text).kind, 'image');
+  assert.equal(image.type, 'image');
+  assert.equal(image.mimeType, 'image/png');
+  assert.equal(Buffer.from(image.data, 'base64').toString('hex'), png.toString('hex'));
+
+  const report = await call('read_file', { path: `${folder}/report.pdf` });
+  assert.equal(report.data.kind, 'pdf');
+  assert.match(report.data.note, /PDF/);
+  assert.equal(report.data.content, undefined);
+
+  const full = await call('get_item', { id, include_file_contents: true });
+  assert.deepEqual(full.data.files.map((f) => [f.name, f.kind, f.content]), [['screen.png', 'image', undefined], ['report.pdf', 'pdf', undefined]]);
+  assert.match(full.data.files[0].note, /read_file shows it/);
+  const plain = await call('get_item', { id });
+  assert.deepEqual(plain.data.files.map((f) => f.kind), ['image', 'pdf']);
+});

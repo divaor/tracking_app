@@ -90,6 +90,13 @@ const FOCUS_MIN_GAP = 60 * 1000;
 
 let state = { phase: 'idle', error: null, lastSyncAt: null, lastPushAt: null };
 const listeners = new Set();
+const syncedListeners = new Set();
+
+/** Runs `fn` after each sync that worked (files attached meanwhile go up then). */
+export function onSynced(fn) {
+  syncedListeners.add(fn);
+  return () => syncedListeners.delete(fn);
+}
 let running = null;
 let again = false;
 let timer = null;
@@ -131,6 +138,7 @@ async function run() {
     const at = new Date().toISOString();
     set({ phase: 'idle', error: null, lastSyncAt: at, lastPushAt: result.pushed ? at : state.lastPushAt });
     if (local) tidyLocal(client).catch((err) => console.warn('Could not tidy the data on this device', err));
+    for (const fn of syncedListeners) fn();
   } catch (err) {
     console.warn('Sync failed', err);
     set({ phase: 'error', error: err?.message ?? String(err) });

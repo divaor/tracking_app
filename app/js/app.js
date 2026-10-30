@@ -31,7 +31,7 @@ import { BoardView, HomeView, ListView } from './ui/views.js';
 import { ItemModal } from './ui/itemModal.js';
 import { ItemWindow, WindowDock } from './ui/itemWindows.js';
 import { clampRect, fullRect, nextRect, tileRects } from './windowLayout.js';
-import { appItemLink, itemIdIn, WEB_APP_URL } from './itemLinks.js';
+import { appItemLink, idFromFragment, itemIdIn, WEB_APP_URL } from './itemLinks.js';
 import { HelpDialog } from './ui/help.js';
 import { askForPlan } from './ui/assist.js';
 import { SettingsView } from './ui/settingsView.js';
@@ -686,10 +686,13 @@ export function App() {
       depth++;
       setFileDrag(true);
     };
+    // Over an open item, files attach to it (ItemPanel's own drop): this overlay stands back.
+    const overItem = (e) => Boolean(e.target?.closest?.('.modal:not(.new-item), .item-window'));
     const over = (e) => {
       if (!hasFiles(e)) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
+      setFileDrag(!overItem(e));
     };
     const leave = (e) => {
       if (!hasFiles(e)) return;
@@ -698,9 +701,11 @@ export function App() {
     };
     const drop = (e) => {
       if (!hasFiles(e)) return;
-      e.preventDefault();
       depth = 0;
       setFileDrag(false);
+      // An item took them (attached).
+      if (e.defaultPrevented) return;
+      e.preventDefault();
       importFiles([...e.dataTransfer.files]);
     };
     window.addEventListener('dragenter', enter);
@@ -783,9 +788,11 @@ export function App() {
     actionsRef.current.takeQuickAdds();
   }, []);
 
-  const onSearch = (value) => {
+  // Part of an id, pasted or followed by Enter: the one item whose id holds it (while typing, the list shows the matches).
+  const fragmentItem = (value) => idFromFragment(value, items.map((i) => i.id));
+  const onSearch = (value, { pasted = false } = {}) => {
     // A link to an item (Claude's, the desktop app's) or its id, pasted or typed: open that item.
-    const linked = itemIdIn(value);
+    const linked = itemIdIn(value) ?? (pasted ? fragmentItem(value) : null);
     if (linked) {
       setQuery('');
       searchRef.current?.blur();
@@ -854,7 +861,8 @@ export function App() {
         <h1 class="view-title">${viewTitle(route)}</h1>
         <div class="search ${query ? 'has-query' : ''}">
           <${Icon} name="search" size=${17} />
-          <input ref=${searchRef} type="search" value=${query} onInput=${(e) => onSearch(e.currentTarget.value)}
+          <input ref=${searchRef} type="search" value=${query} onInput=${(e) => onSearch(e.currentTarget.value, { pasted: e.inputType === 'insertFromPaste' })}
+            onKeyDown=${(e) => e.key === 'Enter' && fragmentItem(query) && (e.preventDefault(), onSearch(query, { pasted: true }))}
             placeholder="Search…  ( / )" aria-label="Search" autocomplete="off" />
           ${query && html`<button type="button" class="icon-btn sm" aria-label="Clear search" onClick=${() => setQuery('')}><${Icon} name="x" size=${15} /></button>`}
         </div>

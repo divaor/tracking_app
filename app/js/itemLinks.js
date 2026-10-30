@@ -21,6 +21,24 @@ export function itemIdIn(text) {
   return BARE_ID.test(s) ? s : null;
 }
 
+/**
+ * The one item whose id holds `text`, a part of an id (what Claude sometimes gives: "27e83a7b",
+ * "mvtquqbr", "mvtquqbr-27e8…"): 6 or more of its letters and digits, with a digit or the dash in
+ * it, or a whole half of the id. Null when no id holds it, or several do.
+ */
+export function idFromFragment(text, ids) {
+  const s = String(text ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^[`"'([]+|[`"')\].,;:…]+$/g, '');
+  if (!/^[0-9a-z-]{6,28}$/.test(s)) return null;
+  const found = [];
+  for (const id of ids) if (id.includes(s) && found.push(id) > 1) return null;
+  const [id] = found;
+  if (!id) return null;
+  return /[\d-]/.test(s) || id.split('-').includes(s) ? id : null;
+}
+
 /** The web app's link to an item (`base`: the app's address, a folder or its page). */
 export function webItemLink(id, base = WEB_APP_URL) {
   const url = new URL(base);
