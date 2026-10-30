@@ -51,6 +51,7 @@ const part = async (name, run) => {
 
 // A model server and a GitHub API on this machine (the phone's network, as far as it knows).
 const asked = [];
+let commitDate = null;
 const server = http.createServer((req, res) => {
   let body = '';
   req.on('data', (c) => (body += c));
@@ -63,8 +64,9 @@ const server = http.createServer((req, res) => {
       return;
     }
     if (/^\/repos\/me\/data\/commits/.test(req.url)) {
-      // Made after the app started looking: a minute from now.
-      const date = new Date(Date.now() + 60_000).toISOString().replace(/\.\d+Z$/, 'Z');
+      // Made after the app started looking (a minute after the first look), the same each time.
+      commitDate ??= new Date(Date.now() + 60_000).toISOString().replace(/\.\d+Z$/, 'Z');
+      const date = commitDate;
       const commit = (sha, message) => ({ sha, commit: { message, committer: { date }, author: { date } } });
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify([commit('b2', 'Tracker: add “Check the oil” (via Claude)'), commit('b1', 'Tracker: sync from Phone (1 added)')]));
@@ -172,7 +174,9 @@ try {
     const fields = await page.evaluate(() => [...document.querySelectorAll('.modal input')].map((i) => i.value).filter(Boolean));
     check('shared text opens a new item with its title and link', ok && fields.some((v) => v.startsWith('Read this later')), fields);
     screencap('shared-text.png');
+    // The title has the keyboard up: the first Back closes the keyboard, the next the item (as in any app).
     adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+    if (!(await until(async () => !(await page.$('.modal')), 2500))) adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
     check('Back closes it', await until(async () => !(await page.$('.modal'))));
   });
 
@@ -191,9 +195,11 @@ try {
       if (id) uri = `content://media/external/images/media/${id}`;
     }
     if (!uri) return check('a shared picture (this emulator did not list it in its media store: not checked)', true);
-    adb('shell', 'am', 'start', '-a', 'android.intent.action.SEND', '-t', 'image/png', '--eu', 'android.intent.extra.STREAM', uri, '--grant-read-uri-permission', '-n', `${PKG}/.MainActivity`);
+    // As a gallery shares it: the picture, and the right to read it (am grants it for the intent's data).
+    adb('shell', 'am', 'start', '-a', 'android.intent.action.SEND', '-t', 'image/png', '-d', uri, '--eu', 'android.intent.extra.STREAM', uri, '--grant-read-uri-permission', '-n', `${PKG}/.MainActivity`);
     const asked2 = await until(() => page.$('.shared-dialog'));
-    check('a shared picture asks where it goes', asked2);
+    const why = asked2 ? '' : await page.evaluate((u) => globalThis.Capacitor.nativePromise('TrackerNative', 'read', { uri: u }).then((r) => `readable (${r.length} bytes)`, (err) => `not readable: ${err?.message ?? err}`), uri);
+    check('a shared picture asks where it goes', asked2, why ? `${uri}: ${why}` : '');
     if (!asked2) return;
     screencap('shared-picture.png');
     await page.fill('.shared-dialog .shared-new input', 'Shared from the gallery');

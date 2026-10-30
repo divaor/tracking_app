@@ -134,7 +134,9 @@ public class TrackerNativePlugin extends Plugin {
         Object stream = intent.getParcelableExtra(Intent.EXTRA_STREAM);
         if (stream instanceof Uri) return (Uri) stream;
         ClipData clip = intent.getClipData();
-        return clip != null && clip.getItemCount() > 0 ? clip.getItemAt(0).getUri() : null;
+        if (clip != null && clip.getItemCount() > 0 && clip.getItemAt(0).getUri() != null) return clip.getItemAt(0).getUri();
+        // Some apps give the file as the intent's data instead.
+        return intent.getData();
     }
 
     @SuppressWarnings("deprecation")
