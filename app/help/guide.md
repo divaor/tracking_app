@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 1.18.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 2.0.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -23,12 +23,32 @@ Every item has a **type** and a **status**:
 
 ## 2. Get it and connect it
 
-### Phone
+### Android: the Tracker app
 
-The phone app is the web app installed to your Home Screen. It works offline and syncs when you're online.
+An app for your phone, updated from the releases like the desktop app. It works offline and syncs when you're online.
 
-1. Open https://divaor.github.io/tracking_app/ in Safari (iPhone) or Chrome (Android).
-2. Install it. On **iPhone**: Share → **Add to Home Screen**. On **Android**: ⋮ → **Install app**.
+1. Install **Obtainium** (from https://github.com/ImranR98/Obtainium/releases or F-Droid). It installs apps from their GitHub releases and keeps them up to date.
+2. In Obtainium: **Add app**, paste `https://github.com/divaor/tracking_app`, **Add**, then **Install** (`Tracker-<version>.apk`). The first time, Android asks to let Obtainium install apps: allow it.
+3. Open Tracker and connect it to your data (below). Obtainium tells you when there's a new version and installs it over the old one; your items and settings stay. (Or download the `.apk` from the releases page and open it; then updates are by hand.)
+
+What the app adds over the web app:
+
+- **Share → Tracker** from any app. Text and links become a new item to look over before you add it. Pictures and other files become a new item, or go on an item you pick.
+- **Add to Tracker** in the menu of text you select in any app: a new item from it.
+- **Long-press the icon** for **Quick add**, **Voice note** (say the item) and **Send a log**.
+- **Notifications while the app is closed**: it looks for what Claude and your other devices changed about every 15 minutes (section 13).
+- **The phone's own voices** for Listen (Google's, or an engine you install), and **its speech input** for the microphone in quick add.
+- **Attachments open with your phone's apps** (a PDF in your PDF reader, a spreadsheet in Sheets), and **Download** and **Export** ask where to save.
+- A model or speech server on your computer (Ollama, Kokoro) works at its address on your network, such as `http://192.168.1.20:11434/v1`, with no extra setup.
+- **Back** closes what is open, then goes to the Overview.
+- The GitHub token and your keys are kept encrypted with a key in the phone's secure hardware, and left out of Android's backups.
+
+### iPhone (and any phone's browser)
+
+The web app installed to your Home Screen. It works offline and syncs when you're online.
+
+1. Open https://divaor.github.io/tracking_app/ in Safari (iPhone) or Chrome.
+2. Install it. On **iPhone**: Share → **Add to Home Screen**. On **Android** (instead of the app): ⋮ → **Install app**.
 3. Open it from the new icon and connect it to your data (below).
 
 ### Desktop (Windows, Mac, Linux)
@@ -316,7 +336,8 @@ You can be notified when:
 
 Tap a notification to open that item.
 
-- **Phone:** in the installed app, go to **Settings → Notifications**, enter your connector's address (without `/mcp`) and tap **Turn on notifications**. Do this on each phone or browser you want notified. On iPhone this needs iOS 16.4 or later, with the app opened from its Home Screen icon. The phone gets push notifications even when the app is closed.
+- **Android app:** notifications while the app is closed are on once you set up GitHub sync: allow them when Android asks (or **Settings → Notifications → Allow notifications**). The app looks about every 15 minutes (the shortest Android allows); **Look now** looks at once. While the app is open, changes show at once. Changes from your other devices are told only with **Changes from my other devices** on, and never this phone's own.
+- **Phone (web app):** in the installed app, go to **Settings → Notifications**, enter your connector's address (without `/mcp`) and tap **Turn on notifications**. Do this on each phone or browser you want notified. On iPhone this needs iOS 16.4 or later, with the app opened from its Home Screen icon. The phone gets push notifications even when the app is closed.
 - **Desktop:** notifications are on by default. The app checks for changes every minute; with *Keep running in the background* on, closing the window leaves it in the system tray (quit from the tray icon).
 
 Choose what you hear about in **Settings → Notifications**.
@@ -377,11 +398,15 @@ On a Mac, use **Cmd** for **Ctrl**.
 | Open in editor shows a PDF as strange text | Update Tracker Editor to 0.34 or later. |
 | Search doesn't find a phrase | Words without quotes are found apart, anywhere in the item; `"in quotes"` they must be next to each other, as written. A phrase is never found across two parts (the title and the notes, two comments). |
 | The phone app shows an old version | Close it completely and open it again while online. It updates itself on the next start. |
+| Obtainium says the Android app cannot be updated ("signatures do not match") | An APK built elsewhere (or a test build) is installed. Sync first (or Export a backup), uninstall Tracker and install it again from Obtainium. |
+| No notifications from the Android app | Settings → Notifications: GitHub sync must be set up and notifications allowed; **Look now** says when it last looked and any error. Some phones stop background work for apps they think unused: in Android's settings, set Tracker's battery use to *Unrestricted*. |
+| The microphone in quick add does nothing (Android app) | The app uses the phone's speech input (Google's): install or turn on the Google app, or Speech Services by Google. |
 
 ## 17. Updates and releases
 
 All of this runs from the **Actions** tab of the app's repository, so it also works from your phone.
 
 - **Web and phone app:** deploys by itself when changes to `app/` reach `main`.
-- **Desktop app:** after the version is bumped (`package.json`, `app/js/version.js` and the cache name in `app/sw.js`), run **Release desktop app** with the new tag (for example `v1.6.0`), or push the tag. It builds the installers and publishes the release.
+- **Desktop and Android apps:** after the version is bumped (`package.json`, `app/js/version.js` and the cache name in `app/sw.js`), run **Release desktop app** with the new tag (for example `v2.0.0`), or push the tag. It builds the installers and the Android app (`Tracker-<version>.apk`, signed with the key in the `ANDROID_KEYSTORE` and `ANDROID_KEYSTORE_PASSWORD` secrets; without them the release has no APK) and publishes the release. Keep a copy of that key: every update must be signed with it.
+- **Android check:** Actions → **Android check** runs the app in an emulator and checks what a browser cannot (sharing, links, Back, the phone's voices, notifications).
 - **Claude connector:** run **Deploy Claude connector** after it changes. Its secrets live in the repository's Actions secrets.
