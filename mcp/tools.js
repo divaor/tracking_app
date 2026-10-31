@@ -2,7 +2,9 @@
 // wording here is what lets Claude act on requests like "send this proposal
 // to my tracker" from any chat or Claude Code session.
 import { APP_VERSION } from '../app/js/version.js';
+import { BOARD_PARTS, STATUSES as BOARD_STATUSES } from '../app/js/boards.js';
 import { MAX_ATTACH_BYTES } from './attach.js';
+import { INLINE_EXPORT_CHARS } from './board.js';
 import { MAX_PLAN_DAYS } from './tracker.js';
 import { UPLOAD_MINUTES } from './uploads.js';
 import { AREAS, DECISIONS, KINDS, PRIORITIES, STATUSES, TYPE_IDS, safeFileName } from '../app/js/model.js';
@@ -16,7 +18,7 @@ Model
 - Status: pending → in_progress → done (docs show as To read → Reading → Read).
 - Items can carry files (proposal.md, report.html, pictures…) kept in the repo; read_file shows you a picture, attach_file adds one.
 - The user reviews docs by setting decision (approved | changes | rejected) and writing feedback.
-- Any item can have comments: the user's notes for you (feedback, questions, decisions) and your replies. awaitingReply marks an item whose latest comment is the user's.
+- Any item can have comments: the user's notes for you and your replies. awaitingReply marks an item whose latest comment is the user's.
 - Each item belongs to at most one project. Projects are in area work or personal; the user filters by them. Tags are free-form; use them for the repositories an item touches.
 
 How to handle requests
@@ -25,15 +27,16 @@ How to handle requests
 - A revised version of something on the tracker → send_document with item_id (the same filename replaces it); it goes back to the user's review queue.
 - "Update tasks on my tracker", "mark X done", "add a task …" → list_items first to avoid duplicates, then update_items / add_items. Batch changes into one call.
 - "Log / track this Claude work" → add_items with type "claude", kind (code, chat, pr, artifact) and url = the session, PR or artifact link.
-- "What's on my tracker?" → get_overview. "Check my tracker for feedback / comments" → list_items with comments "unanswered" (docs: decision); read them with get_item, act, then reply with update_items comment (what you did or your answer).
+- "What's on my tracker?" → get_overview. "Check my tracker for feedback / comments" → list_items with comments "unanswered" (docs: decision); read them with get_item, act, then reply with update_items comment.
 - "Pin / unpin X" → update_items pinned true / false (list_items pinned true lists them).
 - "Attach this screenshot / picture / file to X" → attach_file (in Claude Code: its upload link with curl).
 - "My plan for today", "how did my week go" → get_overview (latestPlan) or get_plans; to make or update one, save_plan.
+- A project's release board → get_board; after a merge, test, decision or step, update_board (set_session for your progress).
 
 Projects and tags
-- "For this conversation use project X (and tag with the repos you touch)" → remember it: pass project "X" on every add_items and send_document (and update_items when filing items), and add the names of the repositories involved as tags (in Claude Code: the git repository you work in; one tag per repo).
+- "For this conversation use project X (and tag with the repos you touch)" → remember it: pass project "X" on every add_items and send_document (and update_items when filing items), and tag with the repositories involved (one tag per repo).
 - Call list_projects before your first write to reuse the exact project and tag spellings. A new project: save_project (area work or personal; ask if unclear). New tags are created by using them.
-- Without such an instruction, set project only when it is obvious (e.g. an existing project named after the repo).
+- Without such an instruction, set project only when it is obvious (an existing project named after the repo).
 
 Tracker Editor files
 - The user's text editor (Tracker Editor) keeps notes, snippets and drafts in the same repo. Not tracker items: use the *_editor_file(s) tools.
@@ -75,7 +78,7 @@ export function createTools(getTracker, { uploads = null } = {}) {
     if (!name || !/\.[A-Za-z0-9]{1,8}$/.test(name)) throw new Error('Give filename (with its extension, e.g. screenshot.png) for the upload link.');
     if (!uploads || !context?.baseUrl) throw new Error('Upload links need the connector over HTTP. Pass source_url (a public https link) or content_base64 instead.');
     const item = await t.findItem(a.item_id);
-    const { url, expiresAt } = await uploads.link(context.baseUrl, { item: item.id, name });
+    const { url, expiresAt } = await uploads.link(context.baseUrl, { op: 'attach', item: item.id, name });
     return {
       upload: { url, expiresAt, command: `curl -sS -T <path of the file> '${url}'` },
       item,
@@ -85,6 +88,35 @@ export function createTools(getTracker, { uploads = null } = {}) {
   }
   const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
   const write = { readOnlyHint: false, destructiveHint: false, openWorldHint: false };
+
+  // import_board without content: a link to PUT the board file to (curl -T).
+  async function boardImportLink(t, a, context) {
+    if (!uploads || !context?.baseUrl) throw new Error('Upload links need the connector over HTTP. Pass the file\'s text as content instead.');
+    const project = await t.boards.nameOf(a.project);
+    const { url, expiresAt } = await uploads.link(context.baseUrl, { op: 'board-import', project });
+    return {
+      project,
+      upload: { url, expiresAt, command: `curl -sS -T <path of the board file> '${url}'` },
+      note: `Send the board file (its page, its data script or JSON) to url within ${UPLOAD_MINUTES} minutes with the command. Its answer says what was imported; nothing on the board is deleted.`,
+    };
+  }
+
+  // export_board: the script itself when small, and a download link (curl -o) when there is HTTP.
+  async function boardExport(t, a, context) {
+    const out = await t.boards.exportScript(a);
+    const result = { project: out.project, variable: out.variable, size: out.size };
+    if (uploads && context?.baseUrl) {
+      const { url, expiresAt } = await uploads.link(context.baseUrl, { op: 'board-export', project: out.project, name: out.variable });
+      result.download = { url, expiresAt, command: `curl -sS '${url}' -o <path of the data file>` };
+    }
+    if (out.size <= INLINE_EXPORT_CHARS || !result.download) {
+      if (out.size > 90_000) throw new Error(`The board is ${out.size.toLocaleString('en')} characters, too large to return here; ask over HTTP for a download link.`);
+      result.script = out.script;
+    }
+    return result;
+  }
+
+  const projectArg = str('The project the board belongs to (its name; matching is case-insensitive).');
 
   return [
     {
@@ -279,6 +311,106 @@ export function createTools(getTracker, { uploads = null } = {}) {
       run: run((t, a, context) => (a.source_url || a.content_base64 ? t.attachFile(a) : uploadLink(t, a, context))),
     },
     {
+      name: 'get_board',
+      title: 'Release board: where it stands',
+      description:
+        "Where a project's release board stands, in a few lines: the headline, the tiles (releases out, features live, tests passed, what waits on the user, open decisions), each release's progress and next step, what waits on the user, open decisions, each session's row and the latest log. Pass since (an ISO time) to also list what changed after it. Whole records: get_board_records.",
+      inputSchema: { type: 'object', properties: { project: projectArg, since: str('ISO time: also list the records changed after it.') }, required: ['project'] },
+      annotations: readOnly,
+      run: run((t, a) => t.boards.get(a)),
+    },
+    {
+      name: 'get_board_records',
+      title: 'Release board records',
+      description: `Whole records of one part of a project's release board (${BOARD_PARTS.join(', ')}): a release's steps, merges, commands, recommendations and risks; a feature's repos, branch, commit and blockers; and so on. Filter by ids, release, status or words; long lists come in pages (pass nextOffset as offset).`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          project: projectArg,
+          part: enumOf(BOARD_PARTS, 'Which part of the board.'),
+          ids: { type: 'array', items: { type: 'string' }, description: 'Only these ids.' },
+          release: str('Only records of this release (its id, e.g. R4).'),
+          status: str('Only records with this status.'),
+          query: str('Words to look for anywhere in the records.'),
+          offset: { type: 'integer', minimum: 0, description: 'Where to start (nextOffset of the last page).' },
+          limit: { type: 'integer', minimum: 1, maximum: 50, description: 'Default 20.' },
+        },
+        required: ['project', 'part'],
+      },
+      annotations: readOnly,
+      run: run((t, a) => t.boards.records(a)),
+    },
+    {
+      name: 'update_board',
+      title: 'Update a release board',
+      description: `Change a project's release board (made if it has none) in one commit: records by id with only the fields that change, a log line, where things stand. A change is { part, id, set: { field: value } }: dotted paths reach inside ("steps.3.done", "dates.deployed"), null removes a field, a record not there yet is added. Or { part, id, remove: true }. Statuses: ${BOARD_STATUSES.join(', ')}. Write a log line for what happened ("R4 merged into dev"), pass session (your session's name) so the board says who changed what, and use the ids get_board shows. Records not mentioned stay as they are, so several sessions can update at once.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          project: projectArg,
+          changes: {
+            type: 'array',
+            maxItems: 200,
+            items: {
+              type: 'object',
+              properties: {
+                part: enumOf(BOARD_PARTS, 'Which part of the board.'),
+                id: str('The record\'s id (releases R1…, features, tests, decisions…; a session\'s id is its name).'),
+                set: { type: 'object', description: 'Fields to set: { status: "live", commit: "abc123", "steps.2.done": true }. null removes a field.' },
+                remove: { type: 'boolean', description: 'Remove the record.' },
+              },
+              required: ['part', 'id'],
+            },
+          },
+          log: str('A line for the board\'s log: what happened.'),
+          log_release: str('The release the log line is about.'),
+          log_item: str('A tracker item the log line points to.'),
+          now: { type: 'object', properties: { headline: str('One line: where things stand.'), summary: str('A few sentences.') }, description: 'Where things stand (the board\'s banner).' },
+          session: str('Your session\'s name, as on the board\'s sessions.'),
+        },
+        required: ['project'],
+      },
+      annotations: write,
+      run: run((t, a) =>
+        t.boards.update({ ...a, log: a.log ? { text: a.log, release: a.log_release, item: a.log_item } : undefined }),
+      ),
+    },
+    {
+      name: 'set_session',
+      title: 'Report your session on a release board',
+      description: "Your session's row on a project's release board: its state (working, waiting, idle, done), status and what it is doing now. Call it when you start, when you wait on something and when you finish.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          project: projectArg,
+          name: str('Your session\'s name, as on the board.'),
+          state: str('working, waiting, idle or done.'),
+          status: enumOf(BOARD_STATUSES, 'Its status colour on the board.'),
+          now: str('What it is doing now, in a line.'),
+          item: str('The tracker item of this session, if any.'),
+        },
+        required: ['project', 'name'],
+      },
+      annotations: write,
+      run: run((t, a) => t.boards.setSession(a)),
+    },
+    {
+      name: 'import_board',
+      title: 'Import a release board file',
+      description: `Bring a release board file (the standalone page, its data script window.NAME = {...}, or its JSON) into a project's board: merged, nothing on the board deleted. With content (small files) it is imported at once; without, the result is an upload link (valid ${UPLOAD_MINUTES} minutes) to send the file to from a shell, e.g. in Claude Code: curl -sS -T board.html '<link>'.`,
+      inputSchema: { type: 'object', properties: { project: projectArg, content: str('The whole file, for small boards. Leave out for an upload link.') }, required: ['project'] },
+      annotations: write,
+      run: run((t, a, context) => (a.content ? t.boards.importText(a) : boardImportLink(t, a, context))),
+    },
+    {
+      name: 'export_board',
+      title: 'Export a release board',
+      description: `A project's release board as its standalone page's data script (window.NAME = {...}), to keep that page current or to share. Small boards come back whole; larger ones as a download link (valid ${UPLOAD_MINUTES} minutes): curl -sS '<link>' -o <the page's data file>.`,
+      inputSchema: { type: 'object', properties: { project: projectArg, variable: str('The script\'s variable (default: the one the board was imported with).') }, required: ['project'] },
+      annotations: readOnly,
+      run: run((t, a, context) => boardExport(t, a, context)),
+    },
+    {
       name: 'get_plans',
       title: 'Plans and past days',
       description: 'The day plans and week reviews the user keeps on the tracker (made in the app or with save_plan, updated during the day; earlier versions kept), and what got done, started and added each day. One day (days 1) comes with the whole texts and the earlier versions; several days with the texts shortened.',
@@ -393,6 +525,23 @@ export const PROMPTS = [
     arguments: [{ name: 'topic', description: 'What the proposal is about (optional).', required: false }],
     text: ({ topic }) =>
       `Write the ${topic ? `proposal about ${topic}` : 'proposal or plan we have been discussing'} as a complete Markdown document (context, proposal, alternatives, risks, open questions) and send it to my tracker with send_document (kind "proposal"). Include the project and a link to this session or PR if you know it. Then tell me the item link.`,
+  },
+  {
+    name: 'release_board',
+    title: 'Keep a release board current',
+    description: "How to keep a project's release board current from this session.",
+    arguments: [
+      { name: 'project', description: 'The project whose board it is.', required: true },
+      { name: 'session', description: "This session's name on the board (optional).", required: false },
+    ],
+    text: ({ project, session }) =>
+      `Keep the release board of "${project}" on my tracker current from this session${session ? ` (you are "${session}" on it)` : ''}:
+- Start with get_board and use its ids (releases, features, tests, decisions); get_board_records for whole records.
+- set_session when you start, when you wait on something and when you finish${session ? `, as "${session}"` : ''}.
+- After a merge, deploy, test, decision or a finished step: update_board with only the fields that changed, a log line saying what happened${session ? ' and your session' : ''}. Use the board's statuses; never guess one.
+- Something I must do (run a command, merge, decide): an action (part actions: text, when, release, item, command). Remove it once done.
+- A question for me: a decision with status open, and say so in your reply.
+- Do not change records other sessions own beyond what your work changed.`,
   },
   {
     name: 'update_tracker',

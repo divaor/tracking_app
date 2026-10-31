@@ -38,12 +38,13 @@ import { appItemLink, idFromFragment, itemIdIn, WEB_APP_URL } from './itemLinks.
 import { HelpDialog } from './ui/help.js';
 import { makePlan, usePlanAuto } from './ui/plans.js';
 import { DaysView } from './ui/days.js';
+import { ReleaseBoardView, useBoards } from './ui/releaseBoard.js';
 import { ListenBar, setListenNotice } from './ui/listen.js';
 import { stopReading, toggleReading } from './reader.js';
 import { cachedPlans } from './planStore.js';
 import { SettingsView } from './ui/settingsView.js';
 
-const VIEWS = ['home', 'board', 'list', 'days', 'projects', 'settings'];
+const VIEWS = ['home', 'board', 'list', 'days', 'release-board', 'projects', 'settings'];
 
 function parseHash() {
   const [view, type, status] = location.hash.replace(/^#\/?/, '').split('/');
@@ -53,11 +54,14 @@ function parseHash() {
     status: STATUSES.includes(status) ? status : 'all',
     // Days: #/days/2026-10-28 (none: today).
     day: view === 'days' && /^\d{4}-\d{2}-\d{2}$/.test(type ?? '') ? type : '',
+    // A project's release board: #/release-board/<slug> (none: the list of them).
+    boardSlug: view === 'release-board' && /^[a-z0-9-]+$/.test(type ?? '') ? type : '',
   };
 }
 
-export function hrefFor({ view, type = 'all', status = 'all', day = '' }) {
+export function hrefFor({ view, type = 'all', status = 'all', day = '', boardSlug = '' }) {
   if (view === 'days') return day ? `#/days/${day}` : '#/days';
+  if (view === 'release-board') return boardSlug ? `#/release-board/${boardSlug}` : '#/release-board';
   const parts = [view];
   if (type !== 'all' || status !== 'all') parts.push(type);
   if (status !== 'all') parts.push(status);
@@ -79,6 +83,8 @@ function viewTitle(route) {
       return 'Projects & tags';
     case 'days':
       return 'Days';
+    case 'release-board':
+      return 'Release board';
     default:
       return 'Overview';
   }
@@ -121,6 +127,8 @@ const firstOf = (list, part) => (getSettings().sidebarAll?.[part] ? list : list.
 
 function Sidebar({ route, items, projects, scope, query, onProject, onTag, sync, onSyncClick, onNew, onHelp }) {
   const open = items.filter((i) => i.status !== 'done');
+  const boards = useBoards();
+  const colorOf = (name) => projects.find((p) => p.key === name.toLowerCase())?.color;
   const allTags = tagCounts(items);
   const tags = firstOf(allTags, 'tags');
   const tagOn = (tag) => query.toLowerCase().split(/\s+/).includes(`#${tag.toLowerCase()}`);
@@ -139,6 +147,13 @@ function Sidebar({ route, items, projects, scope, query, onProject, onTag, sync,
       ${link({ view: 'board' }, 'Board', 'board')}
       ${link({ view: 'list' }, 'All items', 'list', open.length)}
       ${link({ view: 'days' }, 'Days', 'calendar')}
+      ${boards.length > 0 &&
+      html`<div class="nav-section nav-section-row">Release boards<a href="#/release-board" class="nav-manage" title="All release boards, and importing a board file">All</a></div>
+        ${boards.map((b) => {
+          const active = route.view === 'release-board' && route.boardSlug === b.slug;
+          return html`<a key=${b.slug} href=${hrefFor({ view: 'release-board', boardSlug: b.slug })} class="nav-link nav-board ${active ? 'active' : ''}" style=${{ '--pc': colorOf(b.project) }}
+            aria-current=${active ? 'page' : undefined}><${Icon} name="rocket" size=${16} /><span class="nav-label">${b.project}</span></a>`;
+        })}`}
       <div class="nav-section">Categories</div>
       ${TYPES.map((t) => link({ view: categoryView, type: t.id }, t.plural, t.id, open.filter((i) => i.type === t.id).length, `type-${t.id}`))}
       <div class="nav-section nav-section-row">Projects<a href="#/projects" class="nav-manage" title="Manage projects and tags">Manage</a></div>
@@ -627,6 +642,7 @@ export function App() {
     'go-docs': () => go({ view: 'list', type: 'doc' }),
     'go-projects': () => go({ view: 'projects' }),
     'go-days': () => go({ view: 'days' }),
+    'go-release-boards': () => go({ view: 'release-board' }),
     'item-listen': () => (modalRef.current || document.activeElement?.closest?.('.item-window') ? window.dispatchEvent(new Event('item:listen')) : toast('Open an item, then Listen (L) reads it to you.')),
     'listen-pause': () => toggleReading(),
     'listen-stop': () => stopReading(),
@@ -825,7 +841,7 @@ export function App() {
   useEffect(
     () =>
       window.desktop?.android?.onBack?.(() => {
-        if (layers.current.length || document.querySelector('.picture-viewer, .voice-list, .shared-dialog, .head-menu-pop')) {
+        if (layers.current.length || document.querySelector('.picture-viewer, .voice-list, .shared-dialog, .head-menu-pop, .rb-drawer')) {
           (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
           return true;
         }
@@ -926,6 +942,8 @@ export function App() {
       sort=${settings.sort} onSort=${(sort) => saveSettings({ sort })} actions=${actions} today=${today} />`;
   } else if (route.view === 'days') {
     view = html`<${DaysView} items=${scopedItems} today=${today} day=${route.day} actions=${actions} />`;
+  } else if (route.view === 'release-board') {
+    view = html`<${ReleaseBoardView} slug=${route.boardSlug} items=${items} projects=${projects} actions=${actions} />`;
   } else if (route.view === 'projects') {
     view = html`<${ProjectsView} items=${items} projects=${projects} actions=${actions} />`;
   } else if (route.view === 'settings') {

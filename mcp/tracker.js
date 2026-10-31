@@ -3,6 +3,7 @@
 // the data repo. Every write is a commit; conflicting writes are retried.
 import { describeChanges } from '../app/js/changes.js';
 import { decodeBase64, download, looksLikeText, MAX_ATTACH_BYTES, typeFor, withExtension } from './attach.js';
+import { createBoards } from './board.js';
 import { createEditorFiles } from './editor.js';
 import { bytesToBase64 } from '../app/js/github.js';
 import { idFromFragment, itemIdIn } from '../app/js/itemLinks.js';
@@ -245,6 +246,17 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       canonicalProject: async (name) => (name ? canonical(name, await load()) : name),
       maxReadChars: MAX_READ_CHARS,
       maxFileBytes: MAX_FILE_BYTES,
+    }),
+
+    // Release boards (boards/<slug>.json), one per project, in the tracker's spelling of its name.
+    boards: createBoards({
+      client,
+      branch,
+      device,
+      now,
+      appUrl,
+      canonicalProject: async (name) => (name ? canonical(name, await load()) : name),
+      maxReadChars: MAX_READ_CHARS,
     }),
 
     async overview() {

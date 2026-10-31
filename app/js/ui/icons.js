@@ -69,6 +69,8 @@ const PATHS = {
   chevronLeft: () => html`<path d="m15 6-6 6 6 6" />`,
   chevronRight: () => html`<path d="m9 6 6 6-6 6" />`,
   zoom: () => html`<circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5M11 8v6M8 11h6" />`,
+  arrowLeft: () => html`<path d="M19 12H5M11 6l-6 6 6 6" />`,
+  rocket: () => html`<path d="M14.5 4.5c2.5-1.2 5-1.5 5-1.5s-.3 2.5-1.5 5L12 14.5 9.5 12z" /><path d="M9.5 12 6 11.5 4 14l4.5 1.5M12 14.5l.5 3.5-2.5 2-1.5-4.5" /><path d="M6.5 17.5C5 19 4.5 21 4.5 21s2-.5 3.5-2" />`,
 };
 
 export function Icon({ name, size = 18, class: cls = '' }) {

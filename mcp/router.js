@@ -4,11 +4,13 @@
 //   /mcp/<secret>        same, for clients that can only take a URL (legacy)
 //   /.well-known/…, /register, /authorize, /token   OAuth (see oauth.js)
 //   /push/config, /push/test                       push notifications
-//   /upload/<token>      a file's bytes for attach_file (PUT, curl -T; the token is the permission)
+//   /upload/<token>      a file for attach_file or import_board (PUT, curl -T; the token is the permission)
+//   /download/<token>    a release board's data script for export_board (GET, curl -o)
+import { boardSlug } from '../app/js/boards.js';
 import { createGitHubClient } from '../app/js/github.js';
 import { MAX_ATTACH_BYTES } from './attach.js';
 import { createOAuth } from './oauth.js';
-import { UPLOAD_PATH } from './uploads.js';
+import { DOWNLOAD_PATH, UPLOAD_PATH } from './uploads.js';
 
 const TRUSTED_ORIGIN = /^https:\/\/([a-z0-9-]+\.)*(claude\.ai|claude\.com|anthropic\.com)$|^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
@@ -49,6 +51,7 @@ export function createHttpHandler({ handle, config, notifier = null, oauthStore 
     if (!secret || secret.length < 16) return plain('MCP_SECRET is not configured (use at least 16 characters).\n', 500);
 
     if (path.startsWith(UPLOAD_PATH)) return upload(request, path.slice(UPLOAD_PATH.length));
+    if (path.startsWith(DOWNLOAD_PATH)) return download(request, path.slice(DOWNLOAD_PATH.length));
 
     const oauth = createOAuth({ secret, issuer, redirectHosts: config.redirectHosts, store: oauthStore });
 
@@ -99,13 +102,14 @@ export function createHttpHandler({ handle, config, notifier = null, oauthStore 
     return mcpPost(request, (message) => handle(message, { baseUrl: issuer }));
   };
 
-  // A file sent to an upload link from attach_file: attached to the link's item under its name.
+  // A file sent to an upload link: attached to the link's item (attach_file), or imported into the
+  // link's project's release board (import_board).
   async function upload(request, token) {
     if (request.method !== 'PUT' && request.method !== 'POST') return json({ ok: false, error: 'Send the file with PUT (curl -T <file> <link>).' }, 405, { Allow: 'PUT, POST' });
     if (!uploads || !getTracker) return json({ ok: false, error: 'Uploads are not available on this connector.' }, 404);
     let claims;
     try {
-      claims = await uploads.open(token);
+      claims = await uploads.open(token, ['attach', 'board-import']);
     } catch (err) {
       return json({ ok: false, error: err.message }, err.status ?? 401);
     }
@@ -114,9 +118,34 @@ export function createHttpHandler({ handle, config, notifier = null, oauthStore 
     const bytes = new Uint8Array(await request.arrayBuffer());
     if (bytes.length > MAX_ATTACH_BYTES) return json(tooBig, 413);
     try {
-      const result = await (await getTracker()).attachBytes(claims.item, claims.name, bytes, { type: request.headers.get('content-type') ?? '' });
+      const tracker = await getTracker();
+      const result =
+        claims.op === 'board-import'
+          ? await tracker.boards.importText({ project: claims.project, content: new TextDecoder().decode(bytes) })
+          : await tracker.attachBytes(claims.item, claims.name, bytes, { type: request.headers.get('content-type') ?? '' });
       await claims.spend();
       return json({ ok: true, ...result });
+    } catch (err) {
+      return json({ ok: false, error: err?.message ?? String(err) }, err?.status >= 500 ? 502 : 400);
+    }
+  }
+
+  // A download link from export_board: the project's board as its page's data script.
+  async function download(request, token) {
+    if (request.method !== 'GET' && request.method !== 'HEAD') return json({ ok: false, error: 'Fetch it with GET (curl -o <file> <link>).' }, 405, { Allow: 'GET' });
+    if (!uploads || !getTracker) return json({ ok: false, error: 'Downloads are not available on this connector.' }, 404);
+    let claims;
+    try {
+      claims = await uploads.open(token, ['board-export']);
+    } catch (err) {
+      return json({ ok: false, error: err.message }, err.status ?? 401);
+    }
+    try {
+      const { script } = await (await getTracker()).boards.exportScript({ project: claims.project, variable: claims.name });
+      return new Response(request.method === 'HEAD' ? null : script, {
+        status: 200,
+        headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Content-Disposition': `attachment; filename="${boardSlug(claims.project)}-board.js"`, 'Cache-Control': 'no-store' },
+      });
     } catch (err) {
       return json({ ok: false, error: err?.message ?? String(err) }, err?.status >= 500 ? 502 : 400);
     }

@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 2.1.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 2.2.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -259,6 +259,18 @@ The bar above every view filters by **All**, **Work**, **Personal**, or any mix 
 
 Open **Projects → Manage** in the sidebar. There you can add projects, set each one's area and color, rename a project (its items move along, and renaming to an existing name merges the two) or delete it (its items stay, without a project). Tags can be renamed, which also merges them, or deleted.
 
+### Release boards
+
+A big project can have a **release board**: its releases, features, tests, decisions, events, the Claude sessions working on it, its repos, what waits on you and a log of how it advances. Each board is kept with your data (`boards/<project>.json`) and shows under **Release boards** in the sidebar (**All** lists them; the command **Go to: Release boards** too).
+
+- **The Overview**: a banner with where things stand and a pill per release; the **next milestone** with a countdown (and the one after); tiles for releases deployed, features live, tests passed, steps waiting on you and decisions still open; a card per release with its progress ring, steps, features, tests and merges; **Waiting on you**, in order; **Latest advancements**; and **Still missing**, the features not live yet by the release they are expected in.
+- **A release** (its card or pill) opens at the side (the whole screen on a phone) with tabs: Overview (summary, dates, steps), Features, Merges, Commands (with **Copy**, what to expect and what to do if not), Tests, Decisions, Recommendations and risks, and Links. A feature, test or decision in it opens over it; the arrow goes back, **Esc** (or Back on Android) closes it. An action's **commands** opens its release right at that command.
+- Item ids in a board are links to those items.
+- **Claude keeps it current**: after a merge, a test, a decision or a finished step, Claude changes only what changed on the board (with a log line saying what happened, and which session did it), so several sessions can update it at once. Ask "Import my release board into my tracker for project X" in Claude Code to bring in a board file you already have; Claude sends the file with an upload link.
+- **Import a board file** yourself: on **Release boards → All** (or under a board), pick the project and the file (a release board page, its data script or its JSON). It merges with the board; nothing on it is deleted.
+- **Data file** (top right of a board) downloads the board as its standalone page's data script (`window.NAME = { … }`), so a page you already use can keep showing it.
+- Coming next: the Timeline, Features, Tests, Decisions, Commands and Log views, then the board in your items, Home, plans and notifications.
+
 ## 9. The model (optional)
 
 Connect a model of your own in **Settings → Model**, the same kinds as in Tracker Editor:
@@ -300,6 +312,7 @@ In any Claude chat or Claude Code session with the Tracker connector on, just sa
 | "Update tasks on my tracker: the login fix is done" | Finds the items and changes their status, notes or dates. |
 | "Pin the release checklist in my tracker" / "Unpin it" | Pins or unpins items, so they stay on top of their project (section 6). |
 | "Log this session as Claude work on my tracker" | Adds a Claude work item with a link to the session or PR. |
+| "Import my release board into my tracker for project Platform" / "Update the release board: R4 is merged into dev, its test passed" / "Where does the release board stand?" | Imports a board file (with an upload link from Claude Code), changes only what changed (with a log line), reports its session's progress, and reads where things stand (section 8, *Release boards*). |
 | "Attach this screenshot to the checkout task in my tracker" | Attaches the picture (or a PDF or any file up to 10 MB) to the item, shown like your own. From Claude Code it sends files from your computer (a screenshot it took, a chart it made); in a chat, files from a public link. A file of the same name is replaced. |
 | "For this conversation use project Platform in my tracker and tag with the repos you touch" | Files everything it adds or sends under Platform and tags each item with the repositories involved, creating them if needed. |
 | "What's on my tracker?" / "What's left open?" | Summarizes counts, what's in progress, what's due and what's waiting for review. |

@@ -29,6 +29,7 @@ Everything lives in the same private data repository the app syncs to:
 ```
 tracker.json                                     items (the app's data file)
 devices.json                                     phones/browsers that want push notifications
+boards/<project>.json                            a project's release board (boards/<project>/log-<month>.json: its older log)
 files/2026-10-20-offline-sync-proposal-1a2b3c/   one folder per document
   proposal.md                                    the file Claude sent
   mockup.html                                    more files or later versions
@@ -182,9 +183,10 @@ Tools:
 - **`delete_items`**: only used when you explicitly ask.
 - **`send_document`**: saves a proposal or artifact as a file and files it as a doc, or adds a new version to an existing doc.
 - **`attach_file`**: attaches a picture, PDF or any other file (up to 10 MB) to an item, as the app does: downloaded from a public https link (`source_url`), given as base64 (`content_base64`, small files), or, with neither, through an upload link that a shell sends the file to (in Claude Code: `curl -sS -T screenshot.png '<link>'`). A file of the same name on the item is replaced.
+- **`get_board`**, **`get_board_records`**, **`update_board`**, **`set_session`**, **`import_board`**, **`export_board`**: a project's release board (`boards/<project>.json`: releases, features, tests, decisions, events, sessions, repos, actions, briefs, log). `get_board` says where it stands in a few lines (and what changed since a time); `update_board` changes records by id with only the fields given (dotted paths reach inside), adds a log line and says which session did it, in one commit that is redone on the newer version when another writer got there first; `import_board` brings in a release board page or its data file (an upload link for big ones), `export_board` gives it back in that format (a download link for big ones).
 - **`list_editor_files`**, **`search_editor_files`**, **`read_editor_file`**, **`save_editor_file`**: your Tracker Editor files (`editor/index.json` and `editor/files/<id>/<name>` in the data repo). Search covers the 60 most recently changed files. Saving creates a file or replaces its text, name, project or tags; the editor picks it up on its next sync. Files encrypted in the editor are never read or changed.
 
-Prompts (slash commands in Claude Code): `use_project`, `send_proposal`, `update_tracker`, `check_feedback`.
+Prompts (slash commands in Claude Code): `use_project`, `send_proposal`, `release_board`, `update_tracker`, `check_feedback`.
 
 The server also sends Claude short instructions that explain these conventions, so you don't have to.
 
@@ -197,7 +199,8 @@ HTTP endpoints:
 | `/register`, `/authorize`, `/token` | OAuth. |
 | `/push/config` | Public key for push subscriptions (used by the app). |
 | `/push/test` | Sends a test notification. The app authenticates with its GitHub token, and the connector checks that it can access the data repo. |
-| `/upload/<token>` | A file for `attach_file` (PUT, the raw bytes). The token is the permission: signed with a key from `MCP_SECRET`, for one item and one file name, good for 15 minutes, and with `OAUTH_KV` usable once. |
+| `/upload/<token>` | A file for `attach_file` or `import_board` (PUT, the raw bytes). The token is the permission: signed with a key from `MCP_SECRET`, for one item and file name (or one project's board), good for 15 minutes, and with `OAUTH_KV` usable once. |
+| `/download/<token>` | A release board's data script for `export_board` (GET), for one project, good for 15 minutes. |
 
 ## Security notes
 

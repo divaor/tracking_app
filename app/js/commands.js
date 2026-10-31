@@ -26,6 +26,7 @@ export const COMMAND_LIST = [
   { id: 'go-docs', group: 'Go to', label: 'Docs (your reading list)' },
   { id: 'go-projects', group: 'Go to', label: 'Projects and tags' },
   { id: 'go-days', group: 'Go to', label: 'Days: past plans and what got done each day' },
+  { id: 'go-release-boards', group: 'Go to', label: 'Release boards: each project\u2019s releases, features, tests and decisions' },
   { id: 'settings', group: 'Go to', label: 'Settings', desktop: 'Mod+,' },
 
   { id: 'search', group: 'Search and filter', label: 'Search', keys: '/', desktop: '/ · Mod+F' },

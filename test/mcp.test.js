@@ -47,9 +47,13 @@ test('initialize, tools/list and prompts follow the MCP shape', async () => {
     'add_items',
     'attach_file',
     'delete_items',
+    'export_board',
+    'get_board',
+    'get_board_records',
     'get_item',
     'get_overview',
     'get_plans',
+    'import_board',
     'list_editor_files',
     'list_items',
     'list_projects',
@@ -60,6 +64,8 @@ test('initialize, tools/list and prompts follow the MCP shape', async () => {
     'save_project',
     'search_editor_files',
     'send_document',
+    'set_session',
+    'update_board',
     'update_items',
   ]);
   for (const tool of tools) {

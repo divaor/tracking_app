@@ -155,7 +155,7 @@ test('full authorization code flow with PKCE, then MCP with the access token', a
 
   const res = await mcpCall(s, flow.tokens.access_token);
   assert.equal(res.status, 200);
-  assert.equal((await res.json()).result.tools.length, 17);
+  assert.equal((await res.json()).result.tools.length, 23);
 
   const tampered = flow.tokens.access_token.slice(0, -2) + (flow.tokens.access_token.endsWith('A') ? 'BB' : 'AA');
   assert.equal((await mcpCall(s, tampered)).status, 401);
