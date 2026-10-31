@@ -1,9 +1,13 @@
 // Release boards kept with the data (boards.js says what they hold): listed and read from the data
 // repo (or the data on this device), kept here so they show at once and offline, read again after
-// each sync (only those whose file changed). Importing a board file merges it with what is there.
+// each sync (only those whose file changed; what changed elsewhere is told as notifications).
+// Importing a board file merges it with what is there; ticks, decisions and comments made here are
+// written at the version read and made again on the newer one when another writer got there first.
+// When this device last looked at each board is kept here too (what changed since is marked).
 import { kvGet, kvSet } from './kv.js';
-import { boardFromData, boardPath, boardScript, BOARDS_DIR, boardSlug, mergeBoards, parseBoard, serializeBoard } from './boards.js';
+import { boardEvents, boardFromData, boardPath, boardScript, BOARDS_DIR, boardSlug, mergeBoards, parseBoard, serializeBoard, waitingEverywhere } from './boards.js';
 import { nowIso } from './model.js';
+import { notifyChanges, remind } from './notifier.js';
 import { getSettings } from './settings.js';
 import { dataClient, onSynced } from './syncManager.js';
 
@@ -11,6 +15,9 @@ let index = null; // [{ slug, project, sha }]
 const boards = new Map(); // slug → { sha, board }
 const listeners = new Set();
 let loading = null;
+let told = false; // the first refresh after starting tells nothing (as the first sync)
+let seen = {}; // slug → when this device last looked (ISO)
+let reminded = []; // the reminders given: `${slug}:${action id}:${time}`
 
 const announce = () => listeners.forEach((fn) => fn());
 
@@ -28,6 +35,8 @@ export const cachedBoard = (slug) => boards.get(slug)?.board ?? null;
 async function loadKept() {
   if (index) return;
   index = (await kvGet('boards:index').catch(() => null)) ?? [];
+  seen = (await kvGet('boards:seen').catch(() => null)) ?? {};
+  reminded = (await kvGet('boards:reminded').catch(() => null)) ?? [];
   for (const { slug } of index) {
     const kept = await kvGet(`board:${slug}`).catch(() => null);
     const board = kept?.board && parseBoard(kept.board);
@@ -59,10 +68,12 @@ export function refreshBoards() {
           const file = await client.getFile(entry.path, branch || undefined);
           board = file && parseBoard(file.text);
           if (board) await keep(slug, file.sha ?? entry.sha, board);
+          if (board && known?.board && told) notifyChanges(boardEvents(known.board, board, { self: getSettings().device }));
         }
         if (board) next.push({ slug, project: board.project || slug, sha: boards.get(slug)?.sha ?? '' });
       }
       next.sort(byName);
+      told = true;
       const changed = JSON.stringify(next) !== JSON.stringify(index);
       index = next;
       await kvSet('boards:index', index).catch(() => {});
@@ -109,6 +120,61 @@ export async function importBoardFile(text, project) {
     }
   }
   throw new Error('The board kept changing elsewhere; try again.');
+}
+
+/**
+ * Changes a board as `change(board)` says (pure: boards.js boardTick, decideBoard, applyBoardChanges)
+ * and writes it at the version read; when another writer got there first, reads the newer one and
+ * changes that. Returns the board written. `what` names the change in the commit message.
+ */
+export async function changeBoard(slug, change, what) {
+  const { client, branch } = await dataClient();
+  const device = getSettings().device || 'this device';
+  const path = `${BOARDS_DIR}/${slug}.json`;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const file = await client.getFile(path, branch || undefined);
+    const there = file ? parseBoard(file.text) : null;
+    if (!there) throw new Error(file ? `${path} cannot be read, so it was left as it is.` : 'That board is not in your data any more.');
+    const board = change(there, { at: nowIso(), by: device });
+    try {
+      const { sha } = await client.putFile(path, { text: serializeBoard(board), sha: file.sha, branch: branch || undefined, message: `Tracker: release board “${board.project}”: ${what} (from ${device})` });
+      await keep(slug, sha ?? '', board);
+      announce();
+      return board;
+    } catch (err) {
+      if (err?.status !== 409 && err?.status !== 422) throw err;
+    }
+  }
+  throw new Error('The board kept changing elsewhere; try again.');
+}
+
+/** When this device last looked at a board (ISO, '' when never). */
+export const boardSeenAt = (slug) => seen[slug] ?? '';
+
+/** Remembers that this device looked at a board now (what changed before is no longer marked). */
+export function markBoardSeen(slug, at = nowIso()) {
+  seen = { ...seen, [slug]: at };
+  kvSet('boards:seen', seen).catch(() => {});
+}
+
+// How long before a step's time it is reminded of.
+export const REMIND_BEFORE_MS = 15 * 60_000;
+
+/** Reminds of steps waiting on the person whose time comes within REMIND_BEFORE_MS (once each). */
+export function checkReminders(now = new Date()) {
+  if (getSettings().boardReminders === false || !index) return;
+  const boardsHere = index.map(({ slug }) => ({ slug, board: boards.get(slug)?.board })).filter((b) => b.board);
+  let added = false;
+  for (const w of waitingEverywhere(boardsHere, now)) {
+    if (!w.time || w.time <= now || w.time - now > REMIND_BEFORE_MS) continue;
+    const key = `${w.slug}:${w.action.id}:${w.time.toISOString()}`;
+    if (reminded.includes(key)) continue;
+    reminded = [...reminded, key].slice(-200);
+    added = true;
+    const mins = Math.max(1, Math.round((w.time - now) / 60_000));
+    remind({ title: `In ${mins} min: ${String(w.action.text ?? '')}`, body: `${w.project}${w.action.when ? ` · ${w.action.when}` : ''}`, href: `#/release-board/${w.slug}` });
+  }
+  if (added) kvSet('boards:reminded', reminded).catch(() => {});
 }
 
 /** The months of a board's older log (boards/<slug>/log-<month>.json, the connector's archive), newest first. */

@@ -4,6 +4,7 @@ import { addDays, pinnedFirst, SORTS, sortItems, STATUSES, statusLabel, TYPES } 
 import { formatLongToday, greeting } from '../format.js';
 import { Icon, StatusIcon } from './icons.js';
 import { EmptyState, ItemCard, ItemRow, QuickAdd, Segmented, TypeFilter } from './components.js';
+import { BoardsWaiting } from './boardLinks.js';
 import { PlanCard, PlanStrip, PlanStripToggle } from './plans.js';
 
 const DONE_LIMIT = 25;
@@ -45,7 +46,7 @@ function Welcome({ actions }) {
   </div>`;
 }
 
-export function HomeView({ items, today, actions, hrefFor }) {
+export function HomeView({ items, today, actions, hrefFor, inScope, titles }) {
   const [captureType, setCaptureType] = useState('task');
   const open = items.filter((i) => i.status !== 'done');
   const inProgressCount = items.filter((i) => i.status === 'in_progress').length;
@@ -85,6 +86,8 @@ export function HomeView({ items, today, actions, hrefFor }) {
         </a>`;
       })}
     </div>
+
+    <${BoardsWaiting} actions=${actions} inScope=${inScope} titles=${titles} />
 
     ${pinned.length > 0 &&
     html`<${Section} title="Pinned" icon="pin" count=${pinned.length}>

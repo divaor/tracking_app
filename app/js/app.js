@@ -23,7 +23,9 @@ import { getSettings, isLocal, isSyncConfigured, onSettings, saveSettings } from
 import { appendToNotes, refinement } from './assist.js';
 import { modelReady, readQuickAdd } from './assistant.js';
 import { getSyncState, movedTo, onSyncState, syncNow } from './syncManager.js';
+import { DEFAULT_EVENTS } from './devices.js';
 import { DEFAULT_NOTIFY, setNotificationHandlers } from './notifier.js';
+import { updatePushEvents } from './push.js';
 import { sharedDraft } from './sharedItems.js';
 import { SharedFilesDialog } from './ui/sharedDialog.js';
 import { dictateIntoQuickAdd } from './ui/dictation.js';
@@ -38,6 +40,7 @@ import { appItemLink, idFromFragment, itemIdIn, WEB_APP_URL } from './itemLinks.
 import { HelpDialog } from './ui/help.js';
 import { makePlan, usePlanAuto } from './ui/plans.js';
 import { DaysView } from './ui/days.js';
+import { checkReminders } from './boardStore.js';
 import { boardHref, ReleaseBoardView, useBoards } from './ui/releaseBoard.js';
 import { ListenBar, setListenNotice } from './ui/listen.js';
 import { stopReading, toggleReading } from './reader.js';
@@ -383,7 +386,21 @@ export function App() {
       }
     };
     navigator.serviceWorker?.addEventListener('message', onMessage);
-    return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
+    // Reminders of steps waiting on you on the release boards, shortly before their time.
+    const reminders = setInterval(() => checkReminders(), 60_000);
+    setTimeout(() => checkReminders(), 5000);
+    // Devices that turned push on before release boards could notify get them once (on by default).
+    const before = getSettings();
+    if (before.push && before.notify?.boards === undefined) {
+      const prefs = { ...DEFAULT_NOTIFY, ...before.notify };
+      updatePushEvents(DEFAULT_EVENTS.filter((id) => prefs[id]))
+        .then(() => saveSettings({ notify: { ...getSettings().notify, boards: true } }))
+        .catch(() => {});
+    }
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', onMessage);
+      clearInterval(reminders);
+    };
   }, []);
 
   /**
@@ -447,6 +464,7 @@ export function App() {
   const projects = useMemo(() => projectList(items, projectRecords), [items, projectRecords]);
   const byKey = useMemo(() => new Map(projects.map((p) => [p.key, p])), [projects]);
   const scopedItems = useMemo(() => items.filter((i) => matchesScope(i, scope, byKey)), [items, scope, byKey]);
+  const itemTitles = useMemo(() => new Map(items.map((i) => [i.id, i.title])), [items]);
   // Today's plan made and updated by itself (setting `planAuto`).
   usePlanAuto({ items: scopedItems, today, on: Boolean(settings.planAuto) });
   // Viewing a single project: new items go into it.
@@ -622,6 +640,10 @@ export function App() {
       toast('Comment deleted', {
         action: { label: 'Undo', run: () => store.get(item.id) && store.update(item.id, restoreCommentPatch(store.get(item.id), comment)) },
       });
+    },
+    /** Opens a release board's link (#/release-board/…), closing the open item first. */
+    openBoard(href) {
+      closeModal(() => (location.hash = href));
     },
     showProject(key) {
       setScope([`project:${key}`]);
@@ -965,7 +987,8 @@ export function App() {
         setInstallPrompt(null);
       }} />`;
   } else {
-    view = html`<${HomeView} items=${scopedItems} today=${today} actions=${actions} hrefFor=${hrefFor} />`;
+    view = html`<${HomeView} items=${scopedItems} today=${today} actions=${actions} hrefFor=${hrefFor}
+      inScope=${(project) => matchesScope({ project }, scope, byKey)} titles=${itemTitles} />`;
   }
   const scoped = ['home', 'board', 'list'].includes(route.view);
 

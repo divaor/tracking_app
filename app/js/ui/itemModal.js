@@ -25,6 +25,7 @@ import { webItemLink, WEB_APP_URL } from '../itemLinks.js';
 import { Icon } from './icons.js';
 import { DecisionBadge, EditorLink, PriorityMark, ProjectsContext, Segmented, TypeBadge } from './components.js';
 import { ProjectChip, TagInput } from './projects.js';
+import { ItemBoardLinks } from './boardLinks.js';
 import { FilesPanel, useFileDrop } from './fileViewer.js';
 import { ItemAssistant } from './assist.js';
 import { FindBar } from './itemFind.js';
@@ -310,6 +311,7 @@ function ViewBody({ item, actions, today, onEdit, bodyRef, onScroll }) {
         html`<p class="muted no-notes">No ${item.type === 'doc' ? 'content' : 'notes'} yet. <button type="button" class="btn link" onClick=${onEdit}>Add some</button></p>`}
 
     <${FilesPanel} item=${item} actions=${actions} />
+    <${ItemBoardLinks} item=${item} actions=${actions} />
     ${isReviewable(item) && html`<${ReviewPanel} item=${item} actions=${actions} />`}
     <${Comments} key=${item.id} item=${item} actions=${actions} />
     <${ItemAssistant} item=${item} actions=${actions} />

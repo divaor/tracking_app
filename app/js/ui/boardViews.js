@@ -3,27 +3,41 @@
 // status, words, missing only), Tests and Commands by release, Decisions (all, open, decided), the
 // Log (with the older months the connector archived) and the board's search. Tables become one
 // card per row on phones (`data-label` on each cell).
-import { html, useEffect, useState } from '../../vendor/preact-htm.js';
-import { boardDate, boardSummary, commandGroups, featureView, isLive, liveRecords, searchBoard, statusLabel, STATUSES, testGroups } from '../boards.js';
+import { html, useContext, useEffect, useState } from '../../vendor/preact-htm.js';
+import { boardDate, boardSummary, commandGroups, featureView, isLive, liveRecords, searchBoard, statusLabel, STATUSES, testGroups, waitingActions } from '../boards.js';
 import { olderLog, olderLogMonths } from '../boardStore.js';
-import { Bar, BoardText, boardDay, Chip, Command, DecisionCard, Empty, ItemLink, opensRow, ReleaseCards, RelLink, SectionTitle, untilText } from './boardParts.js';
+import { Bar, BoardEdit, BoardText, boardDay, Chip, Command, DecisionCard, Empty, ItemLink, opensRow, ReleaseCards, RelLink, SectionTitle, untilText, useIsNew } from './boardParts.js';
+import { Icon } from './icons.js';
 import { Timeline, TimelineLegend, TIMELINE_ZOOMS } from './boardTimeline.js';
 
 const releaseName = (r, id) => (r ? `${r.id} · ${r.title ?? ''}` : id || '');
 
-function ActionList({ actions, titles, onOpen }) {
+/** What waits on the person, in order, each ticked done here (`project` names the board, on Home). */
+export function ActionList({ actions, titles, onOpen, project = '' }) {
+  const edit = useContext(BoardEdit);
+  const isNew = useIsNew();
+  const [busy, setBusy] = useState('');
   if (!actions.length) return html`<${Empty}>Nothing waits on you.</${Empty}>`;
-  return html`<ol class="rb-list rb-numbered">${actions.map((a, i) => html`<li key=${a.id}><span class="rb-num">${i + 1}</span><div>
+  const tick = async (a) => {
+    setBusy(a.id);
+    await edit.tick({ kind: 'action', id: a.id }, true, String(a.text ?? ''), a);
+    setBusy('');
+  };
+  return html`<ol class="rb-list rb-numbered">${actions.map((a, i) => html`<li key=${a.id} class=${isNew(a) ? 'rb-new' : ''}>
+    ${edit
+      ? html`<button type="button" class="rb-check" role="checkbox" aria-checked="false" aria-label=${`Done: ${a.text}`} title="Mark as done" disabled=${busy === a.id} onClick=${() => tick(a)}><${Icon} name="check" size=${13} /></button>`
+      : html`<span class="rb-num">${i + 1}</span>`}<div>
     <div class="rb-ttl"><${BoardText} text=${a.text} titles=${titles} /></div>
     ${a.detail && html`<div class="rb-desc"><${BoardText} text=${a.detail} titles=${titles} /></div>`}
-    <div class="rb-links">${a.when && html`<span class="rb-tag">${a.when}</span>`}<${RelLink} id=${a.release} onOpen=${onOpen} /><${ItemLink} id=${a.item} titles=${titles} />
+    <div class="rb-links">${project && html`<span class="rb-tag rb-project-tag">${project}</span>`}${a.when && html`<span class="rb-tag">${a.when}</span>`}<${RelLink} id=${a.release} onOpen=${onOpen} /><${ItemLink} id=${a.item} titles=${titles} />
       ${a.command && a.release && html`<button type="button" class="link-btn" onClick=${() => onOpen({ type: 'release', id: a.release, tab: 'commands', command: a.command })}>commands</button>`}</div>
   </div></li>`)}</ol>`;
 }
 
 function LogList({ log, titles, onOpen }) {
+  const isNew = useIsNew();
   if (!log.length) return html`<${Empty}>No entries yet.</${Empty}>`;
-  return html`<ul class="rb-list rb-log">${log.map((l, i) => html`<li key=${l.id ?? i}><span class="rb-when">${boardDay(l.time)}</span><div>
+  return html`<ul class="rb-list rb-log">${log.map((l, i) => html`<li key=${l.id ?? i} class=${isNew(l) ? 'rb-new' : ''}><span class="rb-when">${boardDay(l.time)}</span><div>
     <div><${BoardText} text=${l.text} titles=${titles} /></div>
     ${(l.release || l.item || l.by) && html`<div class="rb-links"><${RelLink} id=${l.release} onOpen=${onOpen} /><${ItemLink} id=${l.item} titles=${titles} />${l.by && html`<span class="muted small">${l.by}</span>`}</div>`}
   </div></li>`)}</ul>`;
@@ -35,7 +49,7 @@ export function Overview({ board, titles, onOpen, now, tabs, href }) {
   const s = boardSummary(board, now);
   const releases = liveRecords(board, 'releases');
   const features = liveRecords(board, 'features');
-  const actions = liveRecords(board, 'actions');
+  const actions = waitingActions(board);
   const log = board.log.filter((l) => !l.deleted).slice(0, 9);
   const [next, after] = s.next;
   const pct = (n, t) => (t ? (n * 100) / t : 0);
@@ -160,6 +174,7 @@ export function ReleasesView({ board, titles, onOpen, now }) {
 // ---- Features -----------------------------------------------------------------------------------
 
 export function FeaturesView({ board, titles, onOpen, state, setState }) {
+  const isNew = useIsNew();
   const filter = { release: '', repo: '', query: '', missing: false, statuses: [], ...state };
   const v = featureView(board, filter);
   const set = (patch) => setState({ ...filter, ...patch });
@@ -189,7 +204,7 @@ export function FeaturesView({ board, titles, onOpen, state, setState }) {
       <tbody>
         ${v.groups.map((g) => [
           html`<tr key=${`g${g.id}`} class="rb-group-row"><td colspan=${columns}>${g.id ? releaseName(g.release, g.id) : 'Not in a release yet'} <span class="muted small">(${g.records.length})</span></td></tr>`,
-          ...g.records.map((f) => html`<tr key=${f.id} class="click" onClick=${opensRow(() => onOpen({ type: 'feature', id: f.id }))}>
+          ...g.records.map((f) => html`<tr key=${f.id} class="click ${isNew(f) ? 'rb-new' : ''}" onClick=${opensRow(() => onOpen({ type: 'feature', id: f.id }))}>
             <td data-label="Feature"><button type="button" class="rb-row-open rb-ttl">${f.name}</button><div class="rb-desc"><${BoardText} text=${f.what} titles=${titles} /></div></td>
             <td data-label="Status"><${Chip} status=${f.status} /></td>
             ${has.repos && html`<td data-label="Repos">${(f.repos ?? []).length > 0 && html`<div class="rb-links">${f.repos.map((x) => html`<span class="rb-tag" key=${x}>${x}</span>`)}</div>`}</td>`}
@@ -206,6 +221,7 @@ export function FeaturesView({ board, titles, onOpen, state, setState }) {
 // ---- Tests --------------------------------------------------------------------------------------
 
 export function TestsView({ board, titles, onOpen }) {
+  const isNew = useIsNew();
   const groups = testGroups(board);
   const all = liveRecords(board, 'tests');
   const has = { owner: all.some((t) => t.owner), item: all.some((t) => t.item) };
@@ -215,7 +231,7 @@ export function TestsView({ board, titles, onOpen }) {
       <${SectionTitle} title=${g.id ? releaseName(g.release, g.id) : 'Not tied to a release'} sub=${`${g.passed} of ${g.records.length} passed`} />
       <div class="rb-panel rb-table-scroll"><table class="rb-table rb-stack">
         <thead><tr><th class="w46">Test</th><th>Status</th><th>When</th>${has.owner && html`<th>Owner</th>`}${has.item && html`<th>Tracker</th>`}</tr></thead>
-        <tbody>${g.records.map((t) => html`<tr key=${t.id} class="click" onClick=${opensRow(() => onOpen({ type: 'test', id: t.id }))}>
+        <tbody>${g.records.map((t) => html`<tr key=${t.id} class="click ${isNew(t) ? 'rb-new' : ''}" onClick=${opensRow(() => onOpen({ type: 'test', id: t.id }))}>
           <td data-label="Test"><button type="button" class="rb-row-open rb-ttl"><${BoardText} text=${t.title} titles=${titles} /></button>${t.note && html`<div class="rb-desc"><${BoardText} text=${t.note} titles=${titles} /></div>`}</td>
           <td data-label="Status"><${Chip} status=${t.status} /></td>
           <td data-label="When" class="small rb-nowrap-cell">${boardDay(t.date)}</td>
@@ -248,7 +264,7 @@ export function CommandsView({ board, titles }) {
     ${groups.length
       ? groups.map((g) => html`<div key=${g.release.id}>
           <${SectionTitle} title=${releaseName(g.release)} sub=${`${g.pending.length} to do · ${g.done.length} done`} />
-          <div class="rb-panel rb-pad">${[...g.pending, ...g.done].map((c, i) => html`<${Command} key=${c.id || i} c=${c} titles=${titles} />`)}</div>
+          <div class="rb-panel rb-pad">${[...g.pending, ...g.done].map((c, i) => html`<${Command} key=${c.id || i} c=${c} titles=${titles} release=${g.release} />`)}</div>
         </div>`)
       : html`<${Empty}>No commands on this board.</${Empty}>`}`;
 }

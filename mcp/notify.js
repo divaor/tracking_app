@@ -58,7 +58,7 @@ export function createNotifier({ client, path = 'tracker.json', branch = '', sec
             const wanted = events.filter((e) => device.events.includes(e.category));
             if (!wanted.length) return;
             const summary = summarizeEvents(wanted);
-            const message = { ...summary, category: wanted[0].category, tag: summary.itemId ? `item-${summary.itemId}` : 'tracker' };
+            const message = { ...summary, category: wanted[0].category, tag: summary.itemId ? `item-${summary.itemId}` : summary.href ? 'board' : 'tracker' };
             const status = await deliver(device, message).catch((err) => {
               log(`Push to ${device.name || device.id} failed: ${err.message}`);
               return 0;

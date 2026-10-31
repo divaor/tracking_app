@@ -2,6 +2,8 @@
 // above List and Board, and updates by themselves (setting `planAuto`).
 import { html, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { modelReady, planWith } from '../assistant.js';
+import { boardPlanLines } from '../boards.js';
+import { cachedBoard, cachedBoards } from '../boardStore.js';
 import { renderMarkdown } from '../markdown.js';
 import { nowIso } from '../model.js';
 import { changedSince, changesSince, describeChanges, emptyPlans, planVersions } from '../plans.js';
@@ -71,7 +73,8 @@ export async function makePlan(kind, { items, today, update = false, auto = fals
     const plans = await loadPlans(today, { fresh: true });
     const previous = update ? plans[kind] : null;
     const changes = previous ? changesSince(items, previous.at, today) : null;
-    const reply = await planWith(items, { kind, today, previous, changes, signal, onToken: (t) => setRunning({ ...running, text: (out += t) }) });
+    const boards = boardPlanLines(cachedBoards().map(({ slug }) => ({ slug, board: cachedBoard(slug) })).filter((b) => b.board));
+    const reply = await planWith(items, { kind, today, previous, changes, boards, signal, onToken: (t) => setRunning({ ...running, text: (out += t) }) });
     const text = (reply || out).trim();
     if (!text) throw new Error('The model gave no answer.');
     const { llm, device } = getSettings();

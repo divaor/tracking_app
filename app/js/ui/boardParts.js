@@ -1,10 +1,18 @@
 // The release board's small parts (ui/releaseBoard.js, its views, timeline and drawer): the board's
 // way of writing dates, status chips, its text (`code`, **bold**, links and tracker ids), rings and
-// bars, commands with Copy, steps, decision and release cards.
-import { html, useState } from '../../vendor/preact-htm.js';
-import { boardDate, statusLabel } from '../boards.js';
+// bars, commands with Copy, steps, decision and release cards, comments. What the person can change
+// (ticks, decisions, comments) goes through the `BoardEdit` context; `NewSince` marks what changed
+// since this device last looked.
+import { createContext, html, useContext, useState } from '../../vendor/preact-htm.js';
+import { boardDate, recordComments, statusLabel } from '../boards.js';
 import { splitItemIds } from '../itemLinks.js';
 import { Icon } from './icons.js';
+
+/** { tick(target, done, label), decide(id, choice, label), comment(part, id, text, command), uncomment(part, id, commentId), device } */
+export const BoardEdit = createContext(null);
+/** (record) => whether it changed since this device last looked (by someone else). */
+export const NewSince = createContext(() => false);
+export const useIsNew = () => useContext(NewSince);
 
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const two = (n) => String(n).padStart(2, '0');
@@ -112,17 +120,63 @@ export function CopyButton({ text }) {
   })}><${Icon} name=${copied ? 'check' : 'copy'} size=${14} />${copied ? 'Copied' : 'Copy'}</button>`;
 }
 
-export function Command({ c, titles, highlight }) {
+export function Command({ c, titles, highlight, release }) {
+  const edit = useContext(BoardEdit);
+  const [busy, setBusy] = useState(false);
   const done = c.status === 'done';
+  const tick = async () => {
+    setBusy(true);
+    await edit.tick({ kind: 'command', release: release.id, command: c.id || c.label }, !done, String(c.label ?? ''));
+    setBusy(false);
+  };
   return html`<div class="rb-cmd ${highlight ? 'highlight' : ''} ${done ? 'done' : ''}" id=${c.id ? `rb-cmd-${c.id}` : undefined}>
     <div class="rb-cmd-head">
       <div><div class="rb-ttl"><${BoardText} text=${c.label} titles=${titles} /></div>${c.when && html`<div class="small muted"><${BoardText} text=${c.when} titles=${titles} /></div>`}</div>
-      <div class="rb-nowrap"><${Chip} status=${done ? 'done' : 'pending'} label=${done ? 'Done' : 'To do'} />${c.code && html`<${CopyButton} text=${c.code} />`}</div>
+      <div class="rb-nowrap">
+        ${edit && release
+          ? html`<button type="button" class="rb-done-btn ${done ? 'on' : ''}" aria-pressed=${done} disabled=${busy} title=${done ? 'Mark as not run' : 'Mark as run'} onClick=${tick}><${Icon} name=${done ? 'check' : 'circle'} size=${14} />${done ? 'Done' : 'Mark done'}</button>`
+          : html`<${Chip} status=${done ? 'done' : 'pending'} label=${done ? 'Done' : 'To do'} />`}
+        ${c.code && html`<${CopyButton} text=${c.code} />`}
+      </div>
     </div>
     ${c.code && html`<${CodeBlock} code=${c.code} />`}
     ${c.expect && html`<div class="rb-expect"><b>Expect:</b> <${BoardText} text=${c.expect} titles=${titles} /></div>`}
     ${c.if_not && html`<div class="rb-expect"><b>If not:</b> <${BoardText} text=${c.if_not} titles=${titles} /></div>`}
     ${c.item && html`<div class="rb-expect">Source: <${ItemLink} id=${c.item} titles=${titles} /></div>`}
+    ${edit && release && c.id && html`<${BoardComments} record=${release} part="releases" command=${c.id} titles=${titles} compact
+      placeholder="Paste the output, or say how it went" />`}
+  </div>`;
+}
+
+/** A record's comments (a release's command's with `command`) and a box to add one, as on items. */
+export function BoardComments({ record, part, command = '', titles, compact = false, placeholder = 'A question or a note for Claude' }) {
+  const edit = useContext(BoardEdit);
+  const [text, setText] = useState('');
+  const [open, setOpen] = useState(!compact);
+  const [busy, setBusy] = useState(false);
+  const comments = recordComments(record, command);
+  if (!edit) return null;
+  const send = async () => {
+    if (!text.trim() || busy) return;
+    setBusy(true);
+    if (await edit.comment(part, record.id, text, command)) setText('');
+    setBusy(false);
+  };
+  return html`<div class="rb-comments ${compact ? 'compact' : ''}">
+    ${!compact && html`<h4>Comments${comments.length > 0 && html` <span class="n">${comments.length}</span>`}</h4>`}
+    ${comments.map((c) => html`<div key=${c.id} class="rb-comment ${/^Claude\b/.test(c.by ?? '') ? 'from-claude' : ''}">
+      <div class="rb-comment-head"><b>${c.by || 'Someone'}</b><span class="muted small">${boardStamp(c.at)}</span>
+        ${c.by === edit.device && html`<button type="button" class="link-btn small" onClick=${() => edit.uncomment(part, record.id, c.id)}>Delete</button>`}</div>
+      <div class="rb-comment-text"><${BoardText} text=${c.text} titles=${titles} /></div>
+    </div>`)}
+    ${open
+      ? html`<div class="rb-comment-new">
+          <textarea rows=${compact ? 2 : 3} value=${text} placeholder=${placeholder} aria-label=${placeholder}
+            onInput=${(e) => setText(e.currentTarget.value)} onKeyDown=${(e) => (e.ctrlKey || e.metaKey) && e.key === 'Enter' && (e.preventDefault(), send())} />
+          <div class="rb-comment-tools"><span class="muted small">Claude sees it on its next look at the board.</span>
+            <button type="button" class="btn sm primary" disabled=${busy || !text.trim()} onClick=${send}>${busy ? 'Sending…' : 'Comment'}</button></div>
+        </div>`
+      : html`<button type="button" class="link-btn small rb-comment-open" onClick=${() => setOpen(true)}>${comments.length ? 'Reply' : 'Comment or paste the output'}</button>`}
   </div>`;
 }
 
@@ -132,10 +186,21 @@ export function KeyValues({ rows }) {
   return html`<dl class="rb-kv">${shown.map(([k, v]) => html`<dt key=${`k${k}`}>${k}</dt><dd key=${`v${k}`}>${v}</dd>`)}</dl>`;
 }
 
-export function Steps({ steps, titles }) {
+export function Steps({ steps, titles, part, record }) {
+  const edit = useContext(BoardEdit);
+  const [busy, setBusy] = useState(-1);
   if (!steps?.length) return html`<p class="muted small">No steps listed.</p>`;
+  const label = (s) => (typeof s === 'string' ? s : String(s?.label ?? ''));
+  const tick = async (s, i) => {
+    setBusy(i);
+    await edit.tick({ kind: 'step', part, id: record.id, index: i, label: label(s) }, !s?.done, label(s));
+    setBusy(-1);
+  };
   return html`<ol class="rb-steps">${steps.map((s, i) => html`<li key=${i} class=${s?.done ? 'done' : ''}>
-    <span class="rb-tick" aria-label=${s?.done ? 'done' : 'to do'}>${s?.done ? html`<${Icon} name="check" size=${13} />` : ''}</span>
+    ${edit && record
+      ? html`<button type="button" class="rb-tick" role="checkbox" aria-checked=${Boolean(s?.done)} aria-label=${label(s)} disabled=${busy === i} title=${s?.done ? 'Mark as not done' : 'Mark as done'}
+          onClick=${() => tick(s, i)}>${s?.done ? html`<${Icon} name="check" size=${13} />` : ''}</button>`
+      : html`<span class="rb-tick" aria-label=${s?.done ? 'done' : 'to do'}>${s?.done ? html`<${Icon} name="check" size=${13} />` : ''}</span>`}
     <div><div><${BoardText} text=${typeof s === 'string' ? s : s?.label} titles=${titles} /></div>
     ${(s?.date || s?.by || s?.item) && html`<div class="small muted">${[boardDay(s.date), s.by].filter(Boolean).join(' · ')} ${s.item ? html`<${ItemLink} id=${s.item} titles=${titles} />` : ''}</div>`}</div>
   </li>`)}</ol>`;
@@ -155,7 +220,8 @@ export const opensRow = (open) => (e) => {
 };
 
 export function DecisionCard({ d, titles, onOpen }) {
-  return html`<div class="rb-panel rb-dcard clickable ${d.status === 'open' ? 'open' : ''}" onClick=${opensRow(() => onOpen({ type: 'decision', id: d.id }))}>
+  const isNew = useIsNew();
+  return html`<div class="rb-panel rb-dcard clickable ${d.status === 'open' ? 'open' : ''} ${isNew(d) ? 'rb-new' : ''}" onClick=${opensRow(() => onOpen({ type: 'decision', id: d.id }))}>
     <div class="rb-top-line"><span class="rb-mono small muted">${[d.code, boardDay(d.date)].filter(Boolean).join(' · ')}</span><${Chip} status=${d.status} /></div>
     <button type="button" class="rb-row-open rb-ttl"><${BoardText} text=${d.title} titles=${titles} /></button>
     <div class="rb-desc"><${BoardText} text=${d.choice} titles=${titles} /></div>
@@ -165,11 +231,12 @@ export function DecisionCard({ d, titles, onOpen }) {
 
 /** The releases' cards: ring, progress, steps, counts. `cards` is boardSummary's. */
 export function ReleaseCards({ releases, cards, titles, onOpen }) {
+  const isNew = useIsNew();
   const cardOf = new Map(cards.map((c) => [c.id, c]));
   return html`<div class="rb-releases">${releases.map((r) => {
     const c = cardOf.get(r.id);
     const color = releaseColor(r);
-    return html`<button type="button" key=${r.id} class="rb-panel rb-rcard" style=${`--c:${color}`} onClick=${() => onOpen({ type: 'release', id: r.id })}>
+    return html`<button type="button" key=${r.id} class="rb-panel rb-rcard ${isNew(r) ? 'rb-new' : ''}" style=${`--c:${color}`} onClick=${() => onOpen({ type: 'release', id: r.id })}>
       <div class="rb-rcard-head"><div><div class="rb-rname">${r.id}</div><${Chip} status=${r.status} label=${r.short_status} /></div><${Ring} percent=${c.progress.percent} color=${color} /></div>
       <div class="rb-rtitle"><${BoardText} text=${r.title} titles=${titles} /></div>
       <${Bar} percent=${c.progress.percent} color=${color} />

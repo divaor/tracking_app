@@ -3,7 +3,7 @@
 // actions waiting on the person, briefs and a log). Records merge one by one: the one changed last
 // wins, deletions are tombstones, so Claude's sessions and the devices never lose each other's
 // changes. A board file of the standalone page (`window.NAME = { … }`) imports and exports as it is.
-import { bumpTime, findWords, foldSearch, nowIso, slugify } from './model.js';
+import { bumpTime, CLAUDE_AUTHOR, findWords, foldSearch, newId, nowIso, slugify } from './model.js';
 
 export const BOARDS_DIR = 'boards';
 export const BOARD_VERSION = 1;
@@ -111,13 +111,33 @@ export function mergeBoards(base, other) {
     const byId = new Map((base[part] ?? []).map((r) => [r.id, r]));
     const order = (base[part] ?? []).map((r) => r.id);
     for (const r of other[part] ?? []) {
-      if (!byId.has(r.id)) order.push(r.id);
-      if (!byId.has(r.id) || newer(byId.get(r.id), r)) byId.set(r.id, r);
+      const mine = byId.get(r.id);
+      if (!mine) order.push(r.id);
+      byId.set(r.id, mine ? withBothComments(newer(mine, r) ? r : mine, mine, r) : r);
     }
     merged[part] = order.map((id) => byId.get(id));
   }
   merged.log = sortLog(merged.log);
   return merged;
+}
+
+// A record's comments from both copies (each at its latest), so a comment is never lost to a change
+// made meanwhile elsewhere; the rest of the record is the newer copy's.
+function withBothComments(winner, a, b) {
+  if (winner.deleted || (!Array.isArray(a.comments) && !Array.isArray(b.comments))) return winner;
+  const comments = unionComments([...(a.comments ?? []), ...(b.comments ?? [])]);
+  return JSON.stringify(comments) === JSON.stringify(winner.comments ?? []) ? winner : { ...winner, comments };
+}
+
+const commentTime = (c) => str(c?.editedAt || c?.at);
+function unionComments(list) {
+  const byId = new Map();
+  for (const c of list) {
+    if (!isObject(c) || !str(c.id)) continue;
+    const prev = byId.get(c.id);
+    if (!prev || commentTime(c) > commentTime(prev) || (commentTime(c) === commentTime(prev) && c.deleted && !prev.deleted)) byId.set(c.id, c);
+  }
+  return [...byId.values()].sort((x, y) => (str(x.at) < str(y.at) ? -1 : str(x.at) > str(y.at) ? 1 : 0));
 }
 
 const sortLog = (log) => [...log].sort((a, b) => (sortKey(b.time) > sortKey(a.time) ? 1 : sortKey(b.time) < sortKey(a.time) ? -1 : 0));
@@ -181,8 +201,12 @@ export function applyBoardChanges(board, changes, { at = nowIso(), by = '' } = {
       record = before && !before.deleted ? { ...before } : { id };
       delete record.deleted;
       for (const [path, value] of Object.entries(set)) {
-        if (path === 'id' || STAMPS.includes(path)) continue;
+        if (path === 'id' || STAMPS.includes(path) || path.split('.')[0] === 'comments') continue;
         record = setPath(record, path, value);
+      }
+      if (c.comment != null || c.uncomment != null) {
+        if (!before || before.deleted) throw new Error(`There is no ${part} ${id} to comment on.`);
+        record.comments = commentChange(record, c, { at, by });
       }
       record.updatedAt = at_;
       record.updatedBy = by;
@@ -195,6 +219,24 @@ export function applyBoardChanges(board, changes, { at = nowIso(), by = '' } = {
   }
   next.log = sortLog(next.log);
   return { board: next, changed };
+}
+
+const MAX_COMMENT_CHARS = 20_000;
+
+// A record's comments after a change's `comment` (text, on its `command` for a release's command)
+// or `uncomment` (a comment's id: left as a tombstone, so a merge does not bring it back).
+function commentChange(record, c, { at, by }) {
+  const comments = Array.isArray(record.comments) ? record.comments : [];
+  const latest = comments.reduce((l, x) => (commentTime(x) > l ? commentTime(x) : l), '');
+  const when = latest ? bumpTime(latest, at) : at;
+  if (c.uncomment != null) {
+    return comments.map((x) => (x.id === str(c.uncomment) && !x.deleted ? { id: x.id, by: x.by, at: x.at, editedAt: when, deleted: true, ...(x.command ? { command: x.command } : {}) } : x));
+  }
+  const words = str(c.comment).trim();
+  if (!words) throw new Error('A comment needs some text.');
+  const command = cleanId(c.command);
+  if (command && !(Array.isArray(record.commands) && record.commands.some((x) => x?.id === command))) throw new Error(`There is no command “${command}” on ${record.id} to comment on.`);
+  return [...comments, { id: newId(), by, at: when, text: words.slice(0, MAX_COMMENT_CHARS), ...(command ? { command } : {}) }];
 }
 
 /** The board with a log entry added (newest first): { text, release?, item? }. */
@@ -304,12 +346,15 @@ export function boardData(board) {
   delete meta.export_variable;
   const out = { meta, now: unstamped(board.now) };
   for (const part of ['actions', 'releases', 'features', 'tests', 'decisions', 'events', 'sessions', 'repos', 'log', 'briefs']) {
-    out[part] = liveRecords(board, part).map((r) => {
-      const plain = unstamped(r);
-      if (DERIVED_IDS.has(part)) delete plain.id;
-      if (part === 'log') delete plain.by;
-      return plain;
-    });
+    out[part] = liveRecords(board, part)
+      .filter((r) => !(part === 'actions' && r.done))
+      .map((r) => {
+        const plain = unstamped(r);
+        delete plain.comments;
+        if (DERIVED_IDS.has(part)) delete plain.id;
+        if (part === 'log') delete plain.by;
+        return plain;
+      });
   }
   return { ...out, ...(board.other ?? {}) };
 }
@@ -362,7 +407,7 @@ export function boardSummary(board, now = new Date()) {
     releases: { out: releases.filter((r) => RELEASE_OUT.has(r.status)).length, total: releases.length },
     features: { live: features.filter((f) => LIVE.has(f.status)).length, total: features.length },
     tests: { passed: tests.filter((t) => TEST_PASSED.has(t.status)).length, total: tests.length },
-    actions: liveRecords(board, 'actions').length,
+    actions: waitingActions(board).length,
     openDecisions: decisions.filter((d) => d.status === 'open').length,
     next: upcoming(board, now).slice(0, 2),
     cards: releases.map((r) => {
@@ -649,4 +694,225 @@ export function searchBoard(board, query, { limit = 50 } = {}) {
     if (hits.length) groups.push({ part, label, total: hits.length, hits: hits.slice(0, limit) });
   }
   return { words, total: groups.reduce((n, g) => n + g.total, 0), groups };
+}
+
+// ---- The board in the rest of the tracker: ticks, decisions, comments, links, events --------------
+
+/** What waits on the person: the actions not ticked done, in the board's order. */
+export const waitingActions = (board) => liveRecords(board, 'actions').filter((a) => !a.done);
+
+// Claude's writes: the connector's device ("Claude", "Claude Code"), with its session after " · ".
+const fromClaude = (by) => new RegExp(`^${CLAUDE_AUTHOR}\\b`).test(str(by));
+const stepLabel = (s) => (typeof s === 'string' ? s : str(s?.label));
+const findStep = (steps, index, label) => (stepLabel(steps[index]) === str(label) || label == null ? index : steps.findIndex((s) => stepLabel(s) === str(label)));
+const findCommand = (commands, command) => commands.findIndex((c) => str(c?.id) === str(command) || (!c?.id && str(c?.label) === str(command)));
+
+/**
+ * Ticks something on the board done or not, as the person does in the app, with a log line:
+ * `{ kind: 'step', part ('releases' | 'events'), id, index, label }` (found by its label when the
+ * steps moved), `{ kind: 'command', release, command }` (its id, or its label when it has none) or
+ * `{ kind: 'action', id }`. Read again before each write, so it applies to the board as it is then.
+ */
+export function boardTick(board, target, done, { at = nowIso(), by = '' } = {}) {
+  const day = boardTime(at);
+  if (target?.kind === 'action') {
+    const a = liveRecords(board, 'actions').find((x) => x.id === target.id);
+    if (!a) throw new Error('That step is no longer on the board.');
+    const { board: next } = applyBoardChanges(board, [{ part: 'actions', id: a.id, set: done ? { done: true, done_at: day, done_by: by } : { done: null, done_at: null, done_by: null } }], { at, by });
+    return addLog(next, { text: `${done ? 'Done' : 'Not done after all'}: ${str(a.text)}`, release: a.release, item: a.item }, { at, by });
+  }
+  if (target?.kind === 'step') {
+    const part = target.part === 'events' ? 'events' : 'releases';
+    const r = liveRecords(board, part).find((x) => x.id === target.id);
+    const steps = Array.isArray(r?.steps) ? r.steps : [];
+    const index = findStep(steps, Number(target.index), target.label);
+    if (!r || index < 0 || index >= steps.length) throw new Error('That step is no longer on the board.');
+    const old = steps[index];
+    const step = { ...(typeof old === 'string' ? { label: old } : old), done: Boolean(done) };
+    if (done) Object.assign(step, { date: day.slice(0, 10), by });
+    else {
+      delete step.date;
+      delete step.by;
+    }
+    const { board: next } = applyBoardChanges(board, [{ part, id: r.id, set: { [`steps.${index}`]: step } }], { at, by });
+    return addLog(next, { text: `${r.id}: ${done ? 'done' : 'not done after all'}: ${stepLabel(old)}`, release: part === 'releases' ? r.id : r.release }, { at, by });
+  }
+  if (target?.kind === 'command') {
+    const r = liveRecords(board, 'releases').find((x) => x.id === target.release);
+    const commands = Array.isArray(r?.commands) ? r.commands : [];
+    const index = findCommand(commands, target.command);
+    if (!r || index < 0) throw new Error('That command is no longer on the board.');
+    const set = done ? { [`commands.${index}.status`]: 'done', [`commands.${index}.done_at`]: day, [`commands.${index}.done_by`]: by } : { [`commands.${index}.status`]: 'pending', [`commands.${index}.done_at`]: null, [`commands.${index}.done_by`]: null };
+    const { board: next } = applyBoardChanges(board, [{ part: 'releases', id: r.id, set }], { at, by });
+    return addLog(next, { text: `${r.id}: ${done ? 'ran' : 'not run after all'}: ${str(commands[index].label)}`, release: r.id }, { at, by });
+  }
+  throw new Error('Nothing to tick.');
+}
+
+/**
+ * Decides an open decision (`choice`: one of its `options`, or the person's words) or opens it again
+ * (`choice` null). Its question stays in `question`; `choice` becomes what was decided.
+ */
+export function decideBoard(board, id, choice, { at = nowIso(), by = '' } = {}) {
+  const d = liveRecords(board, 'decisions').find((x) => x.id === id);
+  if (!d) throw new Error('That decision is no longer on the board.');
+  const label = d.code || d.title || d.id;
+  let set;
+  if (choice == null) {
+    set = { status: 'open', decided: null, decided_at: null, decided_by: null, ...(d.question != null ? { choice: d.question, question: null } : {}) };
+  } else {
+    const words = str(choice).trim();
+    if (!words) throw new Error('Say what you decided.');
+    set = { status: 'decided', decided: words, decided_at: boardTime(at), decided_by: by, choice: words, ...(d.question == null && d.status === 'open' ? { question: str(d.choice) } : {}) };
+  }
+  const { board: next } = applyBoardChanges(board, [{ part: 'decisions', id, set }], { at, by });
+  return addLog(next, { text: choice == null ? `${label}: open again` : `Decided ${label}: ${str(choice).trim()}`, release: d.release, item: d.item }, { at, by });
+}
+
+/** A record's comments that show, oldest first (a release's own, or those on its `command`). */
+export const recordComments = (record, command = '') => (Array.isArray(record?.comments) ? record.comments : []).filter((c) => !c.deleted && str(c.command) === str(command));
+
+/** Records whose latest comment is the person's (Claude has not answered): [{ part, id, title, command?, comment }]. */
+export function commentsAwaiting(board) {
+  const out = [];
+  for (const part of BOARD_PARTS) {
+    if (part === 'log') continue;
+    for (const r of liveRecords(board, part)) {
+      const live = (Array.isArray(r.comments) ? r.comments : []).filter((c) => !c.deleted);
+      for (const command of new Set(live.map((c) => str(c.command)))) {
+        const last = live.filter((c) => str(c.command) === command).at(-1);
+        if (last && !fromClaude(last.by)) out.push({ part, id: r.id, title: recordTitle(part, r), ...(command ? { command } : {}), comment: last });
+      }
+    }
+  }
+  return out.sort((a, b) => (str(a.comment.at) < str(b.comment.at) ? -1 : str(a.comment.at) > str(b.comment.at) ? 1 : 0));
+}
+
+/** What on the board points to a tracker item (in a field or its text): records, then log entries. */
+export function boardLinksTo(board, itemId) {
+  const id = str(itemId);
+  if (!id) return { records: [], log: [] };
+  const records = [];
+  for (const part of ['releases', 'features', 'tests', 'decisions', 'events', 'actions', 'briefs', 'sessions']) {
+    for (const r of liveRecords(board, part)) {
+      if (part === 'actions' && r.done) continue;
+      if (JSON.stringify({ ...r, comments: undefined }).includes(id)) records.push({ part, id: r.id, title: recordTitle(part, r), status: part === 'actions' ? 'waiting' : str(r.status), release: part === 'releases' ? r.id : str(r.release) });
+    }
+  }
+  const log = board.log.filter((l) => !l.deleted && JSON.stringify(l).includes(id));
+  return { records, log };
+}
+
+/**
+ * Notification-ready events between two copies of a board (changes.js's shape, category 'boards'):
+ * a test failed, a release changed status, a decision or a step waits for the person, a comment.
+ * Changes made by `self` (this device) say nothing; `href` opens the board.
+ */
+export function boardEvents(before, after, { self = '' } = {}) {
+  if (!before || !after) return [];
+  const href = `#/release-board/${boardSlug(after.project)}`;
+  const project = str(after.project);
+  const events = [];
+  const add = (by, title, body, open) => {
+    if (self && by === self) return;
+    events.push({ category: 'boards', title, body: body ? `${body} · ${project}` : project, by: by || 'Another device', fromClaude: fromClaude(by), href: open ? `${href}/${open.type}/${encodeURIComponent(open.id)}` : href });
+  };
+  const was = (part) => new Map(liveRecords(before, part).map((r) => [r.id, r]));
+  const tests = was('tests');
+  for (const t of liveRecords(after, 'tests')) if (t.status === 'failed' && tests.get(t.id)?.status !== 'failed') add(t.updatedBy, 'A test failed', str(t.title), { type: 'test', id: t.id });
+  const releases = was('releases');
+  for (const r of liveRecords(after, 'releases')) {
+    const old = releases.get(r.id);
+    if (old && old.status !== r.status) add(r.updatedBy, `${r.id} is ${str(r.short_status || statusLabel(r.status)).toLowerCase()}`, str(r.title), { type: 'release', id: r.id });
+  }
+  const decisions = was('decisions');
+  for (const d of liveRecords(after, 'decisions')) if (d.status === 'open' && decisions.get(d.id)?.status !== 'open') add(d.updatedBy, 'A decision to make', str(d.title), { type: 'decision', id: d.id });
+  const actions = was('actions');
+  for (const a of waitingActions(after)) {
+    const old = actions.get(a.id);
+    if (!old || old.deleted || old.done) add(a.updatedBy, 'Waiting on you', str(a.text));
+  }
+  for (const part of BOARD_PARTS) {
+    if (part === 'log') continue;
+    const prev = was(part);
+    for (const r of liveRecords(after, part)) {
+      const seen = new Set((prev.get(r.id)?.comments ?? []).map((c) => c.id));
+      const added = (Array.isArray(r.comments) ? r.comments : []).filter((c) => !c.deleted && !seen.has(c.id));
+      const last = added.at(-1);
+      const open = { releases: 'release', features: 'feature', tests: 'test', decisions: 'decision', events: 'event' }[part];
+      if (last) add(last.by, `${fromClaude(last.by) ? CLAUDE_AUTHOR : last.by || 'Someone'} commented on ${recordTitle(part, r)}`, str(last.text).replace(/\s+/g, ' ').slice(0, 140), open && { type: open, id: r.id });
+    }
+  }
+  return events;
+}
+
+const WEEKDAY_NAMES = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+/**
+ * When an action is due, from its `at` or its `when` as the page writes it ("2026-11-02 16:00",
+ * "Mon 11-02 16:00 UTC", "Sun 16:00 UTC": the next Sunday), in UTC; null when it says no time.
+ */
+export function actionTime(action, now = new Date()) {
+  const exact = boardDate(action?.at) ?? boardDate(action?.when);
+  if (exact) return exact;
+  const when = str(action?.when).trim().toLowerCase();
+  const time = /(\d{1,2}):(\d{2})/.exec(when);
+  const [h, m] = time ? [Number(time[1]), Number(time[2])] : [12, 0];
+  const md = /\b(\d{1,2})-(\d{1,2})\b/.exec(when.replace(/\d{1,2}:\d{2}/, ''));
+  if (md) {
+    let d = new Date(Date.UTC(now.getUTCFullYear(), Number(md[1]) - 1, Number(md[2]), h, m));
+    if (d - now < -183 * DAY_MS) d = new Date(Date.UTC(now.getUTCFullYear() + 1, Number(md[1]) - 1, Number(md[2]), h, m));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const wd = WEEKDAY_NAMES.findIndex((w) => new RegExp(`\\b${w}`).test(when));
+  if (wd < 0 || !time) return null;
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, m));
+  let ahead = (wd - d.getUTCDay() + 7) % 7;
+  if (ahead === 0 && d < now) ahead = 7;
+  return new Date(d.getTime() + ahead * DAY_MS);
+}
+
+/**
+ * What waits on the person on every board, those with a time first (soonest), then the rest in each
+ * board's order: [{ slug, project, action, time }]. `boards`: [{ slug, board }].
+ */
+export function waitingEverywhere(boards, now = new Date()) {
+  const all = boards.flatMap(({ slug, board }) => waitingActions(board).map((action, order) => ({ slug, project: str(board.project), action, time: actionTime(action, now), order })));
+  return all.sort((a, b) => (a.time && b.time ? a.time - b.time : a.time ? -1 : b.time ? 1 : 0));
+}
+
+/** How long a board has had no word (ms since its newest change), or null for an empty one. */
+export function boardQuietFor(board, now = new Date()) {
+  const { at } = boardUpdated(board);
+  return at ? now - new Date(at) : null;
+}
+
+/** Lines about the boards for the day plan and the week review (next milestones, what waits, open decisions). */
+export function boardPlanLines(boards, now = new Date()) {
+  const lines = [];
+  for (const { board } of boards) {
+    const next = upcoming(board, now).slice(0, 2).map((n) => `${n.title} (${n.date.toISOString().slice(0, 16).replace('T', ' ')} UTC)`);
+    const waiting = waitingActions(board).slice(0, 5).map((a) => `${str(a.text)}${a.when ? ` (${a.when})` : ''}`);
+    const open = liveRecords(board, 'decisions').filter((d) => d.status === 'open').map((d) => str(d.title));
+    if (!next.length && !waiting.length && !open.length) continue;
+    lines.push(`Release board "${str(board.project)}":`);
+    if (next.length) lines.push(`- Next milestones: ${next.join('; ')}`);
+    if (waiting.length) lines.push(`- Waiting on me: ${waiting.join('; ')}`);
+    if (open.length) lines.push(`- Decisions still open: ${open.slice(0, 5).join('; ')}`);
+  }
+  return lines.join('\n');
+}
+
+/** The boards' log entries of a local day (YYYY-MM-DD), newest first: [{ slug, project, entry }]. */
+export function boardDayLog(boards, day) {
+  const out = [];
+  for (const { slug, board } of boards) {
+    for (const entry of board.log) {
+      const d = boardDate(entry.time);
+      if (entry.deleted || !d) continue;
+      const local = `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+      if (local === day) out.push({ slug, project: str(board.project), entry, at: d });
+    }
+  }
+  return out.sort((a, b) => b.at - a.at);
 }

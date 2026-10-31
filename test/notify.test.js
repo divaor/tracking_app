@@ -193,3 +193,23 @@ test('pinning and unpinning are named in notifications', async () => {
   const unpinned = [normalizeItem({ ...before[0], updatedAt: '2026-10-03T00:00:00.000Z', updatedBy: 'Claude' })];
   assert.equal(describeChanges(pinned, unpinned)[0].title, 'Claude unpinned a task');
 });
+
+test('the connector tells about release board changes: a test failed, comments; only devices that want boards', async () => {
+  const s = setup();
+  const phone = fakeBrowser('https://push.example/phone');
+  const laptop = fakeBrowser('https://push.example/laptop');
+  s.register([
+    { id: 'phone', name: 'Phone', subscription: phone.subscription, events: ['items', 'boards'] },
+    { id: 'laptop', name: 'Laptop', subscription: laptop.subscription, events: ['items'] },
+  ]);
+  await s.call('update_board', { project: 'Demo', changes: [{ part: 'tests', id: 't-1', set: { title: 'Login test', status: 'scheduled' } }] });
+  assert.equal(s.pushes.length, 0, 'a board made from nothing says nothing');
+  await s.call('update_board', { project: 'Demo', changes: [{ part: 'tests', id: 't-1', set: { status: 'failed' } }] });
+  assert.equal(s.pushes.length, 1, 'only the device that wants boards');
+  assert.equal(s.pushes[0].url, 'https://push.example/phone');
+  const message = phone.decrypt(s.pushes[0].body);
+  assert.deepEqual([message.title, message.body, message.href, message.category], ['A test failed', 'Login test · Demo', '#/release-board/demo/test/t-1', 'boards']);
+  // In the app: the boards category, and Claude's changes are wanted.
+  assert.equal(wantedEvents([{ category: 'boards', fromClaude: true }], { boards: true }).length, 1);
+  assert.equal(wantedEvents([{ category: 'boards', fromClaude: true }], { boards: false }).length, 0);
+});

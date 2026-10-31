@@ -2,7 +2,7 @@
 // import_board and export_board (with their upload and download links), against a fake GitHub.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseBoard, readBoardData } from '../app/js/boards.js';
+import { applyBoardChanges, boardTick, parseBoard, readBoardData, serializeBoard } from '../app/js/boards.js';
 import { memoryStore } from '../mcp/oauth.js';
 import { createServerFromEnv } from '../mcp/server.js';
 import { DEMO } from './fixtures/board-demo.js';
@@ -204,4 +204,39 @@ test('the release_board prompt says how to keep a board current', async () => {
   assert.match(text, /you are "Docs"/);
   assert.match(text, /set_session/);
   assert.match(text, /update_board/);
+});
+
+test('comments and ticks from the app: get_board shows what awaits Claude; Claude answers with update_board; get_overview has the boards', async () => {
+  const { call, board, github } = setup();
+  await call('import_board', { project: 'Demo app', content: page() });
+  // On the phone: a comment on a feature and on a command, and the first action ticked done.
+  let b = applyBoardChanges(board(), [
+    { part: 'features', id: 'f-export', comment: 'Is CSV enough?' },
+    { part: 'releases', id: 'R2', comment: 'Output: merged cleanly', command: 'c-merge' },
+  ], { at: '2026-10-31T10:00:00.000Z', by: 'Phone' }).board;
+  b = boardTick(b, { kind: 'action', id: b.actions[0].id }, true, { at: '2026-10-31T10:01:00.000Z', by: 'Phone' });
+  github.write(PATH, serializeBoard(b));
+
+  const got = (await call('get_board', { project: 'Demo app' })).data;
+  assert.deepEqual(got.waitingOnYou.map((a) => a.text), ['Run the migration']);
+  assert.equal(got.tiles.waitingOnYou, 1);
+  assert.deepEqual(got.commentsAwaiting.map((c) => [c.part, c.id, c.command ?? '', c.by, c.text]), [
+    ['releases', 'R2', 'c-merge', 'Phone', 'Output: merged cleanly'],
+    ['features', 'f-export', '', 'Phone', 'Is CSV enough?'],
+  ]);
+
+  // Claude answers one; it cannot delete the user's comment.
+  const userComment = board().features.find((f) => f.id === 'f-export').comments[0].id;
+  const answered = await call('update_board', { project: 'Demo app', session: 'Docs', changes: [{ part: 'features', id: 'f-export', comment: 'CSV first, PDF later.', uncomment: userComment }] });
+  assert.equal(answered.isError, false, answered.text);
+  const comments = board().features.find((f) => f.id === 'f-export').comments;
+  assert.deepEqual(comments.map((c) => [c.by, c.text, Boolean(c.deleted)]), [['Phone', 'Is CSV enough?', false], ['Claude Code · Docs', 'CSV first, PDF later.', false]]);
+  assert.deepEqual((await call('get_board', { project: 'Demo app' })).data.commentsAwaiting.map((c) => c.id), ['R2']);
+  const bad = await call('update_board', { project: 'Demo app', changes: [{ part: 'tests', id: 'nope', comment: 'x' }] });
+  assert.equal(bad.isError, true);
+  assert.match(bad.text, /no tests nope to comment on/);
+
+  const overview = (await call('get_overview')).data;
+  assert.deepEqual(overview.releaseBoards.map((r) => [r.project, r.waitingOnYou, r.openDecisions, r.commentsAwaiting]), [['Demo app', ['Run the migration (Mon 11-02)'], 1, 1]]);
+  assert.equal(overview.releaseBoards[0].link, 'https://me.github.io/tracking_app/#/release-board/demo-app');
 });

@@ -39,6 +39,10 @@ export const DEFAULT_SETTINGS = {
   // Today's plan made and updated by itself (ui/plans.js usePlanAuto), and where its strip is hidden.
   planAuto: false,
   planStripHidden: { list: false, board: false },
+  // Release boards: one with no word for longer than this says so (0: never); reminders of what waits
+  // on you with a time (Sun 16:00 UTC), shortly before.
+  boardQuietHours: 48,
+  boardReminders: true,
   // In a browser on a computer: links to items not on this device go to the desktop app (tracker-app://).
   openItemsInApp: false,
   // Claude connector address, used for push notifications.

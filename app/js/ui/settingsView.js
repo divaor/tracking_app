@@ -395,6 +395,16 @@ export function SettingsView({ sync, actions, items, installPrompt, onInstall, t
         <input type="checkbox" checked=${Boolean(getSettings().pinnedPastFilters)} onChange=${(e) => saveSettings({ pinnedPastFilters: e.currentTarget.checked })} />
         <span>Show pinned items whatever the filters<small>On top of every list and board column, whatever type, status or #tag you filter by, as long as their project is shown. Off: they show only when they match, then on top.</small></span>
       </label>
+      <h3 class="settings-sub">Release boards</h3>
+      <label class="field inline-number">
+        <span>Say a board is quiet after<small>A board with no word from Claude or anyone for longer says so at its top (0: never).</small></span>
+        <span class="with-unit"><input type="number" min="0" max="999" step="1" value=${getSettings().boardQuietHours ?? 48}
+          onChange=${(e) => saveSettings({ boardQuietHours: Math.max(0, Math.min(999, Math.round(Number(e.currentTarget.value) || 0))) })} /> hours</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" checked=${getSettings().boardReminders !== false} onChange=${(e) => saveSettings({ boardReminders: e.currentTarget.checked })} />
+        <span>Remind me of steps waiting on me<small>A step with a time (“Sun 16:00 UTC”) is notified 15 minutes before, while the app is open (the desktop app also in the background).</small></span>
+      </label>
     </${Card}>
     <${DataCard} actions=${actions} items=${items} />
     <${AppsCard} installPrompt=${installPrompt} onInstall=${onInstall} />

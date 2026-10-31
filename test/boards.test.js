@@ -11,8 +11,17 @@ import {
   boardPath,
   boardScript,
   boardSummary,
+  actionTime,
+  boardDayLog,
+  boardEvents,
+  boardLinksTo,
+  boardPlanLines,
+  boardQuietFor,
   boardTabs,
+  boardTick,
   changedSince,
+  commentsAwaiting,
+  decideBoard,
   commandGroups,
   emptyBoard,
   featureView,
@@ -22,6 +31,7 @@ import {
   MAX_LOG,
   parseBoard,
   readBoardData,
+  recordComments,
   releaseProgress,
   searchBoard,
   serializeBoard,
@@ -31,6 +41,8 @@ import {
   timelineLayout,
   timelineRange,
   upcoming,
+  waitingActions,
+  waitingEverywhere,
 } from '../app/js/boards.js';
 
 import { DEMO } from './fixtures/board-demo.js';
@@ -302,4 +314,159 @@ test('the board\'s search: every word, accents and case aside, by part; commands
   const many = searchBoard(board, 'r', { limit: 1 });
   assert.ok(many.groups.every((g) => g.hits.length <= 1));
   assert.ok(many.total > many.groups.length);
+});
+
+const demoBoard = () => boardFromData(DEMO, { project: 'Demo', at: AT });
+const LATER = '2026-10-31T10:00:00.000Z';
+
+test('comments on board records: added, on a command, deleted as tombstones, never written through set', () => {
+  let { board } = applyBoardChanges(demoBoard(), [{ part: 'features', id: 'f-export', comment: 'Is CSV enough?' }], { at: LATER, by: 'Laptop' });
+  ({ board } = applyBoardChanges(board, [{ part: 'features', id: 'f-export', comment: 'Yes, CSV first.', set: { status: 'in_progress' } }], { at: LATER, by: 'Claude · Reports' }));
+  const f = board.features.find((x) => x.id === 'f-export');
+  assert.equal(f.status, 'in_progress');
+  assert.deepEqual(recordComments(f).map((c) => [c.by, c.text]), [['Laptop', 'Is CSV enough?'], ['Claude · Reports', 'Yes, CSV first.']]);
+  assert.ok(f.comments[1].at > f.comments[0].at, 'each comment after the last one');
+  ({ board } = applyBoardChanges(board, [{ part: 'releases', id: 'R2', comment: 'Output: merged cleanly', command: 'c-merge' }], { at: LATER, by: 'Laptop' }));
+  const r2 = board.releases.find((x) => x.id === 'R2');
+  assert.deepEqual(recordComments(r2, 'c-merge').map((c) => c.text), ['Output: merged cleanly']);
+  assert.deepEqual(recordComments(r2), []);
+  assert.throws(() => applyBoardChanges(board, [{ part: 'releases', id: 'R2', comment: 'x', command: 'nope' }], { at: LATER }), /no command/);
+  assert.throws(() => applyBoardChanges(board, [{ part: 'tests', id: 'nope', comment: 'x' }], { at: LATER }), /no tests nope/);
+  assert.throws(() => applyBoardChanges(board, [{ part: 'tests', id: 't-login', comment: '   ' }], { at: LATER }), /needs some text/);
+  ({ board } = applyBoardChanges(board, [{ part: 'features', id: 'f-export', set: { comments: [], 'comments.0.text': 'hacked' } }], { at: LATER }));
+  assert.equal(board.features.find((x) => x.id === 'f-export').comments.length, 2, 'set cannot touch comments');
+  const first = f.comments[0].id;
+  ({ board } = applyBoardChanges(board, [{ part: 'features', id: 'f-export', uncomment: first }], { at: LATER, by: 'Laptop' }));
+  const after = board.features.find((x) => x.id === 'f-export');
+  assert.deepEqual(recordComments(after).map((c) => c.text), ['Yes, CSV first.']);
+  assert.equal(after.comments.find((c) => c.id === first).deleted, true);
+  // Exported, the page's data has no comments.
+  assert.equal(boardData(board).features.find((x) => x.id === 'f-export').comments, undefined);
+});
+
+test('a merge keeps the comments of both copies, even when the other copy changed the record later', () => {
+  const base = demoBoard();
+  const mine = applyBoardChanges(base, [{ part: 'decisions', id: 'd-2', comment: 'CSV please' }], { at: LATER, by: 'Phone' }).board;
+  const theirs = applyBoardChanges(base, [{ part: 'decisions', id: 'd-2', set: { title: 'Report format (urgent)' } }], { at: '2026-10-31T11:00:00.000Z', by: 'Claude' }).board;
+  for (const merged of [mergeBoards(mine, theirs), mergeBoards(theirs, mine)]) {
+    const d = merged.decisions.find((x) => x.id === 'd-2');
+    assert.equal(d.title, 'Report format (urgent)');
+    assert.deepEqual(recordComments(d).map((c) => c.text), ['CSV please']);
+  }
+  // A deleted comment stays deleted when merged with a copy that still has it.
+  const id = mine.decisions.find((x) => x.id === 'd-2').comments[0].id;
+  const gone = applyBoardChanges(mine, [{ part: 'decisions', id: 'd-2', uncomment: id }], { at: '2026-10-31T12:00:00.000Z', by: 'Phone' }).board;
+  assert.deepEqual(recordComments(mergeBoards(mine, gone).decisions.find((x) => x.id === 'd-2')), []);
+});
+
+test('ticks: an action done (no longer waiting, not exported), a step, a command; each with a log line', () => {
+  let board = boardTick(demoBoard(), { kind: 'action', id: waitingActions(demoBoard())[0].id }, true, { at: LATER, by: 'Phone' });
+  assert.deepEqual(waitingActions(board).map((a) => a.text), ['Run the migration']);
+  assert.equal(boardSummary(board).actions, 1);
+  assert.equal(boardData(board).actions.length, 1);
+  assert.match(board.log[0].text, /^Done: Merge `feature\/login` into dev/);
+  assert.equal(board.log[0].by, 'Phone');
+  board = boardTick(board, { kind: 'action', id: board.actions[0].id }, false, { at: LATER, by: 'Phone' });
+  assert.equal(waitingActions(board).length, 2);
+  assert.equal(board.actions[0].done_at, undefined);
+
+  board = boardTick(board, { kind: 'step', part: 'releases', id: 'R2', index: 1, label: 'Merge' }, true, { at: LATER, by: 'Phone' });
+  const r2 = board.releases.find((r) => r.id === 'R2');
+  assert.deepEqual(r2.steps[1], { label: 'Merge', done: true, date: '2026-10-31', by: 'Phone' });
+  assert.equal(releaseProgress(r2).done, 2);
+  assert.match(board.log[0].text, /^R2: done: Merge/);
+  // Found by its label when the steps moved.
+  board = boardTick(board, { kind: 'step', part: 'releases', id: 'R2', index: 0, label: 'Deploy' }, true, { at: LATER, by: 'Phone' });
+  assert.equal(board.releases.find((r) => r.id === 'R2').steps[2].done, true);
+  // An event's steps written as plain text become steps with a label.
+  board = boardTick(board, { kind: 'step', part: 'events', id: 'e-swap', index: 1, label: 'swap' }, true, { at: LATER, by: 'Phone' });
+  assert.deepEqual(board.events.find((e) => e.id === 'e-swap').steps, ['stop', { label: 'swap', done: true, date: '2026-10-31', by: 'Phone' }, 'start']);
+  assert.throws(() => boardTick(board, { kind: 'step', part: 'releases', id: 'R2', index: 9, label: 'Nope' }, true), /no longer on the board/);
+
+  board = boardTick(board, { kind: 'command', release: 'R2', command: 'c-merge' }, true, { at: LATER, by: 'Phone' });
+  const c = board.releases.find((r) => r.id === 'R2').commands[0];
+  assert.deepEqual([c.status, c.done_by], ['done', 'Phone']);
+  assert.match(board.log[0].text, /^R2: ran: Merge into dev/);
+  assert.throws(() => boardTick(board, { kind: 'command', release: 'R2', command: 'nope' }, true), /no longer/);
+});
+
+test('deciding in the app: an option or the person\'s words, the question kept; open again', () => {
+  let board = decideBoard(demoBoard(), 'd-2', 'CSV', { at: LATER, by: 'Phone' });
+  let d = board.decisions.find((x) => x.id === 'd-2');
+  assert.deepEqual([d.status, d.choice, d.question, d.decided, d.decided_by], ['decided', 'CSV', 'PDF or CSV?', 'CSV', 'Phone']);
+  assert.match(board.log[0].text, /^Decided D2: CSV/);
+  assert.equal(boardSummary(board).openDecisions, 0);
+  board = decideBoard(board, 'd-2', null, { at: LATER, by: 'Phone' });
+  d = board.decisions.find((x) => x.id === 'd-2');
+  assert.deepEqual([d.status, d.choice, d.question, d.decided], ['open', 'PDF or CSV?', undefined, undefined]);
+  assert.throws(() => decideBoard(board, 'd-2', '  '), /what you decided/);
+});
+
+test('comments awaiting Claude: the records whose latest comment is the person\'s', () => {
+  let { board } = applyBoardChanges(demoBoard(), [
+    { part: 'features', id: 'f-export', comment: 'Is CSV enough?' },
+    { part: 'releases', id: 'R2', comment: 'Output attached', command: 'c-merge' },
+    { part: 'tests', id: 't-login', comment: 'Passed on my phone' },
+  ], { at: LATER, by: 'Phone' });
+  ({ board } = applyBoardChanges(board, [{ part: 'tests', id: 't-login', comment: 'Thanks, noted.' }], { at: LATER, by: 'Claude · QA' }));
+  assert.deepEqual(commentsAwaiting(board).map((a) => [a.part, a.id, a.command ?? '', a.comment.text]), [['releases', 'R2', 'c-merge', 'Output attached'], ['features', 'f-export', '', 'Is CSV enough?']]);
+});
+
+test('what on a board points to an item, and the events a change makes for notifications', () => {
+  const board = demoBoard();
+  const links = boardLinksTo(board, 'mvaaaaaa-0123456789abcdef');
+  assert.deepEqual(links.records.map((r) => [r.part, r.id]), [['features', 'f-reports'], ['actions', board.actions[0].id], ['briefs', 'B1']]);
+  assert.equal(links.log.length, 2);
+  assert.deepEqual(boardLinksTo(board, 'mvzzzzzz-0000000000000000'), { records: [], log: [] });
+
+  let after = applyBoardChanges(board, [
+    { part: 'tests', id: 't-reports', set: { status: 'failed' } },
+    { part: 'releases', id: 'R2', set: { status: 'live', short_status: 'Live' } },
+    { part: 'decisions', id: 'd-new', set: { title: 'Rename the app?', status: 'open' } },
+    { part: 'actions', id: 'a-new', set: { text: 'Approve the release' } },
+    { part: 'features', id: 'f-export', comment: 'Done on my side' },
+  ], { at: LATER, by: 'Claude · Release' }).board;
+  const events = boardEvents(board, after);
+  assert.deepEqual(events.map((e) => e.title), ['A test failed', 'R2 is live', 'A decision to make', 'Waiting on you', 'Claude commented on Export']);
+  assert.ok(events.every((e) => e.category === 'boards' && e.fromClaude && e.body.endsWith('· Demo')));
+  assert.equal(events[0].href, '#/release-board/demo/test/t-reports');
+  assert.equal(events[3].href, '#/release-board/demo');
+  // This device's own changes say nothing; nothing before (a first import) says nothing.
+  after = applyBoardChanges(board, [{ part: 'tests', id: 't-reports', set: { status: 'failed' } }], { at: LATER, by: 'Phone' }).board;
+  assert.deepEqual(boardEvents(board, after, { self: 'Phone' }), []);
+  assert.deepEqual(boardEvents(null, after), []);
+});
+
+test('when an action is due, from how the page writes it; everything waiting, soonest first', () => {
+  const now = new Date('2026-10-31T12:00:00Z'); // a Saturday
+  const at = (when) => actionTime({ when }, now)?.toISOString() ?? null;
+  assert.equal(at('2026-11-02 16:00'), '2026-11-02T16:00:00.000Z');
+  assert.equal(at('Mon 11-02 16:00 UTC'), '2026-11-02T16:00:00.000Z');
+  assert.equal(at('Mon 11-02'), '2026-11-02T12:00:00.000Z');
+  assert.equal(at('Sun 16:00 UTC'), '2026-11-01T16:00:00.000Z');
+  assert.equal(at('Sat 09:00'), '2026-11-07T09:00:00.000Z'); // today's has passed: next week
+  assert.equal(at('Sat 18:00'), '2026-10-31T18:00:00.000Z');
+  assert.equal(at('01-05 10:00'), '2027-01-05T10:00:00.000Z'); // early next year, not ten months ago
+  assert.equal(at('now'), null);
+  assert.equal(at('this weekend'), null);
+  assert.equal(actionTime({ at: '2026-11-03 08:00', when: 'soon' }, now).toISOString(), '2026-11-03T08:00:00.000Z');
+
+  const other = applyBoardChanges(emptyBoard('Other'), [{ part: 'actions', id: 'a-x', set: { text: 'Call the vendor', when: 'Sun 09:00 UTC' } }], { at: AT }).board;
+  const all = waitingEverywhere([{ slug: 'demo', board: demoBoard() }, { slug: 'other', board: other }], now);
+  assert.deepEqual(all.map((w) => [w.slug, w.action.text]), [['other', 'Call the vendor'], ['demo', 'Run the migration'], ['demo', 'Merge `feature/login` into dev']]);
+});
+
+test('the boards in plans and Days, and how long a board has been quiet', () => {
+  const now = new Date('2026-10-31T12:00:00Z');
+  const board = demoBoard();
+  const lines = boardPlanLines([{ slug: 'demo', board }], now);
+  assert.match(lines, /Release board "Demo":/);
+  assert.match(lines, /Next milestones: Server swap \(2026-11-01 16:00 UTC\); R2: go live \(2026-11-02 16:00 UTC\)/);
+  assert.match(lines, /Waiting on me: Merge `feature\/login` into dev \(now\); Run the migration \(Mon 11-02\)/);
+  assert.match(lines, /Decisions still open: Report format/);
+  assert.equal(boardPlanLines([{ slug: 'e', board: emptyBoard('E') }], now), '');
+  const day = boardDayLog([{ slug: 'demo', board }], '2026-10-30');
+  assert.deepEqual(day.map((d) => d.entry.text), process.env.TZ && process.env.TZ !== 'UTC' ? day.map((d) => d.entry.text) : ['R2 cut']);
+  assert.equal(boardQuietFor(board, new Date(Date.parse(AT) + 3600000)), 3600000);
+  assert.equal(boardQuietFor(emptyBoard('E'), now), null);
 });

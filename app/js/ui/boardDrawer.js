@@ -1,10 +1,46 @@
 // The release board's drawer: a release with its tabs (overview, features, merges, commands, tests,
 // decisions, recommendations, links), or a feature, test, decision or event. Opened from anywhere on
 // the board (`onOpen({ type, id, tab, command })`), with Back through what was opened from it.
-import { html, useEffect, useLayoutEffect, useRef } from '../../vendor/preact-htm.js';
+import { html, useContext, useEffect, useLayoutEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { liveRecords, releaseProgress, statusLabel } from '../boards.js';
-import { Bar, BoardText, boardDay, Chip, Command, DecisionCard, Empty, ItemLink, KeyValues, releaseColor, Steps } from './boardParts.js';
+import { Bar, BoardComments, BoardEdit, BoardText, boardDay, Chip, Command, DecisionCard, Empty, ItemLink, KeyValues, releaseColor, Steps } from './boardParts.js';
 import { Icon } from './icons.js';
+import { ListenButton, sourceOf } from './listen.js';
+
+// What a drawer does not read aloud: its bar, tabs, buttons and fields, comment times.
+const DRAWER_NOT_READ = '.rb-dr-bar, .rb-dr-tabs, .rb-comment-head .muted, .rb-comment-new, .rb-comment-open, .rb-decide, button, input, textarea, select, label, .rb-code';
+
+// An open decision decided here: one of its options (buttons), or the person's words; a decided one
+// can be opened again. Claude sees it on its next look (get_board since, the log).
+function Decide({ d }) {
+  const edit = useContext(BoardEdit);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (!edit) return null;
+  const label = d.code || d.title || d.id;
+  const go = async (choice) => {
+    setBusy(true);
+    if (await edit.decide(d.id, choice, label)) setText('');
+    setBusy(false);
+  };
+  if (d.status !== 'open') {
+    return html`<div class="rb-decide decided">
+      ${d.decided_by && html`<span class="muted small">Decided ${d.decided_at ? `${boardDay(d.decided_at)} ` : ''}by ${d.decided_by}</span>`}
+      <button type="button" class="btn sm" disabled=${busy} onClick=${() => go(null)}>Open it again</button>
+    </div>`;
+  }
+  const options = (Array.isArray(d.options) ? d.options : []).map((o) => (typeof o === 'string' ? o : String(o?.label ?? ''))).filter(Boolean);
+  return html`<div class="rb-decide">
+    <h4>Decide</h4>
+    ${options.length > 0 && html`<div class="rb-options">${options.map((o) => html`<button type="button" key=${o} class="btn sm" disabled=${busy} onClick=${() => go(o)}>${o}</button>`)}</div>`}
+    <div class="rb-decide-row">
+      <input type="text" value=${text} placeholder=${options.length ? 'Or say what you decided' : 'What you decided'} aria-label="What you decided"
+        onInput=${(e) => setText(e.currentTarget.value)} onKeyDown=${(e) => e.key === 'Enter' && text.trim() && go(text)} />
+      <button type="button" class="btn sm primary" disabled=${busy || !text.trim()} onClick=${() => go(text)}>Decide</button>
+    </div>
+    <p class="muted small">Claude sees your decision on its next look at the board; a comment below can say why.</p>
+  </div>`;
+}
 
 export function Drawer({ board, open, onOpen, onBack, onClose, titles, canBack }) {
   const ref = useRef(null);
@@ -53,7 +89,8 @@ export function Drawer({ board, open, onOpen, onBack, onClose, titles, canBack }
     const dates = r.dates ?? {};
     body.overview = html`${r.summary && html`<p><${BoardText} text=${r.summary} titles=${titles} /></p>`}
       <h4>Dates</h4><${KeyValues} rows=${[['Opened', dates.opened], ['Merged', dates.merged], ['Deployed', dates.deployed], ['Tested', dates.tested], ['Closed', dates.closed], ['Expected', dates.expected]].map(([k, v]) => [k, boardDay(v)])} />
-      <h4>Steps</h4><${Steps} steps=${r.steps} titles=${titles} />`;
+      <h4>Steps</h4><${Steps} steps=${r.steps} titles=${titles} part="releases" record=${r} />
+      <${BoardComments} record=${r} part="releases" titles=${titles} />`;
     body.features = features.length
       ? html`<ul class="rb-list">${features.map((f) => html`<li key=${f.id}><button type="button" class="link-btn" onClick=${() => onOpen({ type: 'feature', id: f.id })}><b>${f.name}</b></button> <${Chip} status=${f.status} />
           <div class="rb-desc"><${BoardText} text=${f.what} titles=${titles} /></div>
@@ -66,7 +103,7 @@ export function Drawer({ board, open, onOpen, onBack, onClose, titles, canBack }
             <td class="rb-mono">${m.commit || ''}</td><td><${Chip} status=${m.status === 'merged' ? 'done' : m.status === 'held' ? 'planned' : 'pending'} label=${m.status} /></td><td class="small rb-nowrap">${boardDay(m.date)}</td></tr>`)}
         </tbody></table></div>`
       : html`<${Empty}>No merges listed.</${Empty}>`;
-    body.commands = commands.length ? commands.map((c) => html`<${Command} key=${c.id || c.label} c=${c} titles=${titles} highlight=${open.command && c.id === open.command} />`) : html`<${Empty}>No commands for this release.</${Empty}>`;
+    body.commands = commands.length ? commands.map((c) => html`<${Command} key=${c.id || c.label} c=${c} titles=${titles} release=${r} highlight=${open.command && c.id === open.command} />`) : html`<${Empty}>No commands for this release.</${Empty}>`;
     body.tests = tests.length
       ? html`<ul class="rb-list">${tests.map((t) => html`<li key=${t.id}><button type="button" class="link-btn" onClick=${() => onOpen({ type: 'test', id: t.id })}><b><${BoardText} text=${t.title} titles=${titles} /></b></button> <${Chip} status=${t.status} />
           ${t.note && html`<div class="rb-desc"><${BoardText} text=${t.note} titles=${titles} /></div>`}
@@ -89,34 +126,43 @@ export function Drawer({ board, open, onOpen, onBack, onClose, titles, canBack }
     const rel = f.release && byId('releases').get(f.release);
     body.overview = html`<p><${BoardText} text=${f.what} titles=${titles} /></p>${f.detail && html`<p><${BoardText} text=${f.detail} titles=${titles} /></p>`}
       <${KeyValues} rows=${[['Status', statusLabel(f.status)], ['Release', f.release ? (rel ? `${rel.id} · ${rel.title}` : f.release) : 'not in a release yet'], ['Shipped', boardDay(f.shipped)], ['Expected', boardDay(f.expected)], ['Repos', (f.repos ?? []).join(', ')], ['Session', f.session], ['Branch', f.branch], ['Commit', f.commit], ['Migration', f.migration]]} />
-      ${f.blockers && html`<h4>Waiting on</h4><div class="rb-callout"><${BoardText} text=${f.blockers} titles=${titles} /></div>`}`;
+      ${f.blockers && html`<h4>Waiting on</h4><div class="rb-callout"><${BoardText} text=${f.blockers} titles=${titles} /></div>`}
+      <${BoardComments} record=${f} part="features" titles=${titles} />`;
   } else if (open.type === 'test') {
     const t = byId('tests').get(open.id);
     if (!t) return null;
     head = html`<div class="rb-kicker">Test</div><h2 class="rb-dr-title"><${BoardText} text=${t.title} titles=${titles} /></h2>
       <div class="rb-dr-meta"><${Chip} status=${t.status} />${t.release && release(t.release)}<${ItemLink} id=${t.item} titles=${titles} /></div>`;
-    body.overview = html`${t.note && html`<p><${BoardText} text=${t.note} titles=${titles} /></p>`}<${KeyValues} rows=${[['Status', statusLabel(t.status)], ['When', boardDay(t.date)], ['Owner', t.owner]]} />`;
+    body.overview = html`${t.note && html`<p><${BoardText} text=${t.note} titles=${titles} /></p>`}<${KeyValues} rows=${[['Status', statusLabel(t.status)], ['When', boardDay(t.date)], ['Owner', t.owner]]} />
+      <${BoardComments} record=${t} part="tests" titles=${titles} />`;
   } else if (open.type === 'decision') {
     const d = byId('decisions').get(open.id);
     if (!d) return null;
     head = html`<div class="rb-kicker">Decision${d.code ? ` ${d.code}` : ''}</div><h2 class="rb-dr-title"><${BoardText} text=${d.title} titles=${titles} /></h2>
       <div class="rb-dr-meta"><${Chip} status=${d.status} />${d.release && release(d.release)}<${ItemLink} id=${d.item} titles=${titles} /></div>`;
-    body.overview = html`<p><${BoardText} text=${d.choice} titles=${titles} /></p><${KeyValues} rows=${[['Date', boardDay(d.date)], ['Status', statusLabel(d.status)]]} />`;
+    body.overview = html`${d.question && html`<p class="rb-question"><span class="muted small">The question</span><br /><${BoardText} text=${d.question} titles=${titles} /></p>`}
+      <p><${BoardText} text=${d.choice} titles=${titles} /></p><${KeyValues} rows=${[['Date', boardDay(d.date)], ['Status', statusLabel(d.status)]]} />
+      <${Decide} d=${d} />
+      <${BoardComments} record=${d} part="decisions" titles=${titles} />`;
   } else if (open.type === 'event') {
     const e = byId('events').get(open.id);
     if (!e) return null;
     head = html`<div class="rb-kicker">${e.kind ? `Event · ${e.kind}` : 'Event'}</div><h2 class="rb-dr-title"><${BoardText} text=${e.title} titles=${titles} /></h2>
       <div class="rb-dr-meta"><${Chip} status=${e.status} />${e.release && release(e.release)}<${ItemLink} id=${e.item} titles=${titles} /></div>`;
     body.overview = html`${e.detail && html`<p><${BoardText} text=${e.detail} titles=${titles} /></p>`}<${KeyValues} rows=${[['When', boardDay(e.date)], ['Status', statusLabel(e.status)]]} />
-      ${(e.steps ?? []).length > 0 && html`<h4>Steps</h4><${Steps} steps=${e.steps} titles=${titles} />`}`;
+      ${(e.steps ?? []).length > 0 && html`<h4>Steps</h4><${Steps} steps=${e.steps} titles=${titles} part="events" record=${e} />`}
+      <${BoardComments} record=${e} part="events" titles=${titles} />`;
   }
   const tab = tabs.some(([id]) => id === open.tab) ? open.tab : 'overview';
+  const readName = `${board.project}: ${open.id}`;
   return html`<div class="rb-scrim" onClick=${onClose} />
     <aside class="rb-drawer" role="dialog" aria-modal="true" aria-label="Release board details" tabindex="-1" ref=${ref}>
       <div class="rb-dr-head">
         <div class="rb-dr-bar">
           ${canBack && html`<button type="button" class="icon-btn" aria-label="Back" title="Back" onClick=${onBack}><${Icon} name="arrowLeft" size=${18} /></button>`}
           <span class="spacer" />
+          <${ListenButton} readKey=${`board-drawer:${open.type}:${open.id}:${tab}`} name=${readName} label=${false} className="icon-btn" size=${18}
+            source=${() => sourceOf(ref.current, { scroller: ref.current?.querySelector('.rb-dr-body'), notRead: DRAWER_NOT_READ, fromStart: true })} />
           <button type="button" class="icon-btn" aria-label="Close" title="Close (Esc)" onClick=${onClose}><${Icon} name="x" size=${18} /></button>
         </div>
         ${head}

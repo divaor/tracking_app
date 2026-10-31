@@ -197,7 +197,7 @@ const clock = (iso) => new Date(iso).toTimeString().slice(0, 5);
  * Messages for a plan of the day ('day') or a review of the week ('week'). With `previous` (the
  * plan made earlier today, { text, at }) and `changes` (changesSince it), it asks for that plan updated.
  */
-export function planMessages(items, { kind = 'day', today, previous = null, changes = null }) {
+export function planMessages(items, { kind = 'day', today, previous = null, changes = null, boards = '' }) {
   const { done, open } = planItems(items, { kind, today });
   let ask =
     kind === 'week'
@@ -222,6 +222,8 @@ export function planMessages(items, { kind = 'day', today, previous = null, chan
   }
   if (kind === 'week') parts.push(`Done in the last 7 days:\n${done.length ? done.map((i) => line(i, today)).join('\n') : '(nothing)'}`);
   parts.push(`Open items:\n${open.length ? open.map((i) => line(i, today)).join('\n') : '(none)'}`);
+  // The release boards' next milestones, what waits on the user there and open decisions (boards.js boardPlanLines).
+  if (boards) parts.push(`From my release boards (take their milestones and what waits on me into account):\n${boards}`);
   return [
     { role: 'system', content: 'You help the user plan their work from their personal tracker. Be brief, concrete and kind; use Markdown.' },
     { role: 'user', content: `${ask}\n\n${parts.join('\n\n')}` },

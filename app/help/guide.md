@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 2.3.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 2.4.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -276,7 +276,19 @@ A big project can have a **release board**: its releases, features, tests, decis
 - **Claude keeps it current**: after a merge, a test, a decision or a finished step, Claude changes only what changed on the board (with a log line saying what happened, and which session did it), so several sessions can update it at once. Ask "Import my release board into my tracker for project X" in Claude Code to bring in a board file you already have; Claude sends the file with an upload link.
 - **Import a board file** yourself: on **Release boards → All** (or under a board), pick the project and the file (a release board page, its data script or its JSON). It merges with the board; nothing on it is deleted.
 - **Data file** (top right of a board) downloads the board as its standalone page's data script (`window.NAME = { … }`), so a page you already use can keep showing it.
-- Coming next: the board in your items, Home, plans, Days and notifications, comments on its records, and ticks and decisions made in the app.
+- **Tick things off** on the board: a step of a release or an event (its circle), a command (**Mark done**) and what waits on you (its circle). Each tick is saved at once with a log line saying who did it, and the toast's **Undo** takes it back. Claude sees it on its next look.
+- **Decide** an open decision in its drawer: one of its options (when Claude listed some) or your own words, then **Decide**. The question stays above what you decided; **Open it again** if you change your mind.
+- **Comments** on any release, feature, test, decision or event, and on each command (**Comment or paste the output**): a question for Claude, or what a command printed. Claude reads the ones it has not answered and replies there. You can delete your own.
+- **What changed since you last looked**: a board you come back to lists what others (Claude, your other devices) changed since your last visit, and marks those cards, rows and log lines with a dot. **Got it** clears the marks; leaving the board does too. Each device keeps its own.
+- **A quiet board**: when no one has written to a board for longer than you set (**Settings → Appearance → Release boards**, 48 hours at first; 0 turns it off), its top says “No word for …”.
+- **Listen** (the speaker at the top of a board or a drawer) reads the view or the record aloud, the timeline and buttons left out.
+- **Elsewhere in the tracker**:
+  - **Home** has **Waiting on you** from every board, the ones with a time first (“in 5 h”), each with its board and release, and a circle to tick it done. It follows the project filter.
+  - An **item** that a board points to shows **On the release board**: the features, tests, decisions, releases and steps that mention it, with their status. A click closes the item and opens that record on the board.
+  - **Days** shows the boards' log lines of the day, next to what got done.
+  - **Plan my day** and the week review take the boards' next milestones, what waits on you and open decisions into account.
+- **Notifications** (category **Release boards** in **Settings → Notifications**, on at first): a test failed, a release changed status, a new decision or step waits for you, or someone commented. A tap opens the board, or the record. Phones with push get them from the connector; the desktop app and an open app tell by themselves.
+- **Reminders**: a step waiting on you with a time (“Sun 16:00 UTC”, “2026-11-02 09:00”) is notified 15 minutes before, while the app is open (the desktop app also in the background). Turn them off in **Settings → Appearance → Release boards**.
 
 ## 9. The model (optional)
 
@@ -320,6 +332,7 @@ In any Claude chat or Claude Code session with the Tracker connector on, just sa
 | "Pin the release checklist in my tracker" / "Unpin it" | Pins or unpins items, so they stay on top of their project (section 6). |
 | "Log this session as Claude work on my tracker" | Adds a Claude work item with a link to the session or PR. |
 | "Import my release board into my tracker for project Platform" / "Update the release board: R4 is merged into dev, its test passed" / "Where does the release board stand?" | Imports a board file (with an upload link from Claude Code), changes only what changed (with a log line), reports its session's progress, and reads where things stand (section 8, *Release boards*). |
+| "Answer my comments on the release board" / "What did I decide or tick on the board?" | Reads the comments you left on records and commands, answers each there, and sees your ticks and decisions (what changed since its last look). |
 | "Attach this screenshot to the checkout task in my tracker" | Attaches the picture (or a PDF or any file up to 10 MB) to the item, shown like your own. From Claude Code it sends files from your computer (a screenshot it took, a chart it made); in a chat, files from a public link. A file of the same name is replaced. |
 | "For this conversation use project Platform in my tracker and tag with the repos you touch" | Files everything it adds or sends under Platform and tags each item with the repositories involved, creating them if needed. |
 | "What's on my tracker?" / "What's left open?" | Summarizes counts, what's in progress, what's due and what's waiting for review. |
@@ -355,8 +368,9 @@ You can be notified when:
 - Claude sends a **document to review** (or a new version), or **attaches** a picture or file to an item.
 - Claude **adds, updates, completes or deletes** items, or **answers in the comments** (the notification shows the start of its comment).
 - On the desktop, an item changes **on one of your other devices**, for example a task you completed on your phone.
+- On a **release board**: a test failed, a release changed status, a decision or a step waits for you, or a comment; and shortly before a step waiting on you is due (section 8, *Release boards*).
 
-Tap a notification to open that item.
+Tap a notification to open that item (or the board). Each kind can be turned off in **Settings → Notifications**.
 
 - **Android app:** notifications while the app is closed are on once you set up GitHub sync: allow them when Android asks (or **Settings → Notifications → Allow notifications**). The app looks about every 15 minutes (the shortest Android allows); **Look now** looks at once. While the app is open, changes show at once. Changes from your other devices are told only with **Changes from my other devices** on, and never this phone's own.
 - **Phone (web app):** in the installed app, go to **Settings → Notifications**, enter your connector's address (without `/mcp`) and tap **Turn on notifications**. Do this on each phone or browser you want notified. On iPhone this needs iOS 16.4 or later, with the app opened from its Home Screen icon. The phone gets push notifications even when the app is closed.

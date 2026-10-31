@@ -6,6 +6,7 @@
 export const NOTIFY_EVENTS = [
   { id: 'documents', label: 'Documents to review', hint: 'New proposals, artifacts and files, and new versions' },
   { id: 'items', label: 'Tasks and items changed by Claude', hint: 'Added, updated, completed or deleted' },
+  { id: 'boards', label: 'Release boards', hint: 'A test failed, a release changed status, a decision or a step waits for you, a comment' },
 ];
 export const DEFAULT_EVENTS = NOTIFY_EVENTS.map((e) => e.id);
 

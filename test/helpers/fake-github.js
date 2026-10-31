@@ -45,8 +45,20 @@ export function createFakeGitHub({ owner = 'me', repo = 'data', defaultBranch = 
     if (u.pathname.startsWith(`${base}/contents/`)) {
       const path = decodeURIComponent(u.pathname.slice(`${base}/contents/`.length));
       if (method === 'GET') {
-        const file = branches.get(u.searchParams.get('ref') ?? defaultBranch)?.get(path);
-        if (!file) return reply(404, { message: 'Not Found' });
+        const files = branches.get(u.searchParams.get('ref') ?? defaultBranch);
+        const file = files?.get(path);
+        if (!file) {
+          // A folder: its entries, as the contents API lists them.
+          const prefix = `${path.replace(/\/+$/, '')}/`;
+          const names = new Map();
+          for (const [p, f] of files ?? []) {
+            if (!p.startsWith(prefix)) continue;
+            const [name, ...rest] = p.slice(prefix.length).split('/');
+            if (!names.has(name)) names.set(name, rest.length ? { name, path: `${prefix}${name}`, type: 'dir', sha: '' } : { name, path: p, type: 'file', sha: f.sha });
+          }
+          if (names.size) return reply(200, [...names.values()]);
+          return reply(404, { message: 'Not Found' });
+        }
         const bytes = file.bytes ?? Buffer.from(file.text);
         return reply(200, { type: 'file', sha: file.sha, size: bytes.length, content: bytes.toString('base64') });
       }

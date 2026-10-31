@@ -257,13 +257,14 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
       appUrl,
       canonicalProject: async (name) => (name ? canonical(name, await load()) : name),
       maxReadChars: MAX_READ_CHARS,
+      onChange,
     }),
 
     async overview() {
       const today = now().slice(0, 10);
       const day = localDate(new Date(now()));
       // The user's day may be a day either side of this server's: the newest plan of the last 24 hours.
-      const [data, ...days] = await Promise.all([load(), ...[1, 0, -1].map((n) => plansOf(addDays(day, n)).catch(() => null))]);
+      const [data, boards, ...days] = await Promise.all([load(), tracker.boards.summaries().catch(() => []), ...[1, 0, -1].map((n) => plansOf(addDays(day, n)).catch(() => null))]);
       const since = Date.parse(now()) - 86_400_000;
       const plan = days
         .filter((d) => d?.plans.day && Date.parse(d.plans.day.at) > since)
@@ -296,6 +297,8 @@ export function createTracker({ client, path = 'tracker.json', branch = '', file
         recentDecisions: sortItems(items.filter((i) => i.decision), 'updated')
           .slice(0, 10)
           .map((i) => ({ ...summarize(i), feedback: i.feedback || undefined })),
+        // Each project's release board in a line or two (get_board for more).
+        releaseBoards: boards.length ? boards : undefined,
         projects: projectList(data.items, data.projects)
           .filter((p) => p.open)
           .slice(0, 20)

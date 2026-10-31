@@ -1,6 +1,6 @@
 // Offline support: precache the app shell, then serve network-first so updates
 // show up immediately when online. GitHub API calls are never intercepted.
-const CACHE = 'tracker-v2.3.0';
+const CACHE = 'tracker-v2.4.0';
 const ASSETS = [
   './',
   'index.html',
@@ -63,6 +63,7 @@ const ASSETS = [
   'js/ui/components.js',
   'js/ui/days.js',
   'js/ui/boardDrawer.js',
+  'js/ui/boardLinks.js',
   'js/ui/boardParts.js',
   'js/ui/boardTimeline.js',
   'js/ui/boardViews.js',
@@ -142,7 +143,9 @@ self.addEventListener('push', (event) => {
   } catch {
     data = { title: 'Tracker', body: event.data?.text() ?? '' };
   }
-  const url = new URL(data.itemId ? `#/item/${encodeURIComponent(data.itemId)}` : '#/', self.registration.scope).href;
+  // A board's notification opens it (only links into the app).
+  const hash = data.itemId ? `#/item/${encodeURIComponent(data.itemId)}` : /^#\/release-board\/[\w%/-]*$/.test(data.href ?? '') ? data.href : '#/';
+  const url = new URL(hash, self.registration.scope).href;
   event.waitUntil(
     (async () => {
       // Every push must show a notification (Safari revokes permission otherwise).

@@ -71,12 +71,15 @@ export function describeChanges(before, after, { self = '' } = {}) {
 
 /** Folds several events into one notification. */
 export function summarizeEvents(events) {
-  if (events.length === 1) return { title: events[0].title, body: events[0].body, itemId: events[0].itemId };
+  if (events.length === 1) return { title: events[0].title, body: events[0].body, itemId: events[0].itemId, href: events[0].href };
+  // Several about one release board open it (boards.js boardEvents' `href`).
+  const boards = new Set(events.map((e) => /^#\/release-board\/[^/]+/.exec(e.href ?? '')?.[0]));
   const fromClaude = events.every((e) => e.fromClaude);
   const titles = events.map((e) => e.body).filter(Boolean);
   const shown = titles.slice(0, 3).join(', ');
   return {
     title: `${fromClaude ? CLAUDE_AUTHOR : 'Your tracker'}: ${events.length} changes`,
     body: titles.length > 3 ? `${shown} and ${titles.length - 3} more` : shown,
+    ...(boards.size === 1 && !boards.has(undefined) ? { href: [...boards][0] } : {}),
   };
 }

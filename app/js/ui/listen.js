@@ -13,7 +13,7 @@ import { ReadAloudBar, useReader } from './readAloud.js';
 export const ITEM_NOT_READ = [
   '.modal-head', '.item-controls', '.item-labels', '.item-id', '.find-bar', '.props', '.open-doc', '.no-notes',
   '.files-head', '.file-pictures', '.file-list', '.file-toolbar', '.file-message', '.review-panel',
-  '.comment-head .muted', '.comments-n', '.comment-new', '.comment-foot', '.item-assist', '.timestamps', '.drop-files-hint',
+  '.comment-head .muted', '.comments-n', '.comment-new', '.comment-foot', '.item-assist', '.timestamps', '.drop-files-hint', '.item-boards',
   'button', 'input', 'textarea', 'select', 'label', 'iframe', '.sr-only',
 ].join(', ');
 // Code is announced, not read; a plain text file shown as it is (`.file-source`) is read.

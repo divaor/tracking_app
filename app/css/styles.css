@@ -5225,3 +5225,102 @@ button.rb-tl-label:hover { background: var(--surface-2); }
   .rb-tl-label { padding: 8px; }
   .rb-tl-label b { font-size: 13px; }
 }
+
+/* ---- Release boards in use (2.4): ticks, decisions, comments, what changed, the board elsewhere ---- */
+.rb-check {
+  flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border-strong); background: var(--surface); color: transparent;
+  display: grid; place-items: center; padding: 0; margin-top: 1px; cursor: pointer;
+}
+.rb-check:hover:not(:disabled) { border-color: var(--st-done); color: var(--st-done); }
+.rb-check:disabled { opacity: 0.5; cursor: progress; }
+button.rb-tick { padding: 0; background: var(--surface); cursor: pointer; }
+button.rb-tick:hover:not(:disabled) { border-color: var(--st-done); }
+.rb-steps li.done button.rb-tick { background: var(--st-done); }
+button.rb-tick:disabled { opacity: 0.6; cursor: progress; }
+.rb-done-btn {
+  display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; cursor: pointer;
+  color: var(--text-2); background: var(--surface); border: 1px dashed var(--border-strong);
+}
+.rb-done-btn:hover:not(:disabled) { border-color: var(--st-done); color: var(--st-done); }
+.rb-done-btn.on { color: var(--st-done); background: color-mix(in srgb, var(--st-done) 13%, transparent); border: 1px solid color-mix(in srgb, var(--st-done) 30%, transparent); }
+.rb-done-btn:disabled { opacity: 0.6; cursor: progress; }
+
+.rb-comments { margin-top: 16px; }
+.rb-comments.compact { margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 6px; }
+.rb-comments h4 { display: flex; gap: 6px; align-items: center; }
+.rb-comments h4 .n { font-size: 11px; background: var(--surface-2); border-radius: 999px; padding: 0 6px; color: var(--text-2); }
+.rb-comment { padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface-2); margin: 6px 0; }
+.rb-comment.from-claude { background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
+.rb-comment-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 12.5px; }
+.rb-comment-head .link-btn { margin-left: auto; }
+.rb-comment-text { font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; margin-top: 2px; }
+.rb-comment-new textarea { width: 100%; min-height: 0; font-size: 13px; resize: vertical; }
+.rb-comment-tools { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin-top: 6px; flex-wrap: wrap; }
+.rb-comment-open { font-size: 12.5px; }
+
+.rb-decide { margin-top: 12px; padding: 12px; border-radius: var(--radius-sm); border: 1px solid color-mix(in srgb, var(--st-open) 35%, var(--border)); background: color-mix(in srgb, var(--st-open) 6%, transparent); }
+.rb-decide h4 { margin-top: 0; }
+.rb-decide.decided { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; border-color: var(--border); background: none; }
+.rb-options { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.rb-decide-row { display: flex; gap: 8px; align-items: center; }
+.rb-decide-row input { min-height: 34px; padding: 5px 10px; font-size: 13px; }
+.rb-decide p { margin: 8px 0 0; }
+.rb-question { background: var(--surface-2); border-radius: var(--radius-sm); padding: 8px 10px; }
+
+.rb-since { border-left: 4px solid var(--accent); }
+.rb-since .rb-list > li { padding: 6px 2px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.rb-since-tools { display: flex; justify-content: flex-end; margin-top: 6px; }
+.rb-new { position: relative; }
+.rb-rcard.rb-new::after, .rb-dcard.rb-new::after {
+  content: ''; position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.rb-table tr.rb-new > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.rb-list > li.rb-new { box-shadow: inset 3px 0 0 var(--accent); padding-left: 10px; }
+.rb-quiet { font-weight: 600; font-size: 12px; color: var(--st-waiting); background: color-mix(in srgb, var(--st-waiting) 12%, transparent); border-radius: 999px; padding: 2px 9px; }
+.rb-project-tag { color: var(--accent); text-decoration: none; }
+.rb-tag.soon { color: var(--st-waiting); background: color-mix(in srgb, var(--st-waiting) 12%, transparent); }
+
+/* Home's "Waiting on you". */
+.board-waiting-list { list-style: none; margin: 0; padding: 0; }
+.board-waiting-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; }
+.board-waiting-body { flex: 1; min-width: 0; }
+.board-waiting-text { font-weight: 500; overflow-wrap: anywhere; }
+.board-waiting-text code { font-family: var(--mono); font-size: 0.9em; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+.board-waiting-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 4px; font-size: 12.5px; }
+.board-waiting .rb-tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 6px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; }
+.board-waiting .rb-tag.rb-project-tag { color: var(--accent); }
+.board-waiting .rb-tag.soon { color: var(--st-waiting); }
+.board-waiting .rb-trk { display: inline-flex; font-size: 12px; padding: 1px 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--accent); text-decoration: none; }
+
+/* An open item's "On the release board". */
+.item-boards { margin: 18px 0 6px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); }
+.item-boards h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 14px; }
+.item-board + .item-board { margin-top: 10px; }
+.item-board-name { font-weight: 600; text-decoration: none; color: var(--accent); }
+.item-board ul { list-style: none; margin: 4px 0; padding: 0; }
+.item-board li { padding: 3px 0; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.item-board li a { color: var(--text); text-decoration: none; }
+.item-board li a:hover { color: var(--accent); text-decoration: underline; }
+.item-boards .rb-chip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap;
+  color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+}
+
+/* Days: the boards' log; Settings: a number with its unit. */
+.day-board-log { list-style: none; margin: 0; padding: 0; }
+.day-board-log > li { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.day-board-log > li:last-child { border-bottom: 0; }
+.day-board-log .rb-when { flex: none; width: 76px; font-size: 12px; color: var(--text-3); }
+.day-board-log .rb-links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 3px; font-size: 12px; }
+.day-board-log .rb-tag { font-size: 11px; padding: 1px 7px; border-radius: 6px; background: var(--surface-2); text-decoration: none; }
+.day-board-log code { font-family: var(--mono); font-size: 0.9em; }
+.inline-number { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.inline-number small { display: block; color: var(--text-3); }
+.with-unit { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.with-unit input { width: 90px !important; }
+
+@media (max-width: 720px) {
+  .rb-decide-row { flex-wrap: wrap; }
+  .rb-decide-row input { flex: 1 1 100%; }
+  .board-waiting-row { padding: 10px 12px; }
+}

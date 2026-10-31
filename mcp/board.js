@@ -3,8 +3,10 @@
 // change records by id with only the fields given and are committed at the version read, read again,
 // changed again and retried when another writer (a session, a device) got there first.
 import {
+  actionTime,
   addLog,
   applyBoardChanges,
+  boardEvents,
   boardFromData,
   boardPath,
   boardScript,
@@ -15,6 +17,7 @@ import {
   BOARD_PARTS,
   BOARDS_DIR,
   changedSince,
+  commentsAwaiting,
   emptyBoard,
   liveRecords,
   mergeBoards,
@@ -25,6 +28,7 @@ import {
   statusLabel,
   STATUSES,
   tidyBoard,
+  waitingActions,
 } from '../app/js/boards.js';
 
 export class BoardError extends Error {}
@@ -35,7 +39,11 @@ const pct = (n, total) => (total ? Math.round((n * 100) / total) : 0);
 // export_board gives the script itself up to this size; a download link beyond it.
 export const INLINE_EXPORT_CHARS = 20_000;
 
-export function createBoards({ client, branch = '', device = 'Claude', now, appUrl = '', canonicalProject, maxReadChars = 90_000 }) {
+const clip = (text, max) => (String(text ?? '').length > max ? `${String(text).slice(0, max - 1)}…` : String(text ?? ''));
+
+// `onChange(events)` gets what a write changed that the person wants to hear about (boardEvents:
+// a test failed, a release's status, a decision or a step waiting for them, a comment) for push.
+export function createBoards({ client, branch = '', device = 'Claude', now, appUrl = '', canonicalProject, maxReadChars = 90_000, onChange = () => {} }) {
   const ref = branch || undefined;
   const link = (name) => (appUrl ? `${appUrl.replace(/#.*$/, '').replace(/\/?$/, '/')}#/release-board/${boardSlug(name)}` : undefined);
 
@@ -104,6 +112,8 @@ export function createBoards({ client, branch = '', device = 'Claude', now, appU
       if (older.length) await archive(name, older);
       try {
         await put(boardPath(name), serializeBoard(tidy), sha, typeof message === 'function' ? message(tidy) : message);
+        const events = boardEvents(board, tidy);
+        if (events.length) onChange(events);
         return { ...result, board: tidy };
       } catch (err) {
         if (!isConflict(err) || attempt >= MAX_ATTEMPTS) throw err;
@@ -148,7 +158,11 @@ export function createBoards({ client, branch = '', device = 'Claude', now, appU
           tests: c.tests.total ? `${c.tests.passed} of ${c.tests.total} passed` : undefined,
         };
       }),
-      waitingOnYou: liveRecords(board, 'actions').map((a) => ({ id: a.id, text: a.text, when: a.when, release: a.release, item: a.item, command: a.command })),
+      waitingOnYou: waitingActions(board).map((a) => ({ id: a.id, text: a.text, when: a.when, at: actionTime(a, new Date(at))?.toISOString(), release: a.release, item: a.item, command: a.command })),
+      // The person's comments you have not answered (answer with update_board: { part, id, comment }).
+      commentsAwaiting: commentsAwaiting(board)
+        .slice(-20)
+        .map((c) => ({ part: c.part, id: c.id, title: c.title || undefined, command: c.command, by: c.comment.by, at: c.comment.at, text: clip(c.comment.text, 400) })),
       openDecisions: liveRecords(board, 'decisions')
         .filter((d) => d.status === 'open')
         .map((d) => ({ id: d.id, code: d.code || undefined, title: d.title, release: d.release, date: d.date })),
@@ -202,7 +216,8 @@ export function createBoards({ client, branch = '', device = 'Claude', now, appU
 
     async update({ project, changes = [], log, now: where, session } = {}) {
       const name = await nameOf(project);
-      const list = Array.isArray(changes) ? changes : [];
+      // Claude adds comments (answers) but does not delete the person's.
+      const list = (Array.isArray(changes) ? changes : []).map((c) => (c && typeof c === 'object' ? { ...c, uncomment: undefined } : c));
       const logEntry = typeof log === 'string' ? { text: log } : log && typeof log === 'object' ? log : null;
       if (!list.length && !logEntry?.text && !where) throw new BoardError('Nothing to change: give changes, log or now.');
       const at = now();
@@ -254,6 +269,31 @@ export function createBoards({ client, branch = '', device = 'Claude', now, appU
       const board = await need(name);
       const script = boardScript(board, variable || board.meta?.export_variable || 'BOARD_DATA');
       return { project: board.project || name, variable: variable || board.meta?.export_variable || 'BOARD_DATA', script, size: script.length };
+    },
+
+    /** Each board in a line or two, for get_overview: what comes next, what waits, open decisions, comments. */
+    async summaries() {
+      const entries = ((await client.listDir(BOARDS_DIR, ref)) ?? []).filter((e) => e.type === 'file' && /\.json$/.test(e.name)).slice(0, 10);
+      const out = [];
+      for (const entry of entries) {
+        const file = await client.getFile(entry.path, ref);
+        const board = file && parseBoard(file.text);
+        if (!board) continue;
+        const s = boardSummary(board, new Date(now()));
+        const next = s.next[0];
+        const waiting = waitingActions(board);
+        const comments = commentsAwaiting(board).length;
+        out.push({
+          project: board.project,
+          link: link(board.project),
+          headline: board.now?.headline || undefined,
+          next: next ? { title: next.title, at: next.date.toISOString() } : undefined,
+          waitingOnYou: waiting.length ? waiting.slice(0, 5).map((a) => (a.when ? `${a.text} (${a.when})` : a.text)) : undefined,
+          openDecisions: s.openDecisions || undefined,
+          commentsAwaiting: comments || undefined,
+        });
+      }
+      return out;
     },
 
     nameOf,

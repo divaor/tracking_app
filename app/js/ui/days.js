@@ -5,6 +5,7 @@ import { html, useEffect, useRef, useState } from '../../vendor/preact-htm.js';
 import { addDays, CLAUDE_AUTHOR } from '../model.js';
 import { formatDue, parseDay } from '../format.js';
 import { dayActivity, doneByDay } from '../plans.js';
+import { DayBoardLog, useBoardDayLog } from './boardLinks.js';
 import { planDays } from '../planStore.js';
 import { renderMarkdown } from '../markdown.js';
 import { Icon } from './icons.js';
@@ -48,6 +49,8 @@ export function DaysView({ items, today, day, actions }) {
   const most = Math.max(1, ...bars.map((b) => b.done));
   const week = bars.slice(-7).reduce((n, b) => n + b.done, 0);
   const activity = dayActivity(items, date);
+  const boardLog = useBoardDayLog(date);
+  const titles = new Map(items.map((i) => [i.id, i.title]));
   const rows = (list) =>
     html`<div class="rows">${list.map((item) => html`<${ItemRow} key=${item.id} item=${item} onOpen=${actions.open} onStatus=${actions.cycleStatus} today=${today} />`)}</div>`;
   const when = date === today ? 'Today' : date === addDays(today, -1) ? 'Yesterday' : formatDue(date, today);
@@ -97,6 +100,7 @@ export function DaysView({ items, today, day, actions }) {
       <${Block} title="Done" icon="check" count=${activity.done.length} empty="Nothing was finished that day.">${rows(activity.done)}</${Block}>
       ${activity.started.length > 0 && html`<${Block} title="Started" icon="arrowRight" count=${activity.started.length}>${rows(activity.started)}</${Block}>`}
       <${Block} title="Added" icon="plus" count=${activity.added.length} empty="Nothing was added that day.">${rows(activity.added)}</${Block}>
+      ${boardLog.length > 0 && html`<${Block} title="On the release boards" icon="rocket" count=${boardLog.length}><${DayBoardLog} entries=${boardLog} titles=${titles} /></${Block}>`}
       ${activity.comments.length > 0 &&
       html`<${Block} title="Comments" icon="comment" count=${activity.comments.length}>
         <ul class="day-comments">

@@ -119,7 +119,7 @@ export async function enablePush({ connectorUrl, vapidKey, events = DEFAULT_EVEN
       ),
     `Tracker: turn on notifications for ${settings.device}`,
   );
-  saveSettings({ connectorUrl: base, push: true, notify: { ...settings.notify, documents: events.includes('documents'), items: events.includes('items') } });
+  saveSettings({ connectorUrl: base, push: true, notify: { ...settings.notify, ...Object.fromEntries(DEFAULT_EVENTS.map((id) => [id, events.includes(id)])) } });
 }
 
 export async function disablePush() {

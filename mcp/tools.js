@@ -23,7 +23,7 @@ Model
 
 How to handle requests
 - "Send (this) proposal / plan / design to my tracker" → send_document with kind "proposal", the COMPLETE proposal as Markdown in content, and a 2–4 sentence summary. Do not send a shortened version.
-- "Send (this) artifact / file / report / README / doc to my tracker" → send_document with the matching kind, the complete file content, and a filename with the right extension (dashboard.html, notes.md, script.py…).
+- "Send (this) artifact / file / report / README / doc to my tracker" → send_document with the matching kind, the complete file content, and a filename with its extension (dashboard.html, notes.md…).
 - A revised version of something on the tracker → send_document with item_id (the same filename replaces it); it goes back to the user's review queue.
 - "Update tasks on my tracker", "mark X done", "add a task …" → list_items first to avoid duplicates, then update_items / add_items. Batch changes into one call.
 - "Log / track this Claude work" → add_items with type "claude", kind (code, chat, pr, artifact) and url = the session, PR or artifact link.
@@ -31,12 +31,12 @@ How to handle requests
 - "Pin / unpin X" → update_items pinned true / false (list_items pinned true lists them).
 - "Attach this screenshot / picture / file to X" → attach_file (in Claude Code: its upload link with curl).
 - "My plan for today", "how did my week go" → get_overview (latestPlan) or get_plans; to make or update one, save_plan.
-- A project's release board → get_board; after a merge, test, decision or step, update_board (set_session for your progress).
+- A project's release board → get_board; after a merge, test, decision or step, update_board (set_session: your progress); answer its comments with update_board comment.
 
 Projects and tags
 - "For this conversation use project X (and tag with the repos you touch)" → remember it: pass project "X" on every add_items and send_document (and update_items when filing items), and tag with the repositories involved (one tag per repo).
 - Call list_projects before your first write to reuse the exact project and tag spellings. A new project: save_project (area work or personal; ask if unclear). New tags are created by using them.
-- Without such an instruction, set project only when it is obvious (an existing project named after the repo).
+- Without such an instruction, set project only when it is obvious (a project named after the repo).
 
 Tracker Editor files
 - The user's text editor (Tracker Editor) keeps notes, snippets and drafts in the same repo. Not tracker items: use the *_editor_file(s) tools.
@@ -314,7 +314,7 @@ export function createTools(getTracker, { uploads = null } = {}) {
       name: 'get_board',
       title: 'Release board: where it stands',
       description:
-        "Where a project's release board stands, in a few lines: the headline, the tiles (releases out, features live, tests passed, what waits on the user, open decisions), each release's progress and next step, what waits on the user, open decisions, each session's row and the latest log. Pass since (an ISO time) to also list what changed after it. Whole records: get_board_records.",
+        "Where a project's release board stands, in a few lines: the headline, the tiles (releases out, features live, tests passed, what waits on the user, open decisions), each release's progress and next step, what waits on the user, open decisions, each session's row, the latest log and the user's comments you have not answered (commentsAwaiting). Pass since (an ISO time) to also list what changed after it (the user ticks steps, commands and actions and decides decisions in the app). Whole records: get_board_records.",
       inputSchema: { type: 'object', properties: { project: projectArg, since: str('ISO time: also list the records changed after it.') }, required: ['project'] },
       annotations: readOnly,
       run: run((t, a) => t.boards.get(a)),
@@ -343,7 +343,7 @@ export function createTools(getTracker, { uploads = null } = {}) {
     {
       name: 'update_board',
       title: 'Update a release board',
-      description: `Change a project's release board (made if it has none) in one commit: records by id with only the fields that change, a log line, where things stand. A change is { part, id, set: { field: value } }: dotted paths reach inside ("steps.3.done", "dates.deployed"), null removes a field, a record not there yet is added. Or { part, id, remove: true }. Statuses: ${BOARD_STATUSES.join(', ')}. Write a log line for what happened ("R4 merged into dev"), pass session (your session's name) so the board says who changed what, and use the ids get_board shows. Records not mentioned stay as they are, so several sessions can update at once.`,
+      description: `Change a project's release board (made if it has none) in one commit: records by id with only the fields that change, a log line, where things stand. A change is { part, id, set: { field: value } }: dotted paths reach inside ("steps.3.done", "dates.deployed"), null removes a field, a record not there yet is added. Or { part, id, remove: true }. Or { part, id, comment: "…" } to answer the user's comment on that record (on a release's command: also command, its id). Statuses: ${BOARD_STATUSES.join(', ')}. Write a log line for what happened ("R4 merged into dev"), pass session (your session's name) so the board says who changed what, and use the ids get_board shows. Records not mentioned stay as they are, so several sessions can update at once.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -358,6 +358,8 @@ export function createTools(getTracker, { uploads = null } = {}) {
                 id: str('The record\'s id (releases R1…, features, tests, decisions…; a session\'s id is its name).'),
                 set: { type: 'object', description: 'Fields to set: { status: "live", commit: "abc123", "steps.2.done": true }. null removes a field.' },
                 remove: { type: 'boolean', description: 'Remove the record.' },
+                comment: str('Your comment on the record (your answer to the user\'s, or what you did).'),
+                command: str('With comment on a release: the id of the command it is about.'),
               },
               required: ['part', 'id'],
             },
@@ -539,8 +541,9 @@ export const PROMPTS = [
 - Start with get_board and use its ids (releases, features, tests, decisions); get_board_records for whole records.
 - set_session when you start, when you wait on something and when you finish${session ? `, as "${session}"` : ''}.
 - After a merge, deploy, test, decision or a finished step: update_board with only the fields that changed, a log line saying what happened${session ? ' and your session' : ''}. Use the board's statuses; never guess one.
-- Something I must do (run a command, merge, decide): an action (part actions: text, when, release, item, command). Remove it once done.
-- A question for me: a decision with status open, and say so in your reply.
+- Something I must do (run a command, merge, decide): an action (part actions: text, when as "Sun 16:00 UTC" or "2026-11-02 16:00" so I am reminded, release, item, command). I tick it done in the app; remove it if it no longer applies.
+- A question for me: a decision with status open (options: the choices, so I can pick one in the app), and say so in your reply.
+- I tick steps and commands, decide and comment in the app: get_board with since shows what I changed, commentsAwaiting what I asked; answer each with update_board { part, id, comment } (a command's: also command).
 - Do not change records other sessions own beyond what your work changed.`,
   },
   {

@@ -77,4 +77,8 @@ test('the plan of the day and the weekly review see the right items', () => {
   assert.match(user.content, /Today is Thursday 2026-10-22/);
   assert.match(user.content, /Overdue report \[task, pending, due 2026-10-20 \(overdue\)\]/);
   assert.match(planMessages(items, { kind: 'week', today })[1].content, /Done in the last 7 days:\n- Finished Tuesday/);
+  // The release boards' lines go in when there are some, and nothing about them when not.
+  const boards = 'Release board "Demo":\n- Waiting on me: Run the migration (Mon 11-02)';
+  assert.match(planMessages(items, { kind: 'day', today, boards })[1].content, /From my release boards \(take their milestones and what waits on me into account\):\nRelease board "Demo":\n- Waiting on me: Run the migration/);
+  assert.doesNotMatch(planMessages(items, { kind: 'day', today })[1].content, /release boards/);
 });
