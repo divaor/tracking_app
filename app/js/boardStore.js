@@ -111,6 +111,29 @@ export async function importBoardFile(text, project) {
   throw new Error('The board kept changing elsewhere; try again.');
 }
 
+/** The months of a board's older log (boards/<slug>/log-<month>.json, the connector's archive), newest first. */
+export async function olderLogMonths(slug) {
+  const { client, branch } = await dataClient();
+  const entries = (await client.listDir(`${BOARDS_DIR}/${slug}`, branch || undefined)) ?? [];
+  return entries
+    .map((e) => e.type === 'file' && /^log-(.+)\.json$/.exec(e.name)?.[1])
+    .filter(Boolean)
+    .sort()
+    .reverse();
+}
+
+/** A month of a board's older log, newest first ([] when it cannot be read). */
+export async function olderLog(slug, month) {
+  const { client, branch } = await dataClient();
+  const file = await client.getFile(`${BOARDS_DIR}/${slug}/log-${month}.json`, branch || undefined);
+  try {
+    const log = JSON.parse(file?.text ?? '{}').log;
+    return Array.isArray(log) ? log.filter((l) => l && !l.deleted) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** The board as its standalone page's data script: { name, text }. */
 export function exportBoardFile(slug) {
   const board = cachedBoard(slug);

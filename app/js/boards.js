@@ -3,7 +3,7 @@
 // actions waiting on the person, briefs and a log). Records merge one by one: the one changed last
 // wins, deletions are tombstones, so Claude's sessions and the devices never lose each other's
 // changes. A board file of the standalone page (`window.NAME = { … }`) imports and exports as it is.
-import { bumpTime, nowIso, slugify } from './model.js';
+import { bumpTime, findWords, foldSearch, nowIso, slugify } from './model.js';
 
 export const BOARDS_DIR = 'boards';
 export const BOARD_VERSION = 1;
@@ -402,4 +402,251 @@ export function recordTitle(part, r) {
   if (!r) return '';
   if (part === 'releases') return [r.id, r.title].filter(Boolean).join(' · ');
   return str(r.title || r.name || r.text || r.label || r.repo || r.code || r.id);
+}
+
+// ---- The board's views (the app's Release board) ------------------------------------------------
+
+const DAY_MS = 86_400_000;
+// The timeline shows at most this many days (around now when the board's dates spread wider).
+export const MAX_TIMELINE_DAYS = 180;
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const two = (n) => String(n).padStart(2, '0');
+const arr = (v) => (Array.isArray(v) ? v : []);
+const utcDay = (d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+/** The day a feature shipped, else the day it is expected ('' when neither). */
+export const featureDate = (f) => str(f?.shipped || f?.expected);
+
+/**
+ * The days the timeline shows, { start, end, days } (whole UTC days): meta.timeline_start and
+ * timeline_end when the board names them, else its dates (phases, milestones, events, features) with
+ * a few days around them and never less than ten days back and two weeks ahead of now.
+ */
+export function timelineRange(board, now = new Date()) {
+  const meta = board?.meta ?? {};
+  let start = boardDate(meta.timeline_start);
+  let end = boardDate(meta.timeline_end);
+  if (!start || !end || end < start) {
+    const times = [];
+    const add = (d) => d && times.push(d.getTime());
+    for (const r of liveRecords(board, 'releases')) {
+      for (const p of arr(r.phases)) add(boardDate(p?.from)), add(boardDate(p?.to));
+      for (const m of arr(r.milestones)) add(boardDate(m?.date));
+    }
+    for (const e of liveRecords(board, 'events')) add(boardDate(e.date));
+    for (const f of liveRecords(board, 'features')) add(boardDate(featureDate(f)));
+    start = new Date(Math.min(now - 10 * DAY_MS, ...times.map((t) => t - 2 * DAY_MS)));
+    end = new Date(Math.max(now.getTime() + 14 * DAY_MS, ...times.map((t) => t + 3 * DAY_MS)));
+  }
+  start = utcDay(start);
+  end = new Date(utcDay(end).getTime() + DAY_MS);
+  if ((end - start) / DAY_MS > MAX_TIMELINE_DAYS) {
+    start = new Date(Math.max(start, utcDay(now).getTime() - 60 * DAY_MS));
+    end = new Date(Math.min(end, start.getTime() + MAX_TIMELINE_DAYS * DAY_MS));
+  }
+  return { start, end, days: Math.round((end - start) / DAY_MS) };
+}
+
+// Places spans of [left, left + width) in the first lane they fit in (the page's packing).
+function lanes() {
+  const ends = [];
+  return {
+    place(left, width) {
+      let i = 0;
+      while (ends[i] != null && ends[i] > left - 6) i++;
+      ends[i] = left + width;
+      return i;
+    },
+    get count() {
+      return ends.length;
+    },
+  };
+}
+
+/**
+ * The timeline drawn in pixels, `dayW` per day: the days (left, label, weekday, weekend, today),
+ * where now is (null when outside), and its rows: each release's phases and milestones, with
+ * `features` its dated features as chips (headline ones; the rest as "+N more"), and the events.
+ */
+export function timelineLayout(board, { now = new Date(), dayW = 64, features = true } = {}) {
+  const range = timelineRange(board, now);
+  const x = (d) => ((d - range.start) / DAY_MS) * dayW;
+  const width = range.days * dayW;
+  const today = utcDay(now).getTime();
+  const days = Array.from({ length: range.days }, (_, i) => {
+    const d = new Date(range.start.getTime() + i * DAY_MS);
+    return { left: i * dayW, label: `${two(d.getUTCMonth() + 1)}-${two(d.getUTCDate())}`, weekday: WEEKDAYS[d.getUTCDay()], weekend: d.getUTCDay() === 0 || d.getUTCDay() === 6, today: d.getTime() === today };
+  });
+  const featureOf = new Map(liveRecords(board, 'features').map((f) => [f.id, f]));
+  const rows = [];
+  for (const r of liveRecords(board, 'releases')) {
+    const segs = [];
+    for (const p of arr(r.phases)) {
+      const a = boardDate(p?.from, { start: true });
+      const b = boardDate(p?.to, { end: true });
+      if (!a || !b) continue;
+      const left = x(a);
+      segs.push({ left, width: Math.max(x(b) - left, 10), label: str(p.label), state: str(p.state), from: str(p.from), to: str(p.to) });
+    }
+    const milestones = [];
+    for (const m of arr(r.milestones)) {
+      const d = boardDate(m?.date);
+      if (d) milestones.push({ left: x(d), label: str(m.label), short: str(m.short), done: m.state === 'done', date: str(m.date) });
+    }
+    rows.push({ kind: 'release', release: r, height: 66, segs, milestones });
+    if (!features) continue;
+    const dated = arr(r.features).map((id) => featureOf.get(id)).filter((f) => f && boardDate(featureDate(f)));
+    const shown = dated.filter((f) => f.headline !== false).sort((a, b) => boardDate(featureDate(a)) - boardDate(featureDate(b)));
+    if (!shown.length) continue;
+    const packed = lanes();
+    const chips = shown.map((f) => {
+      const left = x(boardDate(featureDate(f))) - 6;
+      return { left, top: 8 + packed.place(left, 30 + str(f.name).length * 6.4) * 28, feature: f, missing: !LIVE.has(f.status) };
+    });
+    if (dated.length > shown.length) {
+      const label = `+${dated.length - shown.length} more`;
+      const left = x(boardDate(featureDate(shown.at(-1)))) - 6;
+      chips.push({ left, top: 8 + packed.place(left, 30 + label.length * 6.4) * 28, more: dated.length - shown.length, label });
+    }
+    rows.push({ kind: 'features', release: r, height: 16 + packed.count * 28, chips, count: dated.length });
+  }
+  const events = liveRecords(board, 'events')
+    .map((e) => ({ e, d: boardDate(e.date) }))
+    .filter(({ d }) => d)
+    .sort((a, b) => a.d - b.d);
+  if (events.length) {
+    const packed = lanes();
+    const marks = events.map(({ e, d }) => ({ left: x(d), top: 14 + packed.place(x(d), 24 + str(e.title).length * 6.2) * 26, event: e, done: e.status === 'done' }));
+    rows.push({ kind: 'events', height: 18 + packed.count * 26, marks });
+  }
+  const nowX = x(now);
+  return { range, width, dayW, days, now: nowX >= 0 && nowX <= width ? nowX : null, rows };
+}
+
+/** The views a board has something for, in order (Overview always). */
+export function boardTabs(board) {
+  const releases = liveRecords(board, 'releases');
+  const has = (part) => liveRecords(board, part).length > 0;
+  return [
+    'overview',
+    (releases.some((r) => arr(r.phases).length || arr(r.milestones).length) || has('events')) && 'timeline',
+    (releases.length || has('repos') || has('sessions') || has('briefs')) && 'releases',
+    has('features') && 'features',
+    has('tests') && 'tests',
+    has('decisions') && 'decisions',
+    releases.some((r) => arr(r.commands).length) && 'commands',
+    board?.log?.some((l) => !l.deleted) && 'log',
+  ].filter(Boolean);
+}
+
+// Records of `part` grouped by their release, in the releases' order, then releases the board does
+// not have (by id), then those without one: [{ id, release (record or null), records }].
+function byRelease(board, records) {
+  const order = liveRecords(board, 'releases');
+  const groups = new Map(order.map((r) => [r.id, []]));
+  const none = [];
+  for (const rec of records) {
+    const id = str(rec.release);
+    if (!id) none.push(rec);
+    else groups.set(id, [...(groups.get(id) ?? []), rec]);
+  }
+  const relOf = new Map(order.map((r) => [r.id, r]));
+  const out = [...groups].filter(([, list]) => list.length).map(([id, list]) => ({ id, release: relOf.get(id) ?? null, records: list }));
+  if (none.length) out.push({ id: '', release: null, records: none });
+  return out;
+}
+
+const matcher = (query) => {
+  const words = findWords(query);
+  return (...fields) => {
+    if (!words.length) return true;
+    const hay = foldSearch(fields.flat().map(str).join('\u0001'));
+    return words.every((w) => hay.includes(w));
+  };
+};
+
+/**
+ * The Features view: the features that pass the filters (`release` an id, 'none' for those in no
+ * release; `repo`; `query` words; `missing` not live yet; `statuses` any of them), grouped by
+ * release, with what the filters offer (statuses as they come, repos sorted) and the counts.
+ */
+export function featureView(board, { release = '', repo = '', query = '', missing = false, statuses = [] } = {}) {
+  const all = liveRecords(board, 'features');
+  const matches = matcher(query);
+  const wanted = new Set(statuses);
+  const shown = all.filter(
+    (f) =>
+      (!release || (release === 'none' ? !f.release : f.release === release)) &&
+      (!repo || arr(f.repos).includes(repo)) &&
+      (!missing || !LIVE.has(f.status)) &&
+      (!wanted.size || wanted.has(f.status)) &&
+      matches(f.name, f.what, f.detail, f.session, f.branch, arr(f.repos)),
+  );
+  return {
+    total: all.length,
+    missing: all.filter((f) => !LIVE.has(f.status)).length,
+    shown: shown.length,
+    statuses: [...new Set(all.map((f) => str(f.status)).filter(Boolean))],
+    repos: [...new Set(all.flatMap((f) => arr(f.repos).map(str)).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    groups: byRelease(board, shown),
+  };
+}
+
+/** The Tests view: tests by release, each group with how many passed. */
+export const testGroups = (board) => byRelease(board, liveRecords(board, 'tests')).map((g) => ({ ...g, passed: g.records.filter((t) => TEST_PASSED.has(t.status)).length }));
+
+/** The Commands view: each release's commands, those to do first. */
+export const commandGroups = (board) =>
+  liveRecords(board, 'releases')
+    .filter((r) => arr(r.commands).length)
+    .map((r) => ({ release: r, pending: r.commands.filter((c) => c?.status !== 'done'), done: r.commands.filter((c) => c?.status === 'done') }));
+
+// What the board's search looks through, part by part (commands come from their releases).
+const SEARCH_GROUPS = [
+  ['releases', 'Releases'],
+  ['features', 'Features'],
+  ['tests', 'Tests'],
+  ['decisions', 'Decisions'],
+  ['actions', 'Waiting on you'],
+  ['events', 'Events'],
+  ['commands', 'Commands'],
+  ['sessions', 'Sessions'],
+  ['briefs', 'Workstreams'],
+  ['repos', 'Repos'],
+  ['log', 'Log'],
+];
+const NOT_SEARCHED = new Set([...STAMPS, 'order', 'color', 'deleted', 'headline']);
+// A release's own text: not its commands (searched apart) or the ids of its features, tests, decisions.
+const RELEASE_NOT_SEARCHED = new Set([...NOT_SEARCHED, 'commands', 'features', 'tests', 'decisions']);
+
+function textOf(value, skip, out = []) {
+  if (typeof value === 'string' || typeof value === 'number') out.push(String(value));
+  else if (Array.isArray(value)) for (const v of value) textOf(v, NOT_SEARCHED, out);
+  else if (isObject(value)) for (const [k, v] of Object.entries(value)) if (!skip.has(k)) textOf(v, NOT_SEARCHED, out);
+  return out;
+}
+
+/**
+ * The board's search: every word (a "quoted phrase" as one) in a record's text, accents and case
+ * aside. { words, total, groups: [{ part, label, total, hits: [{ part, id, record, release? }] }] },
+ * at most `limit` hits a group (`total` counts them all).
+ */
+export function searchBoard(board, query, { limit = 50 } = {}) {
+  const words = findWords(query);
+  if (!words.length) return { words, total: 0, groups: [] };
+  const hit = (record, skip = NOT_SEARCHED) => {
+    const hay = foldSearch(textOf(record, skip).join('\u0001'));
+    return words.every((w) => hay.includes(w));
+  };
+  const groups = [];
+  for (const [part, label] of SEARCH_GROUPS) {
+    let hits;
+    if (part === 'commands') {
+      hits = liveRecords(board, 'releases').flatMap((r) => arr(r.commands).filter((c) => isObject(c) && hit(c)).map((c) => ({ part, id: str(c.id), record: c, release: r.id })));
+    } else {
+      const skip = part === 'releases' ? RELEASE_NOT_SEARCHED : NOT_SEARCHED;
+      hits = (part === 'log' ? board.log.filter((l) => !l.deleted) : liveRecords(board, part)).filter((r) => hit(r, skip)).map((r) => ({ part, id: r.id, record: r }));
+    }
+    if (hits.length) groups.push({ part, label, total: hits.length, hits: hits.slice(0, limit) });
+  }
+  return { words, total: groups.reduce((n, g) => n + g.total, 0), groups };
 }

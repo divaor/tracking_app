@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 2.2.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 2.3.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -263,13 +263,20 @@ Open **Projects → Manage** in the sidebar. There you can add projects, set eac
 
 A big project can have a **release board**: its releases, features, tests, decisions, events, the Claude sessions working on it, its repos, what waits on you and a log of how it advances. Each board is kept with your data (`boards/<project>.json`) and shows under **Release boards** in the sidebar (**All** lists them; the command **Go to: Release boards** too).
 
-- **The Overview**: a banner with where things stand and a pill per release; the **next milestone** with a countdown (and the one after); tiles for releases deployed, features live, tests passed, steps waiting on you and decisions still open; a card per release with its progress ring, steps, features, tests and merges; **Waiting on you**, in order; **Latest advancements**; and **Still missing**, the features not live yet by the release they are expected in.
+- **Its views are tabs** under the board's name: Overview, Timeline, Releases, Features, Tests, Decisions, Commands and Log. A view the board has nothing for stays hidden. Each has its own address (`#/release-board/<project>/features`), so Back goes to the view before and a link can open one.
+- **The Overview**: a banner with where things stand and a pill per release; the **next milestone** with a countdown (and the one after); tiles for releases deployed, features live, tests passed, steps waiting on you and decisions still open (a tile opens its view); a card per release with its progress ring, steps, features, tests and merges; the timeline; **Waiting on you**, in order; **Latest advancements**; and **Still missing**, the features not live yet by the release they are expected in.
+- **Timeline**: a row per release with its phases as bars (striped when planned), its milestones as diamonds and, under it, its features as chips on the day they shipped or are expected (dashed: not live yet; the rest of a big release as **+N more**). The events (infra, ops and other dates) have a row of their own. A red line marks now, and the timeline opens scrolled to it. **Features** turns the feature rows off; **Compact**, **Normal** and **Wide** set the zoom. Point at anything to see what it is and when; a click opens it. It scrolls sideways under the row names, on a phone too.
+- **Releases**: the release cards, **What runs where** (each repo's live, master and dev), the **Workstreams** and the **Sessions** (who works on what, and when each last reported).
+- **Features**: a table by release. Filter by release (or **Not in a release**), repo, words and **Missing only**. Click statuses to show only those; click again to show all. Columns without anything in them (repos, session, tracker) are left out. The filters stay while you move between views.
+- **Tests** by release, with how many passed. **Decisions** as cards, newest first: **All**, **Open** or **Decided**. **Commands**: every command to run, by release, to do first, with **Copy**, what to expect and what to do if not. **Log**: every advancement, newest first. Once the log grows long, older months are kept apart; a **Show** button brings back one month at a time.
+- **Search the board** (top right) looks through everything on it: releases, features, tests, decisions, events, commands, sessions, workstreams, repos, what waits on you and the log. Every word must be there, accents and case aside; quotes keep a phrase together. Results are grouped by part, and a click opens one (a command opens its release right at it). **Esc** clears the search.
+- On a phone each table becomes a card per row, the tabs and the timeline scroll sideways, and the drawer takes the whole screen.
 - **A release** (its card or pill) opens at the side (the whole screen on a phone) with tabs: Overview (summary, dates, steps), Features, Merges, Commands (with **Copy**, what to expect and what to do if not), Tests, Decisions, Recommendations and risks, and Links. A feature, test or decision in it opens over it; the arrow goes back, **Esc** (or Back on Android) closes it. An action's **commands** opens its release right at that command.
 - Item ids in a board are links to those items.
 - **Claude keeps it current**: after a merge, a test, a decision or a finished step, Claude changes only what changed on the board (with a log line saying what happened, and which session did it), so several sessions can update it at once. Ask "Import my release board into my tracker for project X" in Claude Code to bring in a board file you already have; Claude sends the file with an upload link.
 - **Import a board file** yourself: on **Release boards → All** (or under a board), pick the project and the file (a release board page, its data script or its JSON). It merges with the board; nothing on it is deleted.
 - **Data file** (top right of a board) downloads the board as its standalone page's data script (`window.NAME = { … }`), so a page you already use can keep showing it.
-- Coming next: the Timeline, Features, Tests, Decisions, Commands and Log views, then the board in your items, Home, plans and notifications.
+- Coming next: the board in your items, Home, plans, Days and notifications, comments on its records, and ticks and decisions made in the app.
 
 ## 9. The model (optional)
 

@@ -38,7 +38,7 @@ import { appItemLink, idFromFragment, itemIdIn, WEB_APP_URL } from './itemLinks.
 import { HelpDialog } from './ui/help.js';
 import { makePlan, usePlanAuto } from './ui/plans.js';
 import { DaysView } from './ui/days.js';
-import { ReleaseBoardView, useBoards } from './ui/releaseBoard.js';
+import { boardHref, ReleaseBoardView, useBoards } from './ui/releaseBoard.js';
 import { ListenBar, setListenNotice } from './ui/listen.js';
 import { stopReading, toggleReading } from './reader.js';
 import { cachedPlans } from './planStore.js';
@@ -46,22 +46,33 @@ import { SettingsView } from './ui/settingsView.js';
 
 const VIEWS = ['home', 'board', 'list', 'days', 'release-board', 'projects', 'settings'];
 
+const decodeArg = (part) => {
+  try {
+    return decodeURIComponent(part);
+  } catch {
+    return part;
+  }
+};
+
 function parseHash() {
-  const [view, type, status] = location.hash.replace(/^#\/?/, '').split('/');
+  const [view, type, status, extra] = location.hash.replace(/^#\/?/, '').split('/');
+  const board = view === 'release-board' && /^[a-z0-9-]+$/.test(type ?? '');
   return {
     view: VIEWS.includes(view) ? view : 'home',
     type: TYPE_IDS.includes(type) ? type : 'all',
     status: STATUSES.includes(status) ? status : 'all',
     // Days: #/days/2026-10-28 (none: today).
     day: view === 'days' && /^\d{4}-\d{2}-\d{2}$/.test(type ?? '') ? type : '',
-    // A project's release board: #/release-board/<slug> (none: the list of them).
-    boardSlug: view === 'release-board' && /^[a-z0-9-]+$/.test(type ?? '') ? type : '',
+    // A project's release board: #/release-board/<slug>[/<view>[/<arg>]] (none: the list of them).
+    boardSlug: board ? type : '',
+    boardTab: board && /^[a-z]+$/.test(status ?? '') ? status : '',
+    boardArg: board && extra ? decodeArg(extra) : '',
   };
 }
 
-export function hrefFor({ view, type = 'all', status = 'all', day = '', boardSlug = '' }) {
+export function hrefFor({ view, type = 'all', status = 'all', day = '', boardSlug = '', boardTab = '', boardArg = '' }) {
   if (view === 'days') return day ? `#/days/${day}` : '#/days';
-  if (view === 'release-board') return boardSlug ? `#/release-board/${boardSlug}` : '#/release-board';
+  if (view === 'release-board') return boardHref(boardSlug, boardTab, boardArg);
   const parts = [view];
   if (type !== 'all' || status !== 'all') parts.push(type);
   if (status !== 'all') parts.push(status);
@@ -943,7 +954,7 @@ export function App() {
   } else if (route.view === 'days') {
     view = html`<${DaysView} items=${scopedItems} today=${today} day=${route.day} actions=${actions} />`;
   } else if (route.view === 'release-board') {
-    view = html`<${ReleaseBoardView} slug=${route.boardSlug} items=${items} projects=${projects} actions=${actions} />`;
+    view = html`<${ReleaseBoardView} slug=${route.boardSlug} tab=${route.boardTab} arg=${route.boardArg} items=${items} projects=${projects} actions=${actions} />`;
   } else if (route.view === 'projects') {
     view = html`<${ProjectsView} items=${items} projects=${projects} actions=${actions} />`;
   } else if (route.view === 'settings') {
