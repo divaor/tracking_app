@@ -213,8 +213,8 @@ test('comments and ticks from the app: get_board shows what awaits Claude; Claud
   let b = applyBoardChanges(board(), [
     { part: 'features', id: 'f-export', comment: 'Is CSV enough?' },
     { part: 'releases', id: 'R2', comment: 'Output: merged cleanly', command: 'c-merge' },
-  ], { at: '2026-10-31T10:00:00.000Z', by: 'Phone' }).board;
-  b = boardTick(b, { kind: 'action', id: b.actions[0].id }, true, { at: '2026-10-31T10:01:00.000Z', by: 'Phone' });
+  ], { at: new Date(Date.now() - 120_000).toISOString(), by: 'Phone' }).board;
+  b = boardTick(b, { kind: 'action', id: b.actions[0].id }, true, { at: new Date(Date.now() - 60_000).toISOString(), by: 'Phone' });
   github.write(PATH, serializeBoard(b));
 
   const got = (await call('get_board', { project: 'Demo app' })).data;
@@ -239,4 +239,15 @@ test('comments and ticks from the app: get_board shows what awaits Claude; Claud
   const overview = (await call('get_overview')).data;
   assert.deepEqual(overview.releaseBoards.map((r) => [r.project, r.waitingOnYou, r.openDecisions, r.commentsAwaiting]), [['Demo app', ['Run the migration (Mon 11-02)'], 1, 1]]);
   assert.equal(overview.releaseBoards[0].link, 'https://me.github.io/tracking_app/#/release-board/demo-app');
+  assert.equal(overview.releaseBoards[0].waitingOnYouTotal, undefined, 'all of them listed');
+
+  // A long list of changes says how many were left out.
+  const many = Array.from({ length: 65 }, (_, i) => ({ part: 'tests', id: `t-${i}`, set: { title: `Test ${i}`, status: 'scheduled' } }));
+  await new Promise((r) => setTimeout(r, 5));
+  const before = new Date().toISOString();
+  await new Promise((r) => setTimeout(r, 5));
+  await call('update_board', { project: 'Demo app', changes: many });
+  const since = (await call('get_board', { project: 'Demo app', since: before })).data.changedSince;
+  assert.deepEqual([since.total, since.shown, since.changes.length], [65, 60, 60]);
+  assert.match(since.more, /^5 older changes not listed/);
 });

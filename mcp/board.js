@@ -175,6 +175,8 @@ export function createBoards({ client, branch = '', device = 'Claude', now, appU
       out.changedSince = {
         since,
         total: changes.length,
+        // The newest 60; say so when there are more (whole records: get_board_records, or a later since).
+        ...(changes.length > 60 ? { shown: 60, more: `${changes.length - 60} older changes not listed: pass a later since, or read records with get_board_records.` } : {}),
         changes: changes.slice(0, 60).map(({ part, id, record }) => ({ part, id, title: recordTitle(part, record) || undefined, status: record.status, deleted: record.deleted || undefined, at: record.updatedAt, by: record.updatedBy })),
       };
     }
@@ -289,6 +291,7 @@ export function createBoards({ client, branch = '', device = 'Claude', now, appU
           headline: board.now?.headline || undefined,
           next: next ? { title: next.title, at: next.date.toISOString() } : undefined,
           waitingOnYou: waiting.length ? waiting.slice(0, 5).map((a) => (a.when ? `${a.text} (${a.when})` : a.text)) : undefined,
+          waitingOnYouTotal: waiting.length > 5 ? waiting.length : undefined,
           openDecisions: s.openDecisions || undefined,
           commentsAwaiting: comments || undefined,
         });
