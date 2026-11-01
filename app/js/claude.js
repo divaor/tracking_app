@@ -15,7 +15,7 @@ const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 // Models that take output_config.effort.
 const EFFORT_MODELS = /^claude-(fable|mythos|opus-5|opus-4-[678]|sonnet-5|sonnet-4-6|haiku-5)/;
 // Short jobs (names, filing, suggestions as you type, quick add, a test) think less and answer sooner.
-const QUICK = new Set(['name', 'file', 'complete', 'quick-add', 'test']);
+const QUICK = new Set(['name', 'file', 'complete', 'quick-add', 'test', 'find-plan', 'find-pick']);
 // System texts this long (about 2,000 tokens) or longer are cached.
 const CACHE_FROM = 8000;
 

@@ -226,7 +226,9 @@ export function planWords(plan) {
   const bits = [];
   if (plan.encrypted) bits.push('encrypted');
   if (plan.untitled) bits.push('no name');
-  const words = [...plan.terms, ...plan.names];
+  // Terms and names, each once (a name is often a term too).
+  const seen = new Set();
+  const words = [...plan.terms, ...plan.names].filter((w) => !seen.has(fold(w)) && seen.add(fold(w)));
   if (words.length) bits.push(words.slice(0, 5).join(', ') + (words.length > 5 ? '…' : ''));
   if (plan.patterns.length) bits.push(`${plan.patterns.length} pattern${plan.patterns.length === 1 ? '' : 's'}`);
   if (plan.projects.length) bits.push(`in ${plan.projects.join(', ')}`);

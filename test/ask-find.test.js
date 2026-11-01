@@ -184,6 +184,7 @@ test('the results: the pick or the ranking, encrypted ones apart', () => {
   assert.equal(findResults(candidates, null, { ...plan, limit: 1 }).results.length, 1, 'no pick: the ranking');
   assert.deepEqual(findResults(candidates, null, { ...plan, encrypted: true }).results, [], 'encrypted files: only the group');
   assert.match(planWords({ ...plan, projects: ['Deep Time'], since: '2026-10-01', sort: 'recent' }), /^docker · in Deep Time · since 2026-10-01 · newest first$/);
+  assert.equal(planWords({ ...plan, terms: ['docker', 'Docker compose'], names: ['Docker', 'dockerfile'] }), 'docker, Docker compose, dockerfile', 'each word once');
 });
 
 test('what is a question to ask, rather than words to match', () => {
