@@ -20,7 +20,7 @@ It runs as an **Electron desktop app** on your computers and as an **installable
 - **Lists**: filter by category and status, sort by priority, due date and more. Search with plain text or `#tags`.
 - **Markdown notes and documents**: paste a doc or import a `.md` file, or drop files onto the window. Checklists (`- [ ] step`) can be ticked right in the reader.
 - **Quick add**: `Write report #work !high @tomorrow` sets a tag, the priority and a due date. Pasting a link fills the Link field. On a phone, tap the microphone and say it. On the desktop, a shortcut opens a small quick add window from any app.
-- **A model of your own** (optional, as in Tracker Editor: Ollama or LM Studio on your computer, Claude or another AI provider with your own API key, or a model service that answers later): quick add understands plain language ("call Ana tomorrow about the invoice, urgent" gets its due date, priority, project and tags), each item gets **Ask the model about this** (summarize, break into steps, draft your review of a document, questions, risks, translate, or any question), and the Overview can **plan your day** or **review your week**. See [6. Model](#6-model-optional).
+- **A model of your own** (optional, as in Tracker Editor: Ollama or LM Studio on your computer, Claude or another AI provider with your own API key, or a model service that answers later): quick add understands plain language ("call Ana tomorrow about the invoice, urgent" gets its due date, priority, project and tags), each item gets **Ask the model about this** (summarize, break into steps, draft your review of a document, questions, risks, translate, or any question), the Overview can **plan your day** or **review your week**, and **the assistant** changes things when you ask in your own words (items, projects, tags, release boards), each change with Undo. See [6. Model](#6-model-optional).
 - **Tracker Editor**: the companion [text editor](https://github.com/divaor/tracker-editor) keeps many files open, synced to the same data repo with the same projects and tags. Items sent from it get **Open in editor**, and attached files get **Edit in editor**; your edits come back here. Set its address under **Settings → Tracker Editor**. The desktop app opens these links in the editor's desktop app when it is installed.
 - **Notifications**: your phone gets a push notification when Claude sends a document to review, stores a file or changes your tasks, even when the app is closed. The desktop app shows native notifications and can keep running in the system tray.
 - **Offline first**: every device keeps a full local copy and syncs automatically when online. Every change is a commit in your data repo, so its history is also your backup.
@@ -147,6 +147,7 @@ With a model on:
 - **Quick add in plain language** (Settings → Quick add): the item is added at once as you typed it, then the model fills in the due date, priority, project (only existing ones) and tags it understood, with **Undo**. What you type with `+ # ! @` and the type you picked stay as they are, and a plain title is never rewritten.
 - **Ask the model about this**, in every item: Summarize, Break into steps (tasks), Turn into a plan (ideas), **Draft my feedback** (documents, from their files too), Questions to ask, Risks and gaps, In English / In Spanish, or any question with follow-ups. **Add to the notes** puts an answer (a checklist of steps, say) in the item; **Use as my feedback** fills your review of a document.
 - **Plan my day** / **Review my week** on the Overview: what to do first today, or what got done, what is stuck and what to focus on next.
+- **The assistant** (A, Ctrl+K, or the ✦ at the top): say what to do in your own words ("move my overdue tasks to next week", "make a project Kitchen with tasks…", "tag everything about the coal forests #layer-08", "tick Built on Deep Time's 2.3") or ask how to do something. It looks up what it needs and makes the changes as cards: small ones at once with **Undo**, changing more than 5 items or renaming waits for **Apply**, deleting asks with a warning. Undo puts back only what that step changed (what changed since stays). **Only explain** makes it say where to click instead. Not with a service that answers later.
 
 ## 7. Quick add from anywhere (desktop) and by voice (phone)
 
@@ -251,6 +252,8 @@ app/                  the web app (also loaded by Electron)
   js/model.js         item model, merge, quick-add parser, checklists
   js/assist.js        what the model is asked (quick add, items, plans) and how replies are checked
   js/assistant.js     the model client from Settings
+  js/assistantSteps.js  the assistant's steps: what the model may do, the looks, the changes and their Undo
+  js/ui/assistantPanel.js  the assistant's panel
   js/llm.js, asyncLlm.js, asyncConnection.js, localFetch.js   model clients, copied from Tracker Editor
   js/sync.js          one pull → merge → push round
   js/github.js        GitHub Contents API client
