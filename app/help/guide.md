@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 2.4.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 2.4.1 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -213,7 +213,8 @@ The speaker in an open item's bar (or **L**) reads it to you: the title, the not
 Any item can carry files: photos, screenshots, PDFs, Word, Excel and PowerPoint files, notes, anything up to 25 MB each.
 
 - **Attach** under the notes picks files. You can also **drop** files on an open item, or **paste** a picture (a screenshot, an image copied from a page). On a phone, **Photo** takes one with the camera.
-- **Pictures** show as small versions; a click shows one large. **←** and **→** go through them, the magnifier shows it at full size, **Esc** closes it (the item stays open). Download, open with its program (desktop app) or remove it from there.
+- **Pictures** show as small versions; a click shows one large. **←** and **→** go through them (on a phone, swipe sideways), **Esc** closes it (the item stays open). Download, open with its program (desktop app) or remove it from there.
+- **Zoom in on a picture**: on a phone, spread two fingers (the spot between them stays where it is) or double-tap where you want to look closer; drag to move around, double-tap again to see it whole. On a computer, click the picture or use `Ctrl` + the mouse wheel; the magnifier zooms in and out too.
 - **Text files** (Markdown, txt, CSV, code…) read inside the item; **Edit in editor** opens them in Tracker Editor.
 - **PDFs and documents** are chips with their type and size. A click opens one with its program in the desktop app (a copy, so changes there don't come back); in a browser it downloads. **Open in editor** (the `</>` button) shows a PDF, Word or other document as it looks in Tracker Editor. Programs and scripts are never opened.
 - **Photos over 4 MB are made smaller** (2,560 pixels on the long side) so your data repo doesn't fill up with phone photos. The message says so; **Keep full size** puts the original back.

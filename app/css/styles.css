@@ -2138,10 +2138,14 @@ button.project-chip:hover {
 }
 
 .picture-stage {
+  position: relative;
   display: grid;
   place-items: center;
   overflow: hidden;
   padding: 0 12px 12px;
+  /* Pinching and dragging are the viewer's (fileViewer.js), not the page's. */
+  touch-action: none;
+  user-select: none;
 }
 
 .picture-stage img {
@@ -2149,17 +2153,17 @@ button.project-chip:hover {
   max-height: 100%;
   object-fit: contain;
   cursor: zoom-in;
-}
-
-.picture-stage.zoomed {
-  place-items: start center;
-  overflow: auto;
+  transform-origin: center;
+  will-change: transform;
+  -webkit-user-drag: none;
 }
 
 .picture-stage.zoomed img {
-  max-width: none;
-  max-height: none;
-  cursor: zoom-out;
+  cursor: grab;
+}
+
+.picture-stage.zoomed img:active {
+  cursor: grabbing;
 }
 
 .picture-nav {
@@ -5220,6 +5224,9 @@ button.rb-tl-label:hover { background: var(--surface-2); }
   .rb-table.rb-stack td:first-child::before { content: none; }
   .rb-table.rb-stack tr.rb-group-row { padding: 0; }
   .rb-panel.rb-table-scroll .rb-table.rb-stack tr.rb-group-row td { display: block; padding: 8px 14px; }
+  /* Stacked rows (phones): the new-record bar on the row's edge, clear of the text (the first cell has no padding here). */
+  .rb-table.rb-stack tr.rb-new { box-shadow: inset 3px 0 0 var(--accent); }
+  .rb-table.rb-stack tr.rb-new > td:first-child { box-shadow: none; }
   .rb-table.rb-stack tr.click:hover td { background: none; }
   .rb-nowrap-cell { white-space: normal; }
   .rb-tl-label { padding: 8px; }

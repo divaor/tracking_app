@@ -185,17 +185,139 @@ function Thumb({ file, pending, onOpen }) {
   </button>`;
 }
 
-/** Pictures one at a time over the window: ← → between them, a click to see it at full size, Esc to close. */
+const MAX_ZOOM = 8;
+const TAP_ZOOM = 2.5;
+
+/**
+ * Pictures one at a time over the window: ← → (or a swipe) between them, Esc to close. Zoom:
+ * two fingers (the point between them stays put), a double tap (or a click) there and back,
+ * Ctrl+wheel, the 🔍 button; drag to move around a zoomed picture.
+ */
 function PictureViewer({ files, index, onIndex, onClose, item, actions }) {
   const file = files[index];
   const [state, setState] = useState({ status: 'loading' });
-  const [zoom, setZoom] = useState(false);
+  // The picture fitted to the stage, then scaled by `s` around its middle and moved by x, y (CSS px).
+  const [view, setView] = useState({ s: 1, x: 0, y: 0 });
+  const zoom = view.s > 1.01;
+  const stageRef = useRef(null);
+  const imgRef = useRef(null);
+  const pointers = useRef(new Map());
+  const gesture = useRef(null);
+  const lastTap = useRef({ t: 0, x: 0, y: 0 });
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  // Kept so the picture covers what it can: no moving it away past its edges.
+  const clamp = (v) => {
+    const stage = stageRef.current;
+    const img = imgRef.current;
+    if (!stage || !img) return v;
+    const s = Math.min(MAX_ZOOM, Math.max(1, v.s));
+    const mx = Math.max(0, (img.offsetWidth * s - stage.clientWidth) / 2);
+    const my = Math.max(0, (img.offsetHeight * s - stage.clientHeight) / 2);
+    return s <= 1.01 ? { s: 1, x: 0, y: 0 } : { s, x: Math.min(mx, Math.max(-mx, v.x)), y: Math.min(my, Math.max(-my, v.y)) };
+  };
+  // The picture's middle on screen when not moved (the point it scales around).
+  const middle = () => {
+    const stage = stageRef.current.getBoundingClientRect();
+    const img = imgRef.current;
+    return { x: stage.left + img.offsetLeft + img.offsetWidth / 2, y: stage.top + img.offsetTop + img.offsetHeight / 2 };
+  };
+  /** Scaled to `s` keeping the screen point (cx, cy) on the same spot of the picture (from the view `from`). */
+  const zoomAt = (s, cx, cy, from = viewRef.current) => {
+    if (!imgRef.current) return from;
+    const m = middle();
+    const px = (cx - m.x - from.x) / from.s;
+    const py = (cy - m.y - from.y) / from.s;
+    const next = Math.min(MAX_ZOOM, Math.max(1, s));
+    return clamp({ s: next, x: cx - m.x - px * next, y: cy - m.y - py * next });
+  };
+  const toggleAt = (cx, cy) => setView(zoom ? { s: 1, x: 0, y: 0 } : zoomAt(TAP_ZOOM, cx, cy));
+  const onPointerDown = (e) => {
+    if (state.status !== 'ready' || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pts = [...pointers.current.values()];
+    if (pts.length === 2) {
+      const [a, b] = pts;
+      gesture.current = { kind: 'pinch', start: viewRef.current, dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+    } else if (pts.length === 1) {
+      gesture.current = { kind: 'drag', start: viewRef.current, x: e.clientX, y: e.clientY, at: Date.now(), moved: false, onImage: e.target === imgRef.current, mouse: e.pointerType === 'mouse' };
+    }
+  };
+  const onPointerMove = (e) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const g = gesture.current;
+    if (!g) return;
+    if (g.kind === 'pinch') {
+      const [a, b] = [...pointers.current.values()];
+      if (!b) return;
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      // The spot under the fingers' first middle follows the middle as they move and spread.
+      const m = middle();
+      const s = Math.min(MAX_ZOOM, Math.max(1, (g.start.s * dist) / g.dist));
+      const px = (g.mid.x - m.x - g.start.x) / g.start.s;
+      const py = (g.mid.y - m.y - g.start.y) / g.start.s;
+      setView(clamp({ s, x: mid.x - m.x - px * s, y: mid.y - m.y - py * s }));
+      return;
+    }
+    const dx = e.clientX - g.x;
+    const dy = e.clientY - g.y;
+    if (Math.hypot(dx, dy) > 6) g.moved = true;
+    if (g.start.s > 1.01) setView(clamp({ s: g.start.s, x: g.start.x + dx, y: g.start.y + dy }));
+  };
+  const onPointerUp = (e) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.delete(e.pointerId);
+    const g = gesture.current;
+    if (g?.kind === 'pinch') {
+      // One finger stays: it drags from here.
+      const left = [...pointers.current.values()][0];
+      gesture.current = left ? { kind: 'drag', start: viewRef.current, x: left.x, y: left.y, at: Date.now(), moved: true } : null;
+      return;
+    }
+    gesture.current = null;
+    if (!g || e.type === 'pointercancel') return;
+    const dx = e.clientX - g.x;
+    const dy = e.clientY - g.y;
+    // Fitted: a swipe sideways goes to the next or previous picture.
+    if (g.moved && g.start.s <= 1.01 && files.length > 1 && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) return go(dx < 0 ? 1 : -1);
+    if (g.moved) return;
+    if (g.mouse) {
+      // A click on the picture zooms there (and back); on the dark around it, closes.
+      if (g.onImage) toggleAt(e.clientX, e.clientY);
+      else if (!zoom) onClose();
+      return;
+    }
+    const now = Date.now();
+    const near = Math.hypot(e.clientX - lastTap.current.x, e.clientY - lastTap.current.y) < 30;
+    if (now - lastTap.current.t < 320 && near) {
+      lastTap.current = { t: 0, x: 0, y: 0 };
+      toggleAt(e.clientX, e.clientY);
+    } else lastTap.current = { t: now, x: e.clientX, y: e.clientY };
+  };
+  const onWheel = (e) => {
+    if (state.status !== 'ready' || !(e.ctrlKey || e.metaKey || zoom)) return;
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) setView(zoomAt(viewRef.current.s * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY));
+    else setView(clamp({ ...viewRef.current, x: viewRef.current.x - e.deltaX, y: viewRef.current.y - e.deltaY }));
+  };
+  // The wheel listener is not passive, so Ctrl+wheel zooms the picture, not the page.
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return undefined;
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  });
   useEffect(() => {
     if (!file) return undefined;
     let alive = true;
     let made = null;
     setState({ status: 'loading' });
-    setZoom(false);
+    setView({ s: 1, x: 0, y: 0 });
+    pointers.current.clear();
+    gesture.current = null;
     loadFileBytes(file).then(
       (bytes) => {
         if (!alive) return;
@@ -236,14 +358,21 @@ function PictureViewer({ files, index, onIndex, onClose, item, actions }) {
       <span class="picture-name" title=${file.path}>${file.name}</span>
       <span class="muted small">${formatBytes(file.size)}${files.length > 1 ? ` · ${index + 1} of ${files.length}` : ''}</span>
       <span class="spacer" />
-      <button type="button" class="icon-btn ${zoom ? 'on' : ''}" title=${zoom ? 'Fit to the window' : 'Full size'} aria-label="Zoom" aria-pressed=${zoom} onClick=${() => setZoom(!zoom)}><${Icon} name="zoom" /></button>
+      <button type="button" class="icon-btn ${zoom ? 'on' : ''}" title=${zoom ? 'Fit to the window' : 'Zoom in (or pinch, double-tap, Ctrl+wheel)'} aria-label="Zoom" aria-pressed=${zoom}
+        onClick=${() => {
+          const m = imgRef.current && middle();
+          if (m) toggleAt(m.x, m.y);
+        }}><${Icon} name="zoom" /></button>
       <button type="button" class="icon-btn" title="Download" aria-label="Download" onClick=${() => downloadFile(file).catch(fail)}><${Icon} name="download" /></button>
       ${window.desktop?.openFile && html`<button type="button" class="icon-btn" title=${window.desktop.android ? 'Open with another app' : 'Open with its program'} aria-label=${window.desktop.android ? 'Open with another app' : 'Open with its program'} onClick=${() => openFileOutside(file).catch(fail)}><${Icon} name="external" /></button>`}
       <button type="button" class="icon-btn danger" title="Remove from this item" aria-label="Remove" onClick=${remove}><${Icon} name="trash" /></button>
       <button type="button" class="icon-btn" title="Close (Esc)" aria-label="Close" onClick=${onClose}><${Icon} name="x" /></button>
     </div>
-    <div class="picture-stage ${zoom ? 'zoomed' : ''}" onMouseDown=${(e) => e.target === e.currentTarget && onClose()}>
-      ${state.status === 'ready' && html`<img src=${state.url} alt=${file.name} onClick=${() => setZoom(!zoom)} />`}
+    <div class="picture-stage ${zoom ? 'zoomed' : ''}" ref=${stageRef}
+      onPointerDown=${onPointerDown} onPointerMove=${onPointerMove} onPointerUp=${onPointerUp} onPointerCancel=${onPointerUp}>
+      ${state.status === 'ready' &&
+      html`<img ref=${imgRef} src=${state.url} alt=${file.name} draggable="false"
+        style=${{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.s})`, transition: gesture.current ? 'none' : 'transform 0.15s ease-out' }} />`}
       ${state.status === 'loading' && html`<p class="muted">Loading ${file.name}…</p>`}
       ${state.status === 'error' && html`<p class="notice error"><${Icon} name="alert" size=${16} /><span>${state.error}</span></p>`}
     </div>
