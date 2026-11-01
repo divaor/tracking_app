@@ -651,6 +651,8 @@ function buildMenu() {
         { type: 'separator' },
         { role: 'togglefullscreen' },
         { type: 'separator' },
+        { label: 'Assistant', accelerator: 'CmdOrCtrl+K', click: () => send('assistant') },
+        { type: 'separator' },
         { label: 'Item Windows Side by Side', click: () => send('windows-tile') },
         { label: 'Minimize Item Windows', click: () => send('windows-minimize') },
         { label: 'Close Item Windows', click: () => send('windows-close') },

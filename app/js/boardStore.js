@@ -4,7 +4,7 @@
 // Importing a board file merges it with what is there; ticks, decisions and comments made here are
 // written at the version read and made again on the newer one when another writer got there first.
 // When this device last looked at each board is kept here too (what changed since is marked).
-import { kvGet, kvSet } from './kv.js';
+import { kvDel, kvGet, kvSet } from './kv.js';
 import { boardEvents, boardFromData, boardPath, boardScript, BOARDS_DIR, boardSlug, mergeBoards, parseBoard, serializeBoard, waitingEverywhere } from './boards.js';
 import { nowIso } from './model.js';
 import { notifyChanges, remind } from './notifier.js';
@@ -126,26 +126,55 @@ export async function importBoardFile(text, project) {
  * Changes a board as `change(board)` says (pure: boards.js boardTick, decideBoard, applyBoardChanges)
  * and writes it at the version read; when another writer got there first, reads the newer one and
  * changes that. Returns the board written. `what` names the change in the commit message.
+ * `create`: a project's name, when a board that is not there yet may be started (`change(null)`).
+ * `onWrite(before, after)` is told the versions written (the assistant keeps them for Undo).
  */
-export async function changeBoard(slug, change, what) {
+export async function changeBoard(slug, change, what, { create = '', onWrite } = {}) {
   const { client, branch } = await dataClient();
   const device = getSettings().device || 'this device';
   const path = `${BOARDS_DIR}/${slug}.json`;
   for (let attempt = 0; attempt < 4; attempt++) {
     const file = await client.getFile(path, branch || undefined);
     const there = file ? parseBoard(file.text) : null;
-    if (!there) throw new Error(file ? `${path} cannot be read, so it was left as it is.` : 'That board is not in your data any more.');
+    if (!there && (file || !create)) throw new Error(file ? `${path} cannot be read, so it was left as it is.` : 'That board is not in your data any more.');
     const board = change(there, { at: nowIso(), by: device });
     try {
-      const { sha } = await client.putFile(path, { text: serializeBoard(board), sha: file.sha, branch: branch || undefined, message: `Tracker: release board “${board.project}”: ${what} (from ${device})` });
+      const { sha } = await client.putFile(path, { text: serializeBoard(board), sha: file?.sha, branch: branch || undefined, message: `Tracker: release board “${board.project}”: ${what} (from ${device})` });
       await keep(slug, sha ?? '', board);
+      if (!file) {
+        index = [...(index ?? []).filter((b) => b.slug !== slug), { slug, project: board.project, sha: sha ?? '' }].sort(byName);
+        await kvSet('boards:index', index).catch(() => {});
+      }
       announce();
+      onWrite?.(there, board);
       return board;
     } catch (err) {
       if (err?.status !== 409 && err?.status !== 422) throw err;
     }
   }
   throw new Error('The board kept changing elsewhere; try again.');
+}
+
+/**
+ * Deletes a board's file when `check(board)` says so (the assistant's Undo of a board it started,
+ * when nothing changed on it since). Returns whether the board is gone.
+ */
+export async function removeBoard(slug, check, what = 'removed') {
+  const { client, branch } = await dataClient();
+  const device = getSettings().device || 'this device';
+  const path = `${BOARDS_DIR}/${slug}.json`;
+  const file = await client.getFile(path, branch || undefined);
+  if (file) {
+    const there = parseBoard(file.text);
+    if (!there || !check(there)) return false;
+    await client.deleteFile(path, { sha: file.sha, branch: branch || undefined, message: `Tracker: release board “${there.project}” ${what} (from ${device})` });
+  }
+  boards.delete(slug);
+  await kvDel(`board:${slug}`).catch(() => {});
+  index = (index ?? []).filter((b) => b.slug !== slug);
+  await kvSet('boards:index', index).catch(() => {});
+  announce();
+  return true;
 }
 
 /** When this device last looked at a board (ISO, '' when never). */

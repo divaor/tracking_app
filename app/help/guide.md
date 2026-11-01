@@ -2,7 +2,7 @@
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 2.4.1 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 2.5.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -305,6 +305,31 @@ With a model on:
 - **Ask the model about this**, in every item: Summarize, Break into steps (tasks), Turn into a plan (ideas), **Draft my feedback** (documents, from their files too), Questions to ask, Risks and gaps, In English / In Spanish, or any question, with follow-ups. **Add to the notes** puts an answer (a checklist of steps, say) in the item; **Use as my feedback** fills your review of a document.
 - **Plan my day** / **Review my week** on the Overview, kept and updated as the day goes, by itself if you like (see [Your day's plan and your week's review](#your-days-plan-and-your-weeks-review)).
 - **Quick add in plain language** (section 4).
+- **The assistant**: say what to do, or ask how to do something (below).
+
+### The assistant
+
+Press **A** (or **Ctrl+K**), the **✦** at the top, or **Assistant** in the side bar, and say what you want done, in your own words:
+
+- *Make a project Kitchen with tasks: fix the leak, call the plumber on Monday, buy parts.*
+- *Move my overdue tasks to next week.* · *Mark the leak done.* · *Pin my tasks in progress.*
+- *Tag everything about the coal forests with #layer-08.* · *Rename the tag home to house.*
+- *Comment on the caching proposal: looks good, go ahead.* · *Approve the language servers proposal.*
+- *Start a release board for Reel Ledger with v1.1: series and books.* · *Tick Built on Deep Time's 2.3.* · *Mark the phone playtest passed.*
+- *What is due this week?* · *What waits on me on my release boards?* · *Plan my day.*
+
+The assistant looks up what it needs (it sees your projects, tags and release boards, and only the items it looks up), then makes the changes as cards in its panel:
+
+- **Small changes are done at once**: adding items, changing up to 5 items, a comment, a project, a step ticked, a record on a release board. Each card says what changed, item by item, and has **Undo**.
+- **Bigger ones wait for you**: changing more than 5 items, renaming a project or a tag (all its items change), deciding a decision, closing a release. The card lists what will change; press **Apply**, **Skip** (leave that step out) or **Stop**.
+- **Deleting asks with a warning**: items, a project (its items stay, without a project), records on a board. **Undo** brings them back.
+- **Undo** puts back only what that step changed, field by field: whatever you or another device changed since stays as it is. Undo is a new edit, so it syncs to your other devices too.
+
+Ask **how** to do something (*How do I attach a photo?*, *Where do I change the theme?*) and it answers from this guide, with the buttons to press. **Only explain, I'll do it** under the box makes it always answer that way: it changes nothing, and shows what it would have done.
+
+Items named in its answers and cards are links: click one to open it. **New** starts over; **Esc** (or Back on a phone) closes the panel. On a wide screen the panel stays beside the list, so you see the changes as they happen.
+
+It needs a model that answers at once (on your computer or an AI provider), not a service that answers later. When you ask how to do something, a model on your computer gets only the parts of this guide about it; an AI provider gets the whole guide with every question (Claude keeps it cached, so it costs little after the first).
 
 ## 10. Documents and reviews
 
@@ -395,6 +420,7 @@ Press **F1** or **?** to open Help: **Commands and shortcuts** lists everything 
 | Keys | Action |
 | --- | --- |
 | **N** | New item |
+| **A** · **Ctrl+K** | The assistant: say what to do, or ask how |
 | **/** | Search (**Ctrl+F** on the desktop) |
 | **Ctrl+F** · **/** | Find in the open item; **Enter** / **Shift+Enter** the next / previous match |
 | **Esc** | Clear the search, or close what's open |

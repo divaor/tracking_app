@@ -112,6 +112,18 @@ export const store = {
     commitLocal(current ? items.map((i) => (i.id === previous.id ? revived : i)) : [...items, revived]);
   },
 
+  /**
+   * Items and projects changed together, as one change: the whole lists (tombstones too) as
+   * `change({ items, projects })` gives them back, from the lists as they are now (the assistant's
+   * steps and their Undo, assistantSteps.js). Returns { before, after } (both { items, projects }).
+   */
+  change(change) {
+    const before = { items, projects };
+    const after = change(before);
+    if (after.items !== items || after.projects !== projects) commitLocal(after.items, after.projects);
+    return { before, after };
+  },
+
   // ---- Projects and tags ------------------------------------------------
 
   saveProject(name, patch = {}) {

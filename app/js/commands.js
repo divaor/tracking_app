@@ -74,6 +74,7 @@ export const COMMAND_LIST = [
   { id: 'qa-link', group: 'Quick add', label: 'Fill the link', code: 'https://…', run: false },
   { id: 'qa-voice', group: 'Quick add', label: 'Say it (phone)', how: 'Tap the microphone', run: false },
 
+  { id: 'assistant', group: 'The model', label: 'The assistant: ask it to add, change, tag, move or tick things, or how to do something', keys: 'A · Mod+K', hint: 'With a model on; small changes are done at once with Undo, the rest after Apply' },
   { id: 'plan-day', group: 'The model', label: 'Plan my day' },
   { id: 'plan-week', group: 'The model', label: 'Review my week' },
   { id: 'model-settings', group: 'The model', label: 'Connect a model (Ollama, LM Studio or a service)' },

@@ -58,6 +58,18 @@ const server = http.createServer((req, res) => {
   req.on('end', () => {
     asked.push({ method: req.method, url: req.url, auth: req.headers.authorization ?? '', body });
     if (req.url === '/v1/chat/completions') {
+      // The assistant (2.5): asked to add a task, it adds it with a step; told it is done, it says so.
+      let asking = null;
+      try {
+        asking = JSON.parse(body);
+      } catch {}
+      if (asking?.messages?.[0]?.content?.includes('You are the assistant inside Tracker')) {
+        const done = String(asking.messages.at(-1).content).startsWith('Results of the steps');
+        const text = done ? 'Added it.' : 'Adding it.\n```tracker-steps\n[{"op": "add-items", "items": [{"title": "Check the tyres", "due": "2026-12-01"}]}]\n```';
+        res.writeHead(200, { 'content-type': 'text/event-stream' });
+        res.end(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: [DONE]\n\n`);
+        return;
+      }
       res.writeHead(200, { 'content-type': 'text/event-stream' });
       res.write('data: {"choices":[{"delta":{"content":"Hello "}}]}\n\n');
       setTimeout(() => res.end('data: {"choices":[{"delta":{"content":"from your computer"}}]}\n\ndata: [DONE]\n\n'), 300);
@@ -143,6 +155,30 @@ try {
     }, HOST);
     check('a model on the computer is reached by the app (plain http, no CORS), its answer streamed', reply.status === 200 && reply.parts.join('').includes('from your computer') && reply.parts.length >= 2, reply);
     check('…with the request as the page made it', asked.some((a) => a.url === '/v1/chat/completions' && a.method === 'POST' && a.body === '{"stream":true}'));
+  });
+
+  await part('the assistant', async () => {
+    await page.evaluate(async (host) => (await import('/js/settings.js')).saveSettings({ llm: { enabled: true, provider: 'openai', baseUrl: `${host}/v1`, chatModel: 'fake', service: 'local' } }), HOST);
+    await page.waitForSelector('.assistant-btn', { timeout: 15_000 });
+    await page.click('.assistant-btn');
+    await page.waitForSelector('.assistant-panel .aip-input textarea');
+    await page.fill('.assistant-panel .aip-input textarea', 'Add a task: check the tyres');
+    await page.click('.assistant-panel .aip-send');
+    const added = await until(() => page.evaluate(async () => Boolean((await import('/js/store.js')).store.visible().find((i) => i.title === 'Check the tyres'))));
+    await until(() => page.evaluate(() => Boolean(document.querySelector('.assistant-panel .aip-step.st-ok'))), 5000);
+    const card = await page.evaluate(() => document.querySelector('.assistant-panel .aip-step.st-ok')?.textContent ?? '');
+    check('the assistant adds an item when asked, on a card with Undo', added && /Add 1 item/.test(card) && /Undo/.test(card), card);
+    const box = await page.evaluate(() => {
+      const r = document.querySelector('.assistant-panel').getBoundingClientRect();
+      return { x: r.x, width: r.width, window: innerWidth };
+    });
+    check('…its panel takes the whole screen', box.x === 0 && Math.abs(box.width - box.window) < 1, box);
+    screencap('assistant.png');
+    // Its box has the keyboard up: the first Back closes the keyboard, the next the panel.
+    adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+    if (!(await until(async () => !(await page.$('.assistant-panel')), 2500))) adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
+    check('Back closes the assistant', await until(async () => !(await page.$('.assistant-panel'))));
+    await page.evaluate(async () => (await import('/js/settings.js')).saveSettings({ llm: { enabled: false } }));
   });
 
   await part('the phone’s voices', async () => {

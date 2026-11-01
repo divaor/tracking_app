@@ -46,6 +46,7 @@ import { ListenBar, setListenNotice } from './ui/listen.js';
 import { stopReading, toggleReading } from './reader.js';
 import { cachedPlans } from './planStore.js';
 import { SettingsView } from './ui/settingsView.js';
+import { AssistantPanel } from './ui/assistantPanel.js';
 
 const VIEWS = ['home', 'board', 'list', 'days', 'release-board', 'projects', 'settings'];
 
@@ -139,7 +140,7 @@ function MoreToggle({ list, part }) {
 }
 const firstOf = (list, part) => (getSettings().sidebarAll?.[part] ? list : list.slice(0, SIDEBAR_FIRST));
 
-function Sidebar({ route, items, projects, scope, query, onProject, onTag, sync, onSyncClick, onNew, onHelp }) {
+function Sidebar({ route, items, projects, scope, query, onProject, onTag, sync, onSyncClick, onNew, onHelp, onAssistant }) {
   const open = items.filter((i) => i.status !== 'done');
   const boards = useBoards();
   const colorOf = (name) => projects.find((p) => p.key === name.toLowerCase())?.color;
@@ -161,6 +162,8 @@ function Sidebar({ route, items, projects, scope, query, onProject, onTag, sync,
       ${link({ view: 'board' }, 'Board', 'board')}
       ${link({ view: 'list' }, 'All items', 'list', open.length)}
       ${link({ view: 'days' }, 'Days', 'calendar')}
+      ${modelReady() &&
+      html`<button type="button" class="nav-link" title="Ask it to change things, or how to do something (A)" onClick=${onAssistant}><${Icon} name="sparkle" size=${18} /><span>Assistant</span><kbd class="nav-key">A</kbd></button>`}
       ${boards.length > 0 &&
       html`<div class="nav-section nav-section-row">Release boards<a href="#/release-board" class="nav-manage" title="All release boards, and importing a board file">All</a></div>
         ${boards.map((b) => {
@@ -250,6 +253,9 @@ export function App() {
   const [, setTick] = useState(0);
   const [linkedItem, setLinkedItem] = useState(takeItemLink);
   const [help, setHelp] = useState(null); // { tab, query }
+  // The assistant that does things: { key, start } while its panel is open.
+  const [assistant, setAssistant] = useState(null);
+  const assistantRef = useRef(null);
   // Files shared with the Android app, waiting for where they go: { files }.
   const [shared, setShared] = useState(null);
   // Item windows: [{ wid, id, x, y, w, h, z, min, max, restore, scroll }], in the order they were
@@ -339,13 +345,28 @@ export function App() {
     layers.current = layers.current.filter((l) => l !== 'help');
     stepBack(history.state?.trackerHelp, then);
   };
+  /** Opens the assistant's panel (`start`: { question } to ask at once); open already: its box gets the focus. */
+  const openAssistant = (start = null) => {
+    if (assistantRef.current && !start) return document.querySelector('.aip-input textarea')?.focus();
+    if (!assistantRef.current) history.pushState({ trackerAssistant: true }, ''), layers.current.push('assistant');
+    assistantRef.current = { key: Date.now(), start };
+    setAssistant(assistantRef.current);
+  };
+  const closeAssistant = (then) => {
+    if (!assistantRef.current) return then?.();
+    assistantRef.current = null;
+    setAssistant(null);
+    layers.current = layers.current.filter((l) => l !== 'assistant');
+    stepBack(history.state?.trackerAssistant, then);
+  };
   useEffect(() => {
-    const layerOf = (state) => (state?.trackerHelp ? 'help' : state?.trackerModal ? 'modal' : null);
+    const layerOf = (state) => (state?.trackerHelp ? 'help' : state?.trackerModal ? 'modal' : state?.trackerAssistant ? 'assistant' : null);
     const onPop = () => {
       // Whatever was opened after the entry we are back on closes.
       const keep = layers.current.lastIndexOf(layerOf(history.state)) + 1;
       for (const layer of layers.current.splice(keep)) {
         if (layer === 'help') (helpRef.current = null), setHelp(null);
+        else if (layer === 'assistant') (assistantRef.current = null), setAssistant(null);
         else (modalRef.current = null), setModal(null);
       }
     };
@@ -653,6 +674,12 @@ export function App() {
       setQuery(`#${tag}`);
       closeModal(() => (location.hash = hrefFor({ view: 'list' })));
     },
+    /** The list with a search (the assistant's show-items): words, #tag, +project; a type and status. */
+    showItems({ query: words = '', type = 'all', status = 'all' } = {}) {
+      setQuery(String(words ?? ''));
+      closeModal(() => (location.hash = hrefFor({ view: 'list', type: TYPE_IDS.includes(type) ? type : 'all', status: STATUSES.includes(status) ? status : 'all' })));
+    },
+    assistant: (start) => openAssistant(start),
   };
   // What Help (commands.js) and the desktop menu can run.
   const go = (target) => (location.hash = hrefFor(target));
@@ -689,6 +716,7 @@ export function App() {
     'plan-day': () => actions.plan('day'),
     'plan-week': () => actions.plan('week'),
     'model-settings': () => (go({ view: 'settings' }), scrollToWhenShown('model')),
+    assistant: () => openAssistant(),
     'pinned-past-filters': () => {
       const on = !getSettings().pinnedPastFilters;
       saveSettings({ pinnedPastFilters: on });
@@ -805,10 +833,24 @@ export function App() {
         e.target.blur();
         return;
       }
+      // Esc closes the assistant when it is on top (a board's drawer, a picture or a menu over it close first).
+      if (e.key === 'Escape' && assistantRef.current && layers.current.at(-1) === 'assistant' && !e.defaultPrevented && !document.querySelector('.rb-drawer, .picture-viewer, .head-menu-pop, .voice-list, .shared-dialog')) {
+        e.preventDefault();
+        closeAssistant();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        actionsRef.current.assistant();
+        return;
+      }
       if (isTyping(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         actionsRef.current.newItem();
+      } else if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        actionsRef.current.assistant();
       } else if (e.key === '/') {
         e.preventDefault();
         searchRef.current?.focus();
@@ -875,6 +917,11 @@ export function App() {
     () =>
       window.desktop?.android?.onBack?.(() => {
         if (layers.current.length || document.querySelector('.picture-viewer, .voice-list, .shared-dialog, .head-menu-pop, .rb-drawer')) {
+          // The assistant on top: Back closes it (its Esc is the window's, so it would not hear it from where the focus is).
+          if (layers.current.at(-1) === 'assistant' && !document.querySelector('.picture-viewer, .voice-list, .shared-dialog, .head-menu-pop, .rb-drawer')) {
+            closeAssistant();
+            return true;
+          }
           (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
           return true;
         }
@@ -966,6 +1013,22 @@ export function App() {
   const front = frontWindow(windows);
   const stackOrder = [...windows].sort((a, b) => a.z - b.z).map((w) => w.wid);
 
+  // What the assistant is told of the screen (assistantSteps.js contextText): what the list shows, the item open.
+  const assistantEnv = useRef(null);
+  assistantEnv.current = () => {
+    const scopeNames = scope.map((s) => (s.startsWith('project:') ? (byKey.get(s.slice(8))?.name ?? s.slice(8)) : s.startsWith('area:') ? `${s.slice(5)} projects` : 'no project'));
+    const where = `${viewTitle(route)}${query ? `, searching “${query}”` : ''}${scopeNames.length && ['home', 'board', 'list'].includes(route.view) ? `, only ${scopeNames.join(' and ')}` : ''}`;
+    const win = frontWindow(windowsRef.current);
+    const open = modalItem ?? (win ? itemsById.get(win.id) : null) ?? null;
+    return {
+      items,
+      projects,
+      today,
+      screen: route.view === 'list' || route.view === 'board' ? { label: where, shown: filtered } : { label: route.view === 'release-board' && route.boardSlug ? `the release board ${route.boardSlug}` : where },
+      open: open && { id: open.id, title: open.title, type: open.type, project: open.project },
+    };
+  };
+
   let view;
   if (route.view === 'board') {
     view = html`<${BoardView} items=${filtered} planItems=${scopedItems} type=${route.type} onType=${(type) => navigate({ type })} actions=${actions} today=${today} keepPinned=${keepPinned} />`;
@@ -992,9 +1055,10 @@ export function App() {
   }
   const scoped = ['home', 'board', 'list'].includes(route.view);
 
-  return html`<${ProjectsContext.Provider} value=${{ byKey, showProject: actions.showProject, togglePin: actions.togglePin }}><${SearchContext.Provider} value=${query}><div class="app ${drawer ? 'drawer-open' : ''} ${windows.length ? 'has-windows' : ''}">
+  return html`<${ProjectsContext.Provider} value=${{ byKey, showProject: actions.showProject, togglePin: actions.togglePin }}><${SearchContext.Provider} value=${query}><div class="app ${drawer ? 'drawer-open' : ''} ${windows.length ? 'has-windows' : ''} ${assistant ? 'assistant-open' : ''}">
     <${Sidebar} route=${route} items=${scopedItems} projects=${projects} scope=${scope} query=${query} onProject=${actions.showProject}
-      sync=${sync} onSyncClick=${onSyncClick} onNew=${() => actions.newItem()} onTag=${(tag) => actions.searchTag(tag)} onHelp=${() => openHelp()} />
+      sync=${sync} onSyncClick=${onSyncClick} onNew=${() => actions.newItem()} onTag=${(tag) => actions.searchTag(tag)} onHelp=${() => openHelp()}
+      onAssistant=${() => (setDrawer(false), openAssistant())} />
     <div class="scrim" onClick=${() => setDrawer(false)} />
     <main class="main">
       <header class="topbar">
@@ -1007,6 +1071,9 @@ export function App() {
             placeholder="Search…  ( / )" aria-label="Search" autocomplete="off" />
           ${query && html`<button type="button" class="icon-btn sm" aria-label="Clear search" onClick=${() => setQuery('')}><${Icon} name="x" size=${15} /></button>`}
         </div>
+        ${modelReady() &&
+        html`<button type="button" class="icon-btn assistant-btn" aria-label="Assistant" aria-pressed=${Boolean(assistant)} title="Assistant: ask it to change things, or how to do something (A)"
+          onClick=${() => (assistant ? closeAssistant() : openAssistant())}><${Icon} name="sparkle" size=${19} /></button>`}
         <${SyncBadge} sync=${sync} onClick=${onSyncClick} compact />
       </header>
       ${query && route.view !== 'settings' &&
@@ -1037,6 +1104,10 @@ export function App() {
     html`<${HelpDialog} tab=${help.tab} query=${help.query} onTab=${(tab) => setHelp((helpRef.current = { ...help, tab }))} onClose=${() => closeHelp()}
       onRun=${modal ? null : (command) => closeHelp(() => actionsRef.current.command(command.id))} />`}
     ${shared && html`<${SharedFilesDialog} files=${shared.files} items=${items} actions=${actions} onClose=${() => setShared(null)} />`}
+    ${assistant &&
+    html`<aside class="assistant-panel" role="dialog" aria-label="Assistant">
+      <${AssistantPanel} key=${assistant.key} env=${() => assistantEnv.current()} start=${assistant.start} actions=${actions} onClose=${() => closeAssistant()} />
+    </aside>`}
     <${ListenBar} />
     <${Toasts} toasts=${toasts} onDismiss=${dismissToast} />
     ${fileDrag &&
