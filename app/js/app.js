@@ -47,6 +47,9 @@ import { stopReading, toggleReading } from './reader.js';
 import { cachedPlans } from './planStore.js';
 import { SettingsView } from './ui/settingsView.js';
 import { AssistantPanel } from './ui/assistantPanel.js';
+import { looksLikeQuestion, questionOf } from './askFind.js';
+import { askFind, canAsk } from './findAsk.js';
+import { FoundView } from './ui/found.js';
 
 const VIEWS = ['home', 'board', 'list', 'days', 'release-board', 'projects', 'settings'];
 
@@ -256,6 +259,9 @@ export function App() {
   // The assistant that does things: { key, start } while its panel is open.
   const [assistant, setAssistant] = useState(null);
   const assistantRef = useRef(null);
+  // Find by asking: what a question in the search box found ({ question, status, phase, results, … }), shown in the list.
+  const [found, setFound] = useState(null);
+  const findController = useRef(null);
   // Files shared with the Android app, waiting for where they go: { files }.
   const [shared, setShared] = useState(null);
   // Item windows: [{ wid, id, x, y, w, h, z, min, max, restore, scroll }], in the order they were
@@ -680,6 +686,29 @@ export function App() {
       closeModal(() => (location.hash = hrefFor({ view: 'list', type: TYPE_IDS.includes(type) ? type : 'all', status: STATUSES.includes(status) ? status : 'all' })));
     },
     assistant: (start) => openAssistant(start),
+    /** Find by asking: runs a question (from the search box), its results in the list's place. */
+    async askFind(text) {
+      const question = questionOf(text);
+      if (!question) return;
+      findController.current?.abort();
+      const controller = (findController.current = new AbortController());
+      setQuery('');
+      setFound({ question, status: 'asking', phase: 'planning' });
+      closeModal(() => (location.hash = hrefFor({ view: 'list' })));
+      const onPhase = (phase) => setFound((f) => (f && f.question === question && f.status === 'asking' ? { ...f, phase } : f));
+      try {
+        const out = await askFind(question, { items: store.visible(), projects: projects.map((p) => p.name), today, signal: controller.signal, onPhase });
+        if (!controller.signal.aborted) setFound({ ...out, status: 'done' });
+      } catch (err) {
+        if (!controller.signal.aborted) setFound({ question, status: 'error', error: err?.message ?? String(err) });
+      }
+    },
+    clearFound() {
+      findController.current?.abort();
+      setFound(null);
+    },
+    /** Opens an item showing one of its text files (a file found by asking). */
+    openFile: (itemId, path) => openModal({ id: itemId, file: path }),
   };
   // What Help (commands.js) and the desktop menu can run.
   const go = (target) => (location.hash = hrefFor(target));
@@ -709,6 +738,10 @@ export function App() {
     'listen-settings': () => (go({ view: 'settings' }), scrollToWhenShown('read-aloud')),
     settings: () => go({ view: 'settings' }),
     search: () => searchRef.current?.focus(),
+    'ask-find': () => {
+      setQuery('? ');
+      searchRef.current?.focus();
+    },
     'clear-search': () => setQuery(''),
     'scope-all': () => setScope([]),
     'scope-work': () => setScope(['area:work']),
@@ -983,12 +1016,16 @@ export function App() {
       return;
     }
     setQuery(value);
+    if (value && found) actions.clearFound();
     if (value && (route.view === 'home' || route.view === 'settings')) location.hash = hrefFor({ view: 'list' });
   };
+  // A question typed in the search box (with a model that answers at once): ✦ Ask, or Enter, runs it.
+  const asking = canAsk(settings) && looksLikeQuestion(query);
 
   // With the setting on, pinned items stay in view past the type, status and #tag filters.
   const keepPinned = Boolean(settings.pinnedPastFilters);
-  const filtered = useMemo(() => filterItems(scopedItems, { query, keepPinned }), [scopedItems, query, keepPinned]);
+  const filterQuery = query.trim().startsWith('?') ? '' : query;
+  const filtered = useMemo(() => filterItems(scopedItems, { query: filterQuery, keepPinned }), [scopedItems, filterQuery, keepPinned]);
   const tagNames = useMemo(() => tagCounts(items).map((t) => t.tag), [items]);
 
   const modalItem = modal?.id ? items.find((i) => i.id === modal.id) : null;
@@ -1024,7 +1061,12 @@ export function App() {
       items,
       projects,
       today,
-      screen: route.view === 'list' || route.view === 'board' ? { label: where, shown: filtered } : { label: route.view === 'release-board' && route.boardSlug ? `the release board ${route.boardSlug}` : where },
+      screen:
+        route.view === 'list' && found?.status === 'done'
+          ? { label: `Found by asking “${found.question}”`, shown: found.results.filter((r) => r.kind === 'item').map((r) => itemsById.get(r.itemId)).filter(Boolean) }
+          : route.view === 'list' || route.view === 'board'
+            ? { label: where, shown: filtered }
+            : { label: route.view === 'release-board' && route.boardSlug ? `the release board ${route.boardSlug}` : where },
       open: open && { id: open.id, title: open.title, type: open.type, project: open.project },
     };
   };
@@ -1032,6 +1074,8 @@ export function App() {
   let view;
   if (route.view === 'board') {
     view = html`<${BoardView} items=${filtered} planItems=${scopedItems} type=${route.type} onType=${(type) => navigate({ type })} actions=${actions} today=${today} keepPinned=${keepPinned} />`;
+  } else if (route.view === 'list' && found) {
+    view = html`<${FoundView} key=${found.question} found=${found} itemsById=${itemsById} actions=${actions} today=${today} canAssist=${canAsk(settings)} />`;
   } else if (route.view === 'list') {
     view = html`<${ListView} items=${filtered} planItems=${scopedItems} type=${route.type} status=${route.status} query=${query} keepPinned=${keepPinned}
       onType=${(type) => navigate({ type })} onStatus=${(status) => navigate({ status })}
@@ -1067,8 +1111,14 @@ export function App() {
         <div class="search ${query ? 'has-query' : ''}">
           <${Icon} name="search" size=${17} />
           <input ref=${searchRef} type="search" value=${query} onInput=${(e) => onSearch(e.currentTarget.value, { pasted: e.inputType === 'insertFromPaste' })}
-            onKeyDown=${(e) => e.key === 'Enter' && fragmentItem(query) && (e.preventDefault(), onSearch(query, { pasted: true }))}
-            placeholder="Search…  ( / )" aria-label="Search" autocomplete="off" />
+            onKeyDown=${(e) => {
+              if (e.key !== 'Enter') return;
+              if (fragmentItem(query)) (e.preventDefault(), onSearch(query, { pasted: true }));
+              else if (asking) (e.preventDefault(), actions.askFind(query));
+            }}
+            placeholder=${canAsk(settings) ? 'Search, or ask: “?the notes about…”  ( / )' : 'Search…  ( / )'} aria-label="Search" autocomplete="off" />
+          ${asking &&
+          html`<button type="button" class="btn primary sm ask-find-btn" title="Find by asking: the model works out what to look for and picks the best (Enter)" onClick=${() => actions.askFind(query)}><${Icon} name="sparkle" size=${14} />Ask</button>`}
           ${query && html`<button type="button" class="icon-btn sm" aria-label="Clear search" onClick=${() => setQuery('')}><${Icon} name="x" size=${15} /></button>`}
         </div>
         ${modelReady() &&
@@ -1076,8 +1126,13 @@ export function App() {
           onClick=${() => (assistant ? closeAssistant() : openAssistant())}><${Icon} name="sparkle" size=${19} /></button>`}
         <${SyncBadge} sync=${sync} onClick=${onSyncClick} compact />
       </header>
-      ${query && route.view !== 'settings' &&
-      html`<div class="search-banner">Showing matches for <strong>${query}</strong><button type="button" class="btn link" onClick=${() => setQuery('')}>Clear</button></div>`}
+      ${found && route.view === 'list' &&
+      html`<div class="search-banner found-banner">
+        <span class="found-chip"><${Icon} name="sparkle" size=${13} />${found.question}<button type="button" class="icon-btn sm" aria-label="Clear what was found" title="Back to the list" onClick=${actions.clearFound}><${Icon} name="x" size=${13} /></button></span>
+        ${found.status === 'done' && html`<span class="muted small">${found.results.length + found.encrypted.length} found</span>`}
+      </div>`}
+      ${query && route.view !== 'settings' && !found &&
+      html`<div class="search-banner">${query.trim().startsWith('?') ? html`Ask: <strong>${questionOf(query) || '…'}</strong>${asking ? ' · press Enter' : ''}` : html`Showing matches for <strong>${query}</strong>`}<button type="button" class="btn link" onClick=${() => setQuery('')}>Clear</button></div>`}
       ${!isLocal(settings) && !isSyncConfigured(settings) && items.length > 0 && route.view === 'home' &&
       html`<a class="sync-hint" href="#/settings"><${Icon} name="cloudOff" size=${16} />Items are only on this device. Set up GitHub sync to use them on your phone and other computers.</a>`}
       <div class="content" ref=${contentRef}>
@@ -1097,7 +1152,7 @@ export function App() {
     html`<${WindowDock} windows=${windows} items=${itemsById} front=${front?.wid} onPick=${windowActions.pick} onClose=${(w) => windowActions.close(w.wid)}
       onTile=${windowActions.tile} onMinimizeAll=${windowActions.minimizeAll} onCloseAll=${windowActions.closeAll} />`}
     ${modal && (modal.draft || modalItem) &&
-    html`<${ItemModal} key=${modal.id ?? 'new'} item=${modalItem} initial=${modal.draft} find=${modal.find} actions=${actions}
+    html`<${ItemModal} key=${modal.id ?? 'new'} item=${modalItem} initial=${modal.draft} find=${modal.find} file=${modal.file} actions=${actions}
       projects=${projects.map((p) => p.name)} tagSuggestions=${tagNames} today=${today} onClose=${() => closeModal()}
       onPopOut=${modalItem ? (from) => actions.popOut(modalItem, from) : undefined} />`}
     ${help &&

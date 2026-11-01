@@ -649,6 +649,58 @@ button.tag:hover {
   display: none;
 }
 
+/* Find by asking (2.6): ✦ Ask in the search box when a question is typed; the question's chip; what it found. */
+.search .ask-find-btn {
+  position: absolute;
+  right: 36px;
+  min-height: 28px;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+.search:has(.ask-find-btn) input { padding-right: 104px !important; }
+.found-banner { flex-wrap: wrap; }
+.found-chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%;
+  padding: 2px 4px 2px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border-strong);
+  color: var(--text); font-weight: 550; overflow-wrap: anywhere;
+}
+.found-chip > .icon { color: var(--accent); flex: none; }
+.found-chip .icon-btn { width: 24px; height: 24px; flex: none; }
+.found-view { display: flex; flex-direction: column; gap: 14px; }
+.found-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.found-head .spacer { flex: 1; }
+.found-plan { margin: 0; overflow-wrap: anywhere; }
+.found-status { display: flex; align-items: center; gap: 8px; margin: 0; }
+.found-status .spin { animation: spin 1s linear infinite; }
+.found-others { display: flex; flex-direction: column; gap: 6px; }
+.found-row {
+  display: flex; gap: 10px; align-items: flex-start; width: 100%; padding: 10px 12px; text-align: left;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text);
+  font: inherit; cursor: pointer; text-decoration: none;
+}
+.found-row:hover { border-color: var(--border-strong); background: var(--surface-2); text-decoration: none; }
+.found-row > .icon { flex: none; margin-top: 2px; color: var(--text-3); }
+.found-row.kind-editor > .icon { color: var(--accent); }
+.found-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.found-name { font-weight: 600; overflow-wrap: anywhere; }
+.found-place { overflow-wrap: anywhere; }
+.found-from {
+  margin-left: 8px; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 600; vertical-align: 1px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.found-why { color: var(--text-2); overflow-wrap: anywhere; }
+.row-snippet.found-why .icon { color: var(--accent); vertical-align: -1px; }
+.found-locked { border: 1px dashed var(--border-strong); border-radius: var(--radius); padding: 10px 12px; }
+.found-locked h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 14px; }
+.found-locked p { margin: 0 0 8px; }
+.found-more { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.found-more .found-others, .found-more .rows { width: 100%; }
+@media (max-width: 720px) {
+  .search .ask-find-btn { right: 34px; padding: 2px 8px; }
+  .search:has(.ask-find-btn) input { padding-right: 92px !important; }
+}
+
+
 .content {
   flex: 1;
   min-height: 0;

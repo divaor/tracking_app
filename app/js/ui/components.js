@@ -176,7 +176,7 @@ export function ItemCard({ item, onOpen, onStatus, today, draggable = false, sho
   </article>`;
 }
 
-export function ItemRow({ item, onOpen, onStatus, today }) {
+export function ItemRow({ item, onOpen, onStatus, today, why = '' }) {
   const { byKey } = useContext(ProjectsContext);
   const found = useFound(item);
   return html`<div class="row type-${item.type} status-${item.status} ${item.pinned ? 'pinned' : ''}" style=${pinStyle(item, byKey)} role="button" tabindex="0"
@@ -185,7 +185,7 @@ export function ItemRow({ item, onOpen, onStatus, today }) {
     <span class="row-type" title=${typeInfo(item.type).label}><${Icon} name=${item.type} size=${16} /></span>
     <div class="row-main">
       <div class="row-title">${item.pinned && html`<${PinMark} item=${item} />`}${found.title}</div>
-      <${Snippet} snippet=${found.snippet} className="row-snippet" />
+      ${why ? html`<div class="row-snippet found-why"><${Icon} name="sparkle" size=${12} /> ${why}</div>` : html`<${Snippet} snippet=${found.snippet} className="row-snippet" />`}
       <${ItemMeta} item=${item} today=${today} />
     </div>
     ${(item.decision || item.priority === 'high' || item.priority === 'urgent') &&

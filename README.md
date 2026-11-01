@@ -147,6 +147,7 @@ With a model on:
 - **Quick add in plain language** (Settings → Quick add): the item is added at once as you typed it, then the model fills in the due date, priority, project (only existing ones) and tags it understood, with **Undo**. What you type with `+ # ! @` and the type you picked stay as they are, and a plain title is never rewritten.
 - **Ask the model about this**, in every item: Summarize, Break into steps (tasks), Turn into a plan (ideas), **Draft my feedback** (documents, from their files too), Questions to ask, Risks and gaps, In English / In Spanish, or any question with follow-ups. **Add to the notes** puts an answer (a checklist of steps, say) in the item; **Use as my feedback** fills your review of a document.
 - **Plan my day** / **Review my week** on the Overview: what to do first today, or what got done, what is stuck and what to focus on next.
+- **Find by asking**: a question in the search box ("the file where I copied a docker command", "tasks about the kitchen due this week", or `?` then anything), then **Enter**: the model works out what to look for, the app searches your items, the text files on them, your release boards and Tracker Editor's files (when they share the data), and the model picks the best with a reason for each. Encrypted Tracker Editor files are found by name only and never reach the model, not even their names.
 - **The assistant** (A, Ctrl+K, or the ✦ at the top): say what to do in your own words ("move my overdue tasks to next week", "make a project Kitchen with tasks…", "tag everything about the coal forests #layer-08", "tick Built on Deep Time's 2.3") or ask how to do something. It looks up what it needs and makes the changes as cards: small ones at once with **Undo**, changing more than 5 items or renaming waits for **Apply**, deleting asks with a warning. Undo puts back only what that step changed (what changed since stays). **Only explain** makes it say where to click instead. Not with a service that answers later.
 
 ## 7. Quick add from anywhere (desktop) and by voice (phone)
@@ -253,6 +254,8 @@ app/                  the web app (also loaded by Electron)
   js/assist.js        what the model is asked (quick add, items, plans) and how replies are checked
   js/assistant.js     the model client from Settings
   js/assistantSteps.js  the assistant's steps: what the model may do, the looks, the changes and their Undo
+  js/askFind.js       Find by asking: the plan, the search, the pick (the same file as Tracker Editor's)
+  js/findSources.js, findAsk.js, editorFiles.js   what Find by asking searches here, and the run
   js/ui/assistantPanel.js  the assistant's panel
   js/llm.js, asyncLlm.js, asyncConnection.js, localFetch.js   model clients, copied from Tracker Editor
   js/sync.js          one pull → merge → push round

@@ -31,6 +31,7 @@ export const COMMAND_LIST = [
 
   { id: 'search', group: 'Search and filter', label: 'Search', keys: '/', desktop: '/ · Mod+F' },
   { id: 'clear-search', group: 'Search and filter', label: 'Clear the search', keys: 'Esc', hint: 'In the search box' },
+  { id: 'ask-find', group: 'Search and filter', label: 'Find by asking: a question in the search box (“the file where I copied a docker command”), then ✦ Ask or Enter', code: '?question', hint: 'With a model on; start with ? to ask for sure. The model works out what to look for and picks the best' },
   { id: 'search-phrase', group: 'Search and filter', label: 'Search a phrase as written (case and accents never matter)', code: '"a phrase"', run: false },
   { id: 'search-tag', group: 'Search and filter', label: 'Search a tag', code: '#tag', run: false },
   { id: 'search-project', group: 'Search and filter', label: 'Search a project', code: '+project', run: false },

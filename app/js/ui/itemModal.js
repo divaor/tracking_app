@@ -277,7 +277,7 @@ function ItemHead({ item, actions, titleId }) {
   </div>`;
 }
 
-function ViewBody({ item, actions, today, onEdit, bodyRef, onScroll }) {
+function ViewBody({ item, actions, today, onEdit, bodyRef, onScroll, file = '' }) {
   const notesHtml = useMemo(() => renderMarkdown(item.notes), [item.notes]);
   const onNotesClick = (e) => {
     const box = e.target.closest?.('input.md-check');
@@ -310,7 +310,7 @@ function ViewBody({ item, actions, today, onEdit, bodyRef, onScroll }) {
       : !item.files.length &&
         html`<p class="muted no-notes">No ${item.type === 'doc' ? 'content' : 'notes'} yet. <button type="button" class="btn link" onClick=${onEdit}>Add some</button></p>`}
 
-    <${FilesPanel} item=${item} actions=${actions} />
+    <${FilesPanel} item=${item} actions=${actions} initialFile=${file} />
     <${ItemBoardLinks} item=${item} actions=${actions} />
     ${isReviewable(item) && html`<${ReviewPanel} item=${item} actions=${actions} />`}
     <${Comments} key=${item.id} item=${item} actions=${actions} />
@@ -429,7 +429,7 @@ const plainKey = (e, key) => e.key === key && !e.metaKey && !e.ctrlKey && !e.alt
  */
 export function ItemPanel({
   item, initial, actions, projects, tagSuggestions = [], today, onClose, frame = 'modal', rootRef, rootProps = {},
-  tools, onHeadPointerDown, onHeadDoubleClick, onPopOut, initialScroll = 0, closeRef, children, find: initialFind = '',
+  tools, onHeadPointerDown, onHeadDoubleClick, onPopOut, initialScroll = 0, closeRef, children, find: initialFind = '', file = '',
 }) {
   const isNew = !item;
   const [mode, setMode] = useState(isNew ? 'edit' : 'view');
@@ -604,7 +604,7 @@ export function ItemPanel({
           if (error) setError('');
         }} projects=${projects} tagSuggestions=${tagSuggestions} onSubmit=${save} titleRef=${titleRef} error=${error}
           ids=${ids} bodyRef=${bodyRef} onScroll=${(e) => setScrolled(e.currentTarget.scrollTop > 4)} />`
-      : html`<${ViewBody} item=${item} actions=${actions} today=${today} onEdit=${startEdit}
+      : html`<${ViewBody} item=${item} actions=${actions} today=${today} onEdit=${startEdit} file=${file}
           bodyRef=${bodyRef} onScroll=${(e) => setScrolled(e.currentTarget.scrollTop > 4)} />`}
     ${editing &&
     html`<footer class="modal-foot">

@@ -49,11 +49,15 @@ export function ModelCard({ actions }) {
   const settings = getSettings();
   const [connection, setConnection] = useState(connectionOf(settings.llm));
   return html`<${Card} title="Model" icon="sparkle" id="model">
-    <p>With a model connected, quick add understands plain language (“call Ana tomorrow about the invoice, urgent”), each item gets <strong>Ask the model about this</strong> (summarize, break into steps, draft your review of a document, risks, translate, or any question), and the Overview can plan your day or review your week.</p>
+    <p>With a model connected, quick add understands plain language (“call Ana tomorrow about the invoice, urgent”), each item gets <strong>Ask the model about this</strong> (summarize, break into steps, draft your review of a document, risks, translate, or any question), the Overview can plan your day or review your week, the <strong>assistant</strong> (A) changes things when you ask, and the search box finds by asking (“?the notes about the kitchen”).</p>
     <div class="field span-2"><span>Connection</span>
       <${Segmented} options=${CONNECTIONS} value=${connection} onChange=${setConnection} label="Connection" />
     </div>
     ${connection === 'async' ? html`<${AsyncModelForm} actions=${actions} />` : connection === 'api' ? html`<${ApiModelForm} actions=${actions} />` : html`<${OpenAiModelForm} actions=${actions} />`}
+    <label class="field checkbox span-2">
+      <input type="checkbox" checked=${Boolean(settings.findNamesOnly)} onChange=${(e) => saveSettings({ findNamesOnly: e.currentTarget.checked })} />
+      <span>Find by asking: send only names<small>A question in the search box goes to your model twice: to work out what to look for, then to pick the best. With this on, the second time it sees only the names and places of what was found, not the lines that matched. Encrypted Tracker Editor files never go, not even their names.</small></span>
+    </label>
     <label class="field checkbox span-2">
       <input type="checkbox" checked=${Boolean(settings.planAuto)} onChange=${(e) => saveSettings({ planAuto: e.currentTarget.checked })} />
       <span>Make and update today's plan by itself<small>The first time the app is open each day (from 6:00), then after you finish, start or add items, at most every 2 hours, while the app is open. Each one is a request to your model.</small></span>

@@ -63,6 +63,14 @@ const server = http.createServer((req, res) => {
       try {
         asking = JSON.parse(body);
       } catch {}
+      // Find by asking (2.6): the plan, then the pick of the first candidate.
+      const system = String(asking?.messages?.[0]?.content ?? '');
+      if (system.startsWith('You turn a question') || system.startsWith('The person asked their app a question')) {
+        const text = system.startsWith('You turn') ? '{"intent": "find", "terms": ["tyre pressure", "tyres"]}' : '{"results": [{"id": "c1", "why": "about checking the tyre pressure"}]}';
+        res.writeHead(200, { 'content-type': 'text/event-stream' });
+        res.end(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: [DONE]\n\n`);
+        return;
+      }
       if (asking?.messages?.[0]?.content?.includes('You are the assistant inside Tracker')) {
         const done = String(asking.messages.at(-1).content).startsWith('Results of the steps');
         const text = done ? 'Added it.' : 'Adding it.\n```tracker-steps\n[{"op": "add-items", "items": [{"title": "Check the tyres", "due": "2026-12-01"}]}]\n```';
@@ -178,6 +186,22 @@ try {
     adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
     if (!(await until(async () => !(await page.$('.assistant-panel')), 2500))) adb('shell', 'input', 'keyevent', 'KEYCODE_BACK');
     check('Back closes the assistant', await until(async () => !(await page.$('.assistant-panel'))));
+    await page.evaluate(async () => (await import('/js/settings.js')).saveSettings({ llm: { enabled: false } }));
+  });
+
+  await part('Find by asking', async () => {
+    await page.evaluate(async (host) => {
+      (await import('/js/settings.js')).saveSettings({ llm: { enabled: true, provider: 'openai', baseUrl: `${host}/v1`, chatModel: 'fake', service: 'local' } });
+      (await import('/js/store.js')).store.add({ title: 'Check the tyre pressure', notes: 'Before the long drive: 2.4 bar front, 2.2 back.' });
+    }, HOST);
+    await page.fill('.search input', 'the note where I wrote the tyre pressure');
+    await page.waitForSelector('.ask-find-btn', { timeout: 10_000 });
+    await page.press('.search input', 'Enter');
+    const found = await until(() => page.evaluate(() => [...document.querySelectorAll('.found-items .row')].some((r) => r.textContent.includes('Check the tyre pressure') && r.textContent.includes('about checking the tyre pressure'))));
+    check('Find by asking: a question in the search box finds the item, with the model’s reason', found, await page.evaluate(() => document.querySelector('.found-view')?.textContent?.slice(0, 300) ?? ''));
+    screencap('find-by-asking.png');
+    await page.click('.found-chip .icon-btn');
+    check('…and its chip goes back to the list', await until(async () => !(await page.$('.found-view'))));
     await page.evaluate(async () => (await import('/js/settings.js')).saveSettings({ llm: { enabled: false } }));
   });
 

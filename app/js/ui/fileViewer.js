@@ -386,11 +386,12 @@ function PictureViewer({ files, index, onIndex, onClose, item, actions }) {
  * An item's files: pictures as small versions (a click shows them large), other files as chips
  * (text reads here, documents open with their program or in the editor), 📎 to attach more.
  */
-export function FilesPanel({ item, actions }) {
+export function FilesPanel({ item, actions, initialFile = '' }) {
   const pending = usePendingFiles();
   const pictures = item.files.filter((f) => attachmentKind(f) === 'image');
   const others = item.files.filter((f) => attachmentKind(f) !== 'image');
-  const [open, setOpen] = useState(() => others.find(isTextAttachment)?.path ?? null);
+  // The text file shown: the one asked for (a file found by asking), else the first.
+  const [open, setOpen] = useState(() => others.find((f) => f.path === initialFile && isTextAttachment(f))?.path ?? others.find(isTextAttachment)?.path ?? null);
   const [viewing, setViewing] = useState(null);
   const pickRef = useRef(null);
   const cameraRef = useRef(null);
