@@ -9,6 +9,7 @@
 // and what changed since stays as it is). The changes are model.js's and boards.js's, as the
 // connector's, so the assistant does what Claude does through the connector.
 import { describeItem } from './assist.js';
+import { codeFences, parseJsonLoose, withoutBlocks, wordsBefore } from './fences.js';
 import {
   addLog,
   applyBoardChanges,
@@ -487,33 +488,34 @@ export function describeStep(raw, names = {}) {
  */
 export function parsePlan(reply, names = {}) {
   const text = str(reply);
-  const fence = /```[ \t]*(tracker-steps|json)?[^\n]*\n([\s\S]*?)```/g;
   const steps = [];
   const problems = [];
-  let words = text;
-  for (const m of text.matchAll(fence)) {
-    const lang = m[1] ?? '';
+  const used = [];
+  // Fences as CommonMark reads them: a ``` inside a step's notes (a code block) never ends the block.
+  for (const block of codeFences(text)) {
+    const lang = block.lang;
+    if (lang && lang !== 'tracker-steps' && lang !== 'json') continue;
     let parsed;
     try {
-      parsed = JSON.parse(m[2]);
+      parsed = parseJsonLoose(block.body);
     } catch {
       if (lang === 'tracker-steps') problems.push('The steps were not valid JSON.');
       continue;
     }
     const list = Array.isArray(parsed) ? parsed : [parsed];
     if (lang !== 'tracker-steps' && !list.every((x) => isObject(x) && typeof x.op === 'string')) continue;
-    words = words.replace(m[0], '');
+    used.push(block);
     for (const raw of list.slice(0, 20)) {
       const d = describeStep(raw, names);
       if (d.problem) problems.push(d.problem);
       else steps.push(d);
     }
   }
-  return { text: words.replace(/\n{3,}/g, '\n\n').trim(), steps, problems };
+  return { text: withoutBlocks(text, used), steps, problems };
 }
 
 /** While the answer streams: the words before the steps' block. */
-export const wordsSoFar = (text) => str(text).replace(/```[ \t]*(tracker-steps|json)[\s\S]*$/, '').trim();
+export const wordsSoFar = (text) => wordsBefore(str(text), ['tracker-steps', 'json']);
 
 // ---- What the model is told ----------------------------------------------------------------
 
