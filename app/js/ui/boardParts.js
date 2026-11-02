@@ -51,13 +51,14 @@ const COLOR = /^(#[0-9a-f]{3,8}|[a-z]{3,20}|(rgb|hsl)a?\([\d\s.,%/]+\))$/i;
 export const releaseColor = (r) => (COLOR.test(String(r?.color ?? '').trim()) ? String(r.color).trim() : statusVar(r?.status));
 
 export function Chip({ status, label }) {
-  return html`<span class="rb-chip" style=${`--c: ${statusVar(status)}`}>${label || statusLabel(status) || 'Planned'}</span>`;
+  const text = String(label || statusLabel(status) || 'Planned');
+  return html`<span class="rb-chip" style=${`--c: ${statusVar(status)}`} title=${text.length > 20 ? text : undefined}><span class="rb-chip-t">${text}</span></span>`;
 }
 
-export function ItemLink({ id, titles, label }) {
+export function ItemLink({ id, titles, label, inText }) {
   if (!id) return null;
   const title = titles?.get(id);
-  return html`<a class="rb-trk" href=${`#/item/${encodeURIComponent(id)}`} title=${title ? `${title} (${id})` : `Open ${id}`}>${label || title || id.slice(0, 8)}</a>`;
+  return html`<a class=${inText ? 'rb-trk in-text' : 'rb-trk'} href=${`#/item/${encodeURIComponent(id)}`} title=${title ? `${title} (${id})` : `Open ${id}`}><span class="rb-trk-t">${label || title || id.slice(0, 8)}</span></a>`;
 }
 
 /** A release's id as a link that opens it in the drawer. */
@@ -72,7 +73,7 @@ function inline(text, titles, keyBase) {
   const re = /\*\*([^*]+)\*\*|\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
   let last = 0;
   const plain = (s, k) =>
-    splitItemIds(s).map((p, i) => (typeof p === 'string' ? p : html`<${ItemLink} key=${`${k}-${i}`} id=${p.id} titles=${titles} />`));
+    splitItemIds(s).map((p, i) => (typeof p === 'string' ? p : html`<${ItemLink} key=${`${k}-${i}`} id=${p.id} titles=${titles} inText />`));
   for (let m = re.exec(text); m; m = re.exec(text)) {
     if (m.index > last) out.push(...plain(text.slice(last, m.index), `${keyBase}-${m.index}`));
     out.push(m[1] != null ? html`<b key=${`${keyBase}-b${m.index}`}>${m[1]}</b>` : html`<a key=${`${keyBase}-a${m.index}`} href=${m[3]} target="_blank" rel="noopener noreferrer">${m[2]}</a>`);
@@ -224,7 +225,7 @@ export function DecisionCard({ d, titles, onOpen }) {
   return html`<div class="rb-panel rb-dcard clickable ${d.status === 'open' ? 'open' : ''} ${isNew(d) ? 'rb-new' : ''}" onClick=${opensRow(() => onOpen({ type: 'decision', id: d.id }))}>
     <div class="rb-top-line"><span class="rb-mono small muted">${[d.code, boardDay(d.date)].filter(Boolean).join(' · ')}</span><${Chip} status=${d.status} /></div>
     <button type="button" class="rb-row-open rb-ttl"><${BoardText} text=${d.title} titles=${titles} /></button>
-    <div class="rb-desc"><${BoardText} text=${d.choice} titles=${titles} /></div>
+    ${d.choice && html`<div class="rb-desc"><${BoardText} text=${d.choice} titles=${titles} /></div>`}
     ${(d.release || d.item) && html`<div class="rb-links"><${RelLink} id=${d.release} onOpen=${onOpen} /><${ItemLink} id=${d.item} titles=${titles} /></div>`}
   </div>`;
 }

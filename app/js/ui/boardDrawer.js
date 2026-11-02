@@ -87,8 +87,9 @@ export function Drawer({ board, open, onOpen, onBack, onClose, titles, canBack }
       ['links', 'Links', (r.links ?? []).length],
     ];
     const dates = r.dates ?? {};
+    const dateRows = [['Opened', dates.opened], ['Merged', dates.merged], ['Deployed', dates.deployed], ['Tested', dates.tested], ['Closed', dates.closed], ['Expected', dates.expected]].map(([k, v]) => [k, boardDay(v)]);
     body.overview = html`${r.summary && html`<p><${BoardText} text=${r.summary} titles=${titles} /></p>`}
-      <h4>Dates</h4><${KeyValues} rows=${[['Opened', dates.opened], ['Merged', dates.merged], ['Deployed', dates.deployed], ['Tested', dates.tested], ['Closed', dates.closed], ['Expected', dates.expected]].map(([k, v]) => [k, boardDay(v)])} />
+      ${dateRows.some(([, v]) => v) && html`<h4>Dates</h4><${KeyValues} rows=${dateRows} />`}
       <h4>Steps</h4><${Steps} steps=${r.steps} titles=${titles} part="releases" record=${r} />
       <${BoardComments} record=${r} part="releases" titles=${titles} />`;
     body.features = features.length
@@ -97,10 +98,10 @@ export function Drawer({ board, open, onOpen, onBack, onClose, titles, canBack }
           <div class="rb-links">${(f.repos ?? []).map((x) => html`<span class="rb-tag" key=${x}>${x}</span>`)}${(f.items ?? []).map((i) => html`<${ItemLink} key=${i} id=${i} titles=${titles} />`)}</div></li>`)}</ul>`
       : html`<${Empty}>No features listed.</${Empty}>`;
     body.merges = (r.merges ?? []).length
-      ? html`<div class="rb-table-scroll"><table class="rb-table"><thead><tr><th>Repo</th><th>What</th><th>Commit</th><th>Status</th><th>When</th></tr></thead><tbody>
+      ? html`<div class="rb-table-scroll"><table class="rb-table"><thead><tr><th>Repo</th><th>What</th><th class="rb-fit">Commit</th><th class="rb-fit">Status</th><th class="rb-fit">When</th></tr></thead><tbody>
           ${r.merges.map((m, i) => html`<tr key=${i}><td><b>${m.repo}</b></td><td><${BoardText} text=${m.branch} titles=${titles} />${m.into && html` <span class="muted">→ ${m.into}</span>`}
             ${m.note && html`<div class="rb-desc"><${BoardText} text=${m.note} titles=${titles} /></div>`}${m.mr && html`<div class="small"><${BoardText} text=${m.mr} titles=${titles} /></div>`}</td>
-            <td class="rb-mono">${m.commit || ''}</td><td><${Chip} status=${m.status === 'merged' ? 'done' : m.status === 'held' ? 'planned' : 'pending'} label=${m.status} /></td><td class="small rb-nowrap">${boardDay(m.date)}</td></tr>`)}
+            <td class="rb-mono rb-fit">${m.commit || ''}</td><td class="rb-fit"><${Chip} status=${m.status === 'merged' ? 'done' : m.status === 'held' ? 'planned' : 'pending'} label=${m.status} /></td><td class="small rb-fit">${boardDay(m.date)}</td></tr>`)}
         </tbody></table></div>`
       : html`<${Empty}>No merges listed.</${Empty}>`;
     body.commands = commands.length ? commands.map((c) => html`<${Command} key=${c.id || c.label} c=${c} titles=${titles} release=${r} highlight=${open.command && c.id === open.command} />`) : html`<${Empty}>No commands for this release.</${Empty}>`;

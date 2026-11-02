@@ -92,9 +92,9 @@ export function Overview({ board, titles, onOpen, now, tabs, href }) {
       <div class="rb-panel"><${Timeline} board=${board} now=${now} features=${false} dayW=${58} onOpen=${onOpen} /></div>
       <${TimelineLegend} />`}
     <div class="rb-cols2">
-      <div><${SectionTitle} title="Waiting on you" sub="in order" />
+      <div class="rb-group"><${SectionTitle} title="Waiting on you" sub="in order" />
         <div class="rb-panel rb-pad"><${ActionList} actions=${actions} titles=${titles} onOpen=${onOpen} /></div></div>
-      <div><${SectionTitle} title="Latest advancements">${tabs.includes('log') && html`<a class="sub" href=${href('log')}>All →</a>`}</${SectionTitle}>
+      <div class="rb-group"><${SectionTitle} title="Latest advancements">${tabs.includes('log') && html`<a class="sub" href=${href('log')}>All →</a>`}</${SectionTitle}>
         <div class="rb-panel rb-pad"><${LogList} log=${log} titles=${titles} onOpen=${onOpen} /></div></div>
     </div>
     ${missing.size > 0 && html`<${SectionTitle} title="Still missing" sub="features not live yet, by the release they are expected in"><a class="sub" href=${href('features', 'missing')}>table →</a></${SectionTitle}>
@@ -149,23 +149,22 @@ export function ReleasesView({ board, titles, onOpen, now }) {
       </table></div>`}
     ${briefs.length > 0 && html`<${SectionTitle} title="Workstreams" sub="each session's work packages" />
       <div class="rb-panel rb-table-scroll"><table class="rb-table rb-stack">
-        <thead><tr><th>Brief</th><th class="w30">Workstream</th><th>Status</th><th>Release</th><th class="w34">Latest</th><th>Tracker</th></tr></thead>
-        <tbody>${briefs.map((b) => html`<tr key=${b.id}><td data-label="Brief"><b>${b.code ?? b.id}</b></td>
-          <td data-label="Workstream"><div class="rb-ttl"><${BoardText} text=${b.title} titles=${titles} /></div>${b.owner && html`<div class="rb-desc">${b.owner}</div>`}</td>
-          <td data-label="Status"><${Chip} status=${briefStatus(b.status)} label=${briefLabel(b.status)} /></td>
-          <td data-label="Release" class="small">${b.release && (liveRecords(board, 'releases').some((r) => r.id === b.release) ? html`<${RelLink} id=${b.release} onOpen=${onOpen} />` : b.release)}</td>
-          <td data-label="Latest" class="rb-desc"><${BoardText} text=${b.detail} titles=${titles} /></td>
-          <td data-label="Tracker">${(b.item || (b.items ?? []).length > 0) && html`<div class="rb-links"><${ItemLink} id=${b.item} titles=${titles} />${(b.items ?? []).slice(0, 2).map((i) => html`<${ItemLink} key=${i} id=${i} titles=${titles} />`)}</div>`}</td></tr>`)}</tbody>
+        <thead><tr><th class="rb-fit">Brief</th><th class="w30">Workstream</th><th class="rb-fit">Status</th><th class="rb-fit">Release</th><th>Latest</th></tr></thead>
+        <tbody>${briefs.map((b) => html`<tr key=${b.id}><td data-label="Brief" class="rb-fit"><b class="rb-clip" title=${b.code ?? b.id}>${b.code ?? b.id}</b></td>
+          <td data-label="Workstream"><div class="rb-ttl"><${BoardText} text=${b.title} titles=${titles} /></div>${b.owner && html`<div class="rb-desc">${b.owner}</div>`}
+            ${(b.item || (b.items ?? []).length > 0) && html`<div class="rb-links"><${ItemLink} id=${b.item} titles=${titles} />${(b.items ?? []).slice(0, 2).map((i) => html`<${ItemLink} key=${i} id=${i} titles=${titles} />`)}</div>`}</td>
+          <td data-label="Status" class="rb-fit"><${Chip} status=${briefStatus(b.status)} label=${briefLabel(b.status)} /></td>
+          <td data-label="Release" class="small rb-fit">${b.release && (liveRecords(board, 'releases').some((r) => r.id === b.release) ? html`<${RelLink} id=${b.release} onOpen=${onOpen} />` : b.release)}</td>
+          <td data-label="Latest" class="rb-desc"><${BoardText} text=${b.detail} titles=${titles} /></td></tr>`)}</tbody>
       </table></div>`}
     ${sessions.length > 0 && html`<${SectionTitle} title="Sessions" sub="who works on what" />
       <div class="rb-panel rb-table-scroll"><table class="rb-table rb-stack">
-        <thead><tr><th>Session</th><th>State</th><th>Now</th><th>Tracker</th></tr></thead>
+        <thead><tr><th class="rb-fit">Session</th><th class="rb-fit">State</th><th>Now</th></tr></thead>
         <tbody>${sessions.map((x) => {
           const reported = boardDate(x.reported);
-          return html`<tr key=${x.id}><td data-label="Session"><b>${x.name ?? x.id}</b>${reported && html`<div class="small muted" title=${x.reported}>reported ${untilText(reported, now)}</div>`}</td>
-            <td data-label="State"><${Chip} status=${x.status || 'waiting'} label=${x.state} /></td>
-            <td data-label="Now" class="rb-desc"><${BoardText} text=${x.now} titles=${titles} /></td>
-            <td data-label="Tracker"><${ItemLink} id=${x.item} titles=${titles} /></td></tr>`;
+          return html`<tr key=${x.id}><td data-label="Session" class="rb-fit"><b class="rb-clip" title=${x.name ?? x.id}>${x.name ?? x.id}</b>${reported && html`<div class="small muted" title=${x.reported}>reported ${untilText(reported, now)}</div>`}</td>
+            <td data-label="State" class="rb-fit"><${Chip} status=${x.status || 'waiting'} label=${x.state} /></td>
+            <td data-label="Now" class="rb-desc"><${BoardText} text=${x.now} titles=${titles} />${x.item && html`<div class="rb-links"><${ItemLink} id=${x.item} titles=${titles} /></div>`}</td></tr>`;
         })}</tbody>
       </table></div>`}
     ${!releases.length && !repos.length && !briefs.length && !sessions.length && html`<${Empty}>No releases on this board yet.</${Empty}>`}`;
@@ -180,8 +179,8 @@ export function FeaturesView({ board, titles, onOpen, state, setState }) {
   const set = (patch) => setState({ ...filter, ...patch });
   const releases = liveRecords(board, 'releases');
   const all = liveRecords(board, 'features');
-  const has = { repos: all.some((f) => (f.repos ?? []).length), session: all.some((f) => f.session), items: all.some((f) => (f.items ?? []).length) };
-  const columns = 3 + has.repos + has.session + has.items;
+  const has = { repos: all.some((f) => (f.repos ?? []).length), session: all.some((f) => f.session) };
+  const columns = 3 + has.repos + has.session;
   const toggle = (s) => set({ statuses: filter.statuses.includes(s) ? filter.statuses.filter((x) => x !== s) : [...filter.statuses, s] });
   return html`<${SectionTitle} title="Features" sub=${`${v.total} tracked · ${v.missing} not live yet`} />
     <div class="rb-filters">
@@ -200,17 +199,17 @@ export function FeaturesView({ board, titles, onOpen, state, setState }) {
       })}</span>
     </div>
     <div class="rb-panel rb-table-scroll"><table class="rb-table rb-stack">
-      <thead><tr><th class="w34">Feature</th><th>Status</th>${has.repos && html`<th>Repos</th>`}${has.session && html`<th>Session</th>`}<th>Shipped / expected</th>${has.items && html`<th>Tracker</th>`}</tr></thead>
+      <thead><tr><th>Feature</th><th class="rb-fit">Status</th>${has.repos && html`<th class="rb-repos">Repos</th>`}${has.session && html`<th class="rb-fit">Session</th>`}<th class="rb-fit">When</th></tr></thead>
       <tbody>
         ${v.groups.map((g) => [
           html`<tr key=${`g${g.id}`} class="rb-group-row"><td colspan=${columns}>${g.id ? releaseName(g.release, g.id) : 'Not in a release yet'} <span class="muted small">(${g.records.length})</span></td></tr>`,
           ...g.records.map((f) => html`<tr key=${f.id} class="click ${isNew(f) ? 'rb-new' : ''}" onClick=${opensRow(() => onOpen({ type: 'feature', id: f.id }))}>
-            <td data-label="Feature"><button type="button" class="rb-row-open rb-ttl">${f.name}</button><div class="rb-desc"><${BoardText} text=${f.what} titles=${titles} /></div></td>
-            <td data-label="Status"><${Chip} status=${f.status} /></td>
-            ${has.repos && html`<td data-label="Repos">${(f.repos ?? []).length > 0 && html`<div class="rb-links">${f.repos.map((x) => html`<span class="rb-tag" key=${x}>${x}</span>`)}</div>`}</td>`}
-            ${has.session && html`<td data-label="Session" class="small">${f.session || null}</td>`}
-            <td data-label="When" class="small rb-nowrap-cell">${f.shipped ? `shipped ${boardDay(f.shipped)}` : f.expected ? `expected ${boardDay(f.expected)}` : html`<span class="muted">not dated</span>`}</td>
-            ${has.items && html`<td data-label="Tracker">${(f.items ?? []).length > 0 && html`<div class="rb-links">${f.items.slice(0, 2).map((i) => html`<${ItemLink} key=${i} id=${i} titles=${titles} />`)}</div>`}</td>`}
+            <td data-label="Feature"><button type="button" class="rb-row-open rb-ttl">${f.name}</button><div class="rb-desc"><${BoardText} text=${f.what} titles=${titles} /></div>
+              ${(f.items ?? []).length > 0 && html`<div class="rb-links">${f.items.slice(0, 2).map((i) => html`<${ItemLink} key=${i} id=${i} titles=${titles} />`)}</div>`}</td>
+            <td data-label="Status" class="rb-fit"><${Chip} status=${f.status} /></td>
+            ${has.repos && html`<td data-label="Repos" class="rb-repos">${(f.repos ?? []).length > 0 && html`<div class="rb-links">${f.repos.map((x) => html`<span class="rb-tag" key=${x} title=${x}>${x}</span>`)}</div>`}</td>`}
+            ${has.session && html`<td data-label="Session" class="small rb-fit">${f.session ? html`<span class="rb-clip" title=${f.session}>${f.session}</span>` : null}</td>`}
+            <td data-label="When" class="small rb-fit">${f.shipped ? `shipped ${boardDay(f.shipped)}` : f.expected ? `expected ${boardDay(f.expected)}` : html`<span class="muted">not dated</span>`}</td>
           </tr>`),
         ])}
         ${!v.shown && html`<tr><td colspan=${columns} class="rb-empty">No feature matches these filters.</td></tr>`}
@@ -224,19 +223,26 @@ export function TestsView({ board, titles, onOpen }) {
   const isNew = useIsNew();
   const groups = testGroups(board);
   const all = liveRecords(board, 'tests');
-  const has = { owner: all.some((t) => t.owner), item: all.some((t) => t.item) };
+  const has = { owner: all.some((t) => t.owner) };
   if (!groups.length) return html`<${SectionTitle} title="Tests" /><${Empty}>No tests yet.</${Empty}>`;
+  // A row no one sees, the same in each release's table: every status, date and owner of the
+  // board's tests, so the short columns are as wide in every table and line up from one to the next.
+  const distinct = (values) => [...new Set(values.filter(Boolean))];
+  const sizer = html`<tr class="rb-sizer" aria-hidden="true"><td />
+    <td class="rb-fit">${distinct(all.map((t) => t.status || 'planned')).map((s) => html`<div key=${s}><${Chip} status=${s} /></div>`)}</td>
+    <td class="small rb-fit">${distinct(all.map((t) => boardDay(t.date))).map((d) => html`<div key=${d}>${d}</div>`)}</td>
+    ${has.owner && html`<td class="small rb-fit">${distinct(all.map((t) => t.owner)).map((o) => html`<div key=${o}><span class="rb-clip">${o}</span></div>`)}</td>`}</tr>`;
   return html`<${SectionTitle} title="Tests" sub="by release" />
-    ${groups.map((g) => html`<div key=${g.id || 'none'}>
+    ${groups.map((g) => html`<div class="rb-group" key=${g.id || 'none'}>
       <${SectionTitle} title=${g.id ? releaseName(g.release, g.id) : 'Not tied to a release'} sub=${`${g.passed} of ${g.records.length} passed`} />
       <div class="rb-panel rb-table-scroll"><table class="rb-table rb-stack">
-        <thead><tr><th class="w46">Test</th><th>Status</th><th>When</th>${has.owner && html`<th>Owner</th>`}${has.item && html`<th>Tracker</th>`}</tr></thead>
-        <tbody>${g.records.map((t) => html`<tr key=${t.id} class="click ${isNew(t) ? 'rb-new' : ''}" onClick=${opensRow(() => onOpen({ type: 'test', id: t.id }))}>
-          <td data-label="Test"><button type="button" class="rb-row-open rb-ttl"><${BoardText} text=${t.title} titles=${titles} /></button>${t.note && html`<div class="rb-desc"><${BoardText} text=${t.note} titles=${titles} /></div>`}</td>
-          <td data-label="Status"><${Chip} status=${t.status} /></td>
-          <td data-label="When" class="small rb-nowrap-cell">${boardDay(t.date)}</td>
-          ${has.owner && html`<td data-label="Owner" class="small">${t.owner || null}</td>`}
-          ${has.item && html`<td data-label="Tracker"><${ItemLink} id=${t.item} titles=${titles} /></td>`}
+        <thead><tr><th>Test</th><th class="rb-fit">Status</th><th class="rb-fit">When</th>${has.owner && html`<th class="rb-fit">Owner</th>`}</tr></thead>
+        <tbody>${sizer}${g.records.map((t) => html`<tr key=${t.id} class="click ${isNew(t) ? 'rb-new' : ''}" onClick=${opensRow(() => onOpen({ type: 'test', id: t.id }))}>
+          <td data-label="Test"><button type="button" class="rb-row-open rb-ttl"><${BoardText} text=${t.title} titles=${titles} /></button>${t.note && html`<div class="rb-desc"><${BoardText} text=${t.note} titles=${titles} /></div>`}
+            ${t.item && html`<div class="rb-links"><${ItemLink} id=${t.item} titles=${titles} /></div>`}</td>
+          <td data-label="Status" class="rb-fit"><${Chip} status=${t.status} /></td>
+          <td data-label="When" class="small rb-fit">${boardDay(t.date)}</td>
+          ${has.owner && html`<td data-label="Owner" class="small rb-fit">${t.owner ? html`<span class="rb-clip" title=${t.owner}>${t.owner}</span>` : null}</td>`}
         </tr>`)}</tbody>
       </table></div>
     </div>`)}`;
@@ -262,7 +268,7 @@ export function CommandsView({ board, titles }) {
   return html`<${SectionTitle} title="Commands" sub="every command to run, per release" />
     <div class="rb-callout">Run each block from the folder it starts with. If a check prints something other than the <b>Expect</b> line, stop and follow <b>If not</b>.</div>
     ${groups.length
-      ? groups.map((g) => html`<div key=${g.release.id}>
+      ? groups.map((g) => html`<div class="rb-group" key=${g.release.id}>
           <${SectionTitle} title=${releaseName(g.release)} sub=${`${g.pending.length} to do · ${g.done.length} done`} />
           <div class="rb-panel rb-pad">${[...g.pending, ...g.done].map((c, i) => html`<${Command} key=${c.id || i} c=${c} titles=${titles} release=${g.release} />`)}</div>
         </div>`)
@@ -297,7 +303,7 @@ export function LogView({ board, slug, titles, onOpen }) {
   };
   return html`<${SectionTitle} title="Advancement log" sub="newest first; every change fed into this board" />
     <div class="rb-panel rb-pad"><${LogList} log=${log} titles=${titles} onOpen=${onOpen} /></div>
-    ${older.map((o) => html`<div key=${o.month}><${SectionTitle} title=${o.month} sub="kept apart once the log grew long" />
+    ${older.map((o) => html`<div class="rb-group" key=${o.month}><${SectionTitle} title=${o.month} sub="kept apart once the log grew long" />
       <div class="rb-panel rb-pad"><${LogList} log=${o.log} titles=${titles} onOpen=${onOpen} /></div></div>`)}
     ${months?.length > 0 && html`<div><button type="button" class="btn" disabled=${busy} onClick=${more}>${busy ? 'Reading…' : `Show ${months[0]}`}</button></div>`}`;
 }
@@ -340,7 +346,7 @@ export function SearchView({ board, query, titles, onOpen }) {
   const found = searchBoard(board, query);
   return html`<${SectionTitle} title=${`Search: ${query.trim()}`} sub=${found.total ? `${found.total} found` : ''} />
     ${found.total
-      ? found.groups.map((g) => html`<div key=${g.part}>
+      ? found.groups.map((g) => html`<div class="rb-group" key=${g.part}>
           <${SectionTitle} title=${g.label} sub=${g.total > g.hits.length ? `${g.hits.length} of ${g.total} shown` : String(g.total)} />
           <div class="rb-panel rb-pad"><ul class="rb-list rb-hits">${g.hits.map((hit, i) => html`<${Hit} key=${`${hit.part}:${hit.id || i}`} hit=${hit} titles=${titles} onOpen=${onOpen} />`)}</ul></div>
         </div>`)

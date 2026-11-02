@@ -5111,10 +5111,17 @@ html[data-native='android'] {
   display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
   color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
 }
-.rb-chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.rb-chip::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.rb-chip-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .rb-tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 6px; background: var(--surface-2); color: var(--text-2); white-space: nowrap; }
-.rb-trk { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 1px 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--accent); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-decoration: none; vertical-align: baseline; }
-.rb-trk::after { content: '\2197'; font-size: 11px; opacity: 0.7; }
+/* A tracker link is a grid: its words shrink with "…" (at its narrowest only the arrow is left), so
+   a long item title never widens what holds it (a table's column, a row of links, a line of
+   text); the whole title is in its tip. */
+.rb-trk { display: inline-grid; grid-template-columns: minmax(0, auto) auto; align-items: center; gap: 4px; max-width: 100%; font-size: 12px; padding: 1px 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--accent); white-space: nowrap; text-decoration: none; vertical-align: baseline; }
+.rb-trk-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rb-trk::after { content: '\2197'; flex: none; font-size: 11px; opacity: 0.7; }
+/* One named in a sentence stays short enough to sit in its line, with room for a "." after it. */
+.rb-trk.in-text { max-width: min(28ch, 100% - 1ch); }
 .rb-trk:hover { border-color: var(--accent); }
 
 .rb-cols2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
@@ -5245,16 +5252,34 @@ a.rb-kpi:hover { border-color: var(--border-strong); box-shadow: var(--shadow); 
 .rb-fstat:hover { opacity: 0.85; }
 .rb-fstat.on:hover { opacity: 1; }
 
+.rb-panel.rb-table-scroll { container: rb-table / inline-size; }
 .rb-panel.rb-table-scroll .rb-table th { padding: 9px 12px; background: var(--surface-2); }
 .rb-panel.rb-table-scroll .rb-table td { padding: 10px 12px; }
 .rb-panel.rb-table-scroll .rb-table tbody tr:last-child td { border-bottom: 0; }
 .rb-table th.w30 { width: 30%; }
-.rb-table th.w34 { width: 34%; }
-.rb-table th.w46 { width: 46%; }
 .rb-table tr.click { cursor: pointer; }
 .rb-table tr.click:hover td { background: var(--surface-2); }
 .rb-table .rb-group-row td { background: color-mix(in srgb, var(--surface-2) 70%, var(--surface-3)); font-weight: 700; font-size: 13px; }
-.rb-nowrap-cell { white-space: nowrap; }
+
+/* A group under its own heading (a release's tests or commands, search results, the Overview's
+   columns): the same gap under the heading as between the board's sections. */
+.rb-group { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+/* Short columns (a status, a date, an owner, a commit) take what they hold, on one line, and
+   the title or text column takes the rest; what may be long in them is cut with "…" (the whole
+   text in its tip). Repos get a share of their own, their tags cut the same way. */
+.rb-table th.rb-fit, .rb-table td.rb-fit { width: 1%; white-space: nowrap; }
+.rb-clip { display: inline-block; max-width: 18ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top; }
+.rb-table th.rb-repos { width: 20%; }
+.rb-table td .rb-tag { max-width: min(100%, 24ch); overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+.rb-table td.rb-fit .rb-chip { max-width: 24ch; }
+/* In a table, tracker links sit under the title they belong to, at most 36ch wide, and their row
+   (repos' tags too) adds nothing to the column's width: the cell's other content sets it. */
+.rb-table .rb-links { contain: inline-size; }
+.rb-table .rb-trk:not(.in-text) { max-width: 36ch; }
+/* The Tests view's row no one sees: it gives the short columns their widths and takes no height. */
+.rb-panel.rb-table-scroll .rb-table tr.rb-sizer td { height: 0; padding-top: 0; padding-bottom: 0; border: 0; line-height: 0; visibility: hidden; }
+.rb-table tr.rb-sizer td > div { height: 0; overflow: hidden; }
 .rb-row-open { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .rb-row-open.rb-ttl { font-weight: 600; }
 .rb-row-open:hover { color: var(--accent); }
@@ -5331,8 +5356,15 @@ button.rb-tl-label:hover { background: var(--surface-2); }
   .rb-tabs a { padding: 7px 10px; }
   .rb-section-title > .rb-controls, .rb-section-title > .rb-seg-group { margin-left: 0; }
   .rb-filters input[type='search'] { flex: 1 1 100%; }
+  .rb-tl-label { padding: 8px; }
+  .rb-tl-label b { font-size: 13px; }
+}
+
+/* A table's rows become cards when its panel is narrow: on a phone, and on a window narrow enough
+   that the sidebar leaves the board less than a 720px window does (686px). */
+@container rb-table (max-width: 686px) {
   .rb-table.rb-stack, .rb-table.rb-stack tbody, .rb-table.rb-stack tr, .rb-table.rb-stack td { display: block; width: 100%; }
-  .rb-table.rb-stack thead { display: none; }
+  .rb-table.rb-stack thead, .rb-table.rb-stack tr.rb-sizer { display: none; }
   .rb-table.rb-stack tr { padding: 10px 14px; border-bottom: 1px solid var(--border); }
   .rb-table.rb-stack tbody tr:last-child { border-bottom: 0; }
   .rb-panel.rb-table-scroll .rb-table.rb-stack td { border: 0; padding: 3px 0 3px 86px; position: relative; min-height: 24px; }
@@ -5346,9 +5378,8 @@ button.rb-tl-label:hover { background: var(--surface-2); }
   .rb-table.rb-stack tr.rb-new { box-shadow: inset 3px 0 0 var(--accent); }
   .rb-table.rb-stack tr.rb-new > td:first-child { box-shadow: none; }
   .rb-table.rb-stack tr.click:hover td { background: none; }
-  .rb-nowrap-cell { white-space: normal; }
-  .rb-tl-label { padding: 8px; }
-  .rb-tl-label b { font-size: 13px; }
+  .rb-table.rb-stack th.rb-fit, .rb-table.rb-stack td.rb-fit { width: 100%; white-space: normal; }
+  .rb-table.rb-stack .rb-clip, .rb-table.rb-stack td .rb-tag, .rb-table.rb-stack .rb-trk:not(.in-text), .rb-table.rb-stack td.rb-fit .rb-chip { max-width: 100%; }
 }
 
 /* ---- Release boards in use (2.4): ticks, decisions, comments, what changed, the board elsewhere ---- */

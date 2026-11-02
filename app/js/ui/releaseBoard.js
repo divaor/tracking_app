@@ -109,7 +109,7 @@ function SinceYouLooked({ changes, since, onOpen, onSeen }) {
 }
 
 // What a board's view does not read aloud: its head, tabs, the timeline, buttons and fields.
-const BOARD_NOT_READ = '.rb-head, .rb-tabs, .rb-since, .rb-import, .rb-tl-wrap, .rb-tl-legend, .rb-filters, .rb-controls, .rb-comment-new, .rb-code, button, input, textarea, select, label';
+const BOARD_NOT_READ = '.rb-head, .rb-tabs, .rb-sizer, .rb-since, .rb-import, .rb-tl-wrap, .rb-tl-legend, .rb-filters, .rb-controls, .rb-comment-new, .rb-code, button, input, textarea, select, label';
 
 /** The boards known here, read again when the view opens (unless `refresh` is false) and after each sync. */
 export function useBoards(refresh = true) {
@@ -248,6 +248,17 @@ export function ReleaseBoardView({ slug, tab = '', arg = '', items, projects, ac
     setSearched('');
     root.current?.closest('.content')?.scrollTo?.({ top: 0 });
   }, [view]);
+  // The tabs scroll sideways on a phone: keep the view's own tab in sight.
+  const tabsRef = useRef(null);
+  useEffect(() => {
+    const nav = tabsRef.current;
+    const on = nav?.querySelector('a.on');
+    if (!on) return;
+    const a = on.getBoundingClientRect();
+    const n = nav.getBoundingClientRect();
+    if (a.left < n.left) nav.scrollLeft -= n.left - a.left + 12;
+    else if (a.right > n.right) nav.scrollLeft += a.right - n.right + 12;
+  }, [slug, view, searched, Boolean(board)]);
   // #/release-board/<slug>/<release|feature|test|decision|event>/<id> opens it in the drawer
   // (notifications, an item's links to the board).
   useEffect(() => {
@@ -307,7 +318,7 @@ export function ReleaseBoardView({ slug, tab = '', arg = '', items, projects, ac
         <button type="button" class="btn sm" title="The board as its standalone page's data file" onClick=${download}><${Icon} name="download" size=${15} />Data file</button>
       </div>
     </div>
-    <nav class="rb-tabs" aria-label="Board views">${shownTabs.map((t) => html`<a key=${t} href=${href(t)} class=${!searched && t === view ? 'on' : ''} aria-current=${!searched && t === view ? 'page' : undefined}
+    <nav class="rb-tabs" ref=${tabsRef} aria-label="Board views">${shownTabs.map((t) => html`<a key=${t} href=${href(t)} class=${!searched && t === view ? 'on' : ''} aria-current=${!searched && t === view ? 'page' : undefined}
       onClick=${() => t === view && (setQuery(''), setSearched(''))}>${BOARD_TABS[t]}</a>`)}</nav>
     ${changes.length > 0 && !searched && html`<${SinceYouLooked} changes=${changes} since=${since} onOpen=${onOpen} onSeen=${seenNow} />`}
     ${body}
