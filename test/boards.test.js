@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  withoutHoles,
   addLog,
   applyBoardChanges,
   boardData,
@@ -469,4 +470,32 @@ test('the boards in plans and Days, and how long a board has been quiet', () => 
   assert.deepEqual(day.map((d) => d.entry.text), process.env.TZ && process.env.TZ !== 'UTC' ? day.map((d) => d.entry.text) : ['R2 cut']);
   assert.equal(boardQuietFor(board, new Date(Date.parse(AT) + 3600000)), 3600000);
   assert.equal(boardQuietFor(emptyBoard('E'), now), null);
+});
+
+test('a list place past the end is added at the end, never leaving a hole (2.6.3)', () => {
+  const board = parseBoard(JSON.stringify({ version: 1, project: 'AION', releases: [{ id: 'R4', commands: [{ id: 'a' }] }] }));
+  const { board: next } = applyBoardChanges(board, [{ part: 'releases', id: 'R4', set: { 'commands.5': { id: 'c' } } }], { at: '2026-11-08T10:00:00Z', by: 'Claude' });
+  assert.deepEqual(next.releases[0].commands, [{ id: 'a' }, { id: 'c' }]);
+  // The place right after the last one, and one inside, as before.
+  const { board: after } = applyBoardChanges(next, [{ part: 'releases', id: 'R4', set: { 'commands.2': { id: 'd' }, 'commands.0.status': 'done' } }]);
+  assert.deepEqual(after.releases[0].commands, [{ id: 'a', status: 'done' }, { id: 'c' }, { id: 'd' }]);
+});
+
+test('a board with holes in its lists reads without them (the Commands view threw on one)', () => {
+  const text = JSON.stringify({
+    version: 1,
+    project: 'AION',
+    releases: [{ id: 'R4', commands: [{ id: 'a' }, null, { id: 'b', steps: [null, { label: 'x' }] }], steps: [{ label: 'one' }, null], features: ['f1', null] }],
+  });
+  const board = parseBoard(text);
+  assert.deepEqual(board.releases[0].commands, [{ id: 'a' }, { id: 'b', steps: [{ label: 'x' }] }]);
+  assert.deepEqual(board.releases[0].steps, [{ label: 'one' }]);
+  assert.deepEqual(board.releases[0].features, ['f1']);
+  assert.deepEqual(commandGroups(board)[0].pending.map((c) => c.id), ['a', 'b']);
+  // A record without holes is the same object (nothing copied).
+  const clean = { id: 'R1', steps: [{ label: 'a' }], meta: { note: null } };
+  assert.equal(withoutHoles(clean), clean);
+  // The standalone page's data file too.
+  const imported = boardFromData('window.AION_DATA = {"releases": [{"id": "R4", "commands": [{"label": "a"}, null]}]};', { project: 'AION' });
+  assert.deepEqual(imported.releases[0].commands, [{ label: 'a' }]);
 });

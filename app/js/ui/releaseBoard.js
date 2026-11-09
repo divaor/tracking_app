@@ -4,7 +4,7 @@
 // Records open in the drawer (boardDrawer.js). Claude keeps the board current (update_board); here a
 // board file can be imported and the board downloaded as its page's data file. #/release-board
 // lists the boards.
-import { html, useEffect, useMemo, useRef, useState } from '../../vendor/preact-htm.js';
+import { html, useEffect, useErrorBoundary, useMemo, useRef, useState } from '../../vendor/preact-htm.js';
 import { applyBoardChanges, boardQuietFor, boardTabs, boardTick, boardUpdated, changedSince, decideBoard, recordTitle } from '../boards.js';
 import { boardSeenAt, cachedBoard, cachedBoards, changeBoard, exportBoardFile, importBoardFile, markBoardSeen, onBoards, refreshBoards } from '../boardStore.js';
 import { saveToDevice } from '../saveFile.js';
@@ -204,6 +204,24 @@ function BoardIndex({ slug, list, projects, actions, titles }) {
   </div>`;
 }
 
+/**
+ * A view or the drawer that cannot be drawn says so here, and the rest of the board keeps working
+ * (until 2.6.3 one bad record threw mid-render and froze the page: the search could not be changed).
+ * Tried again when `again` changes (another view, another search, another record).
+ */
+function Guard({ again, what, children }) {
+  const [error, reset] = useErrorBoundary((err) => console.error(`Release board: ${what} could not be drawn`, err));
+  useEffect(() => {
+    if (error) reset();
+  }, [again]);
+  if (!error) return children;
+  return html`<div class="rb-panel rb-pad rb-broken" role="alert">
+    <b>${what[0].toUpperCase()}${what.slice(1)} could not be drawn.</b>
+    <span class="muted"> Something on the board is not as the app expects (${error.message || String(error)}). The other views still work.</span>
+    <button type="button" class="btn sm" onClick=${reset}>Try again</button>
+  </div>`;
+}
+
 function BoardSearch({ value, onChange }) {
   return html`<div class="search rb-search ${value ? 'has-query' : ''}">
     <${Icon} name="search" size=${16} />
@@ -321,9 +339,9 @@ export function ReleaseBoardView({ slug, tab = '', arg = '', items, projects, ac
     <nav class="rb-tabs" ref=${tabsRef} aria-label="Board views">${shownTabs.map((t) => html`<a key=${t} href=${href(t)} class=${!searched && t === view ? 'on' : ''} aria-current=${!searched && t === view ? 'page' : undefined}
       onClick=${() => t === view && (setQuery(''), setSearched(''))}>${BOARD_TABS[t]}</a>`)}</nav>
     ${changes.length > 0 && !searched && html`<${SinceYouLooked} changes=${changes} since=${since} onOpen=${onOpen} onSeen=${seenNow} />`}
-    ${body}
+    <${Guard} again=${`${slug}|${view}|${searched}|${arg}`} what=${searched ? 'the search' : `the ${BOARD_TABS[view]} view`}>${body}</${Guard}>
     ${view === 'overview' && !searched && html`<${ImportCard} projects=${projects} project=${board.project} actions=${actions} />`}
-    ${open && html`<${Drawer} key=${`${open.type}:${open.id}`} board=${board} open=${open} onOpen=${onOpen} titles=${titles} canBack=${stack.length > 1}
-      onBack=${() => setStack((s) => s.slice(0, -1))} onClose=${() => setStack([])} />`}
+    ${open && html`<${Guard} again=${`${open.type}:${open.id}`} what="this record"><${Drawer} key=${`${open.type}:${open.id}`} board=${board} open=${open} onOpen=${onOpen} titles=${titles} canBack=${stack.length > 1}
+      onBack=${() => setStack((s) => s.slice(0, -1))} onClose=${() => setStack([])} /></${Guard}>`}
   </div></${NewSince.Provider}></${BoardEdit.Provider}>`;
 }

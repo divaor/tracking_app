@@ -93,7 +93,7 @@ export function parseBoard(input) {
       if (!id || seen.has(id)) return false;
       seen.add(id);
       return true;
-    });
+    }).map(withoutHoles);
   }
   return board;
 }
@@ -168,8 +168,29 @@ function setPath(target, path, value) {
   if (value === null) {
     if (Array.isArray(node) && /^\d+$/.test(last)) node.splice(Number(last), 1);
     else delete node[last];
-  } else node[last] = value;
+  } else if (Array.isArray(node) && /^\d+$/.test(last) && Number(last) > node.length) node.push(value);
+  else node[last] = value;
   return root;
+}
+
+/**
+ * A record's lists without empty places (null, undefined), at any depth. Setting a list's
+ * place past its end used to leave holes, which JSON writes as null (an R4 command on a board
+ * made the Commands view throw until 2.6.3): read again, a board never has them.
+ */
+export function withoutHoles(value) {
+  if (Array.isArray(value)) {
+    const clean = value.filter((v) => v != null).map(withoutHoles);
+    return clean.length === value.length && clean.every((v, i) => v === value[i]) ? value : clean;
+  }
+  if (!isObject(value)) return value;
+  let out = null;
+  for (const [k, v] of Object.entries(value)) {
+    if (v === null || typeof v !== 'object') continue;
+    const clean = withoutHoles(v);
+    if (clean !== v) (out ??= { ...value })[k] = clean;
+  }
+  return out ?? value;
 }
 
 /**
@@ -328,7 +349,7 @@ export function boardFromData(input, { project, at = nowIso(), by = '' } = {}) {
       if (!id) continue;
       for (let n = 2; seen.has(id); n++) id = `${idFor(part, raw)}-${n}`;
       seen.add(id);
-      const record = { ...raw, ...(part === 'log' ? { time: sortKey(raw.time) } : {}), id, ...stamp };
+      const record = withoutHoles({ ...raw, ...(part === 'log' ? { time: sortKey(raw.time) } : {}), id, ...stamp });
       board[part].push(record);
     }
   }
