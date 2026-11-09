@@ -525,6 +525,8 @@ test('plans: save_plan keeps versions, the overview shows the latest, get_plans 
   const { serializePlans, withPlan } = await import('../app/js/plans.js');
   const fromApp = withPlan({ ...kept, versions: undefined }, 'day', { text: '- From the app', at: new Date(Date.now() + 1000).toISOString(), by: 'Test PC', model: 'm' });
   github.write(path, serializePlans(fromApp));
+  // Versions are told apart by their time: a fast machine saved both of Claude's in one millisecond.
+  await new Promise((resolve) => setTimeout(resolve, 5));
   await call('save_plan', { text: '- Then the docs' });
   const one = (await call('get_plans', { days: 1 })).data.days;
   assert.equal(one.length, 1);
