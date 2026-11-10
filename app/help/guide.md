@@ -339,7 +339,16 @@ The assistant looks up what it needs (it sees your projects, tags and release bo
 
 Ask **how** to do something (*How do I attach a photo?*, *Where do I change the theme?*) and it answers from this guide, with the buttons to press. **Only explain, I'll do it** under the box makes it always answer that way: it changes nothing, and shows what it would have done.
 
-Items named in its answers and cards are links: click one to open it. **New** starts over; **Esc** (or Back on a phone) closes the panel. On a wide screen the panel stays beside the list, so you see the changes as they happen.
+Items named in its answers and cards are links: click one to open it. **Esc** (or Back on a phone) closes the panel. On a wide screen the panel stays beside the list, so you see the changes as they happen.
+
+#### Its chats are kept
+
+Closing the panel no longer loses the conversation. Each chat is kept on this device (never synced), and the panel takes up the last one when you open it again, with its cards as they ended: **Undo** on them still works, and a follow-up goes on from what the assistant saw then.
+
+- **New chat** (at the top) starts afresh; the chat before stays in **Chats**. A question handed over from elsewhere (Find by asking's **Ask the assistant**) starts a new one too.
+- **Chats** (the clock at the top, or the command **The assistant's chats**) lists them, newest first: those about the item open, its project, all of them, the saved ones; type words to find one. A chat is about the item that was open when it began, or the project the screen showed alone.
+- **☆** saves a chat for good (the newest 300 others are kept); the pencil renames it; the bin deletes it, with **Undo** in the message.
+- A long chat sends the assistant its newest messages whole and shortens the oldest, so it keeps fitting the model.
 
 It needs a model that answers at once (on your computer or an AI provider), not a service that answers later. When you ask how to do something, a model on your computer gets only the parts of this guide about it; an AI provider gets the whole guide with every question (Claude keeps it cached, so it costs little after the first).
 

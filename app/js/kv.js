@@ -28,11 +28,14 @@ function run(mode, fn) {
   return openDb().then(
     (db) =>
       new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE, mode);
+        // Writes are committed at once (as Tracker Editor's kv.js): a page closing or reloading
+        // right after a change still keeps it.
+        const tx = mode === 'readwrite' ? db.transaction(STORE, mode, { durability: 'strict' }) : db.transaction(STORE, mode);
         const req = fn(tx.objectStore(STORE));
         tx.oncomplete = () => resolve(req.result);
         tx.onerror = () => reject(tx.error);
         tx.onabort = () => reject(tx.error);
+        if (mode === 'readwrite') tx.commit?.();
       }),
   );
 }

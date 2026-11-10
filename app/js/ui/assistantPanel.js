@@ -27,6 +27,8 @@ import {
   undoDataChanges,
   wordsSoFar,
 } from '../assistantSteps.js';
+import { assistantChats } from '../assistantChatStore.js';
+import { chatLink, chatPreview, chatTitle, fitMessages, historyBudget, newChatId, settledTurns } from '../assistantChats.js';
 import { llmClient, modelReady } from '../assistant.js';
 import { boardSlug } from '../boards.js';
 import { cachedBoard, cachedBoards, changeBoard, refreshBoards, removeBoard } from '../boardStore.js';
@@ -35,6 +37,7 @@ import { nowIso, projectKey, resolveProjectName } from '../model.js';
 import { connectionOf } from '../providers.js';
 import { getSettings } from '../settings.js';
 import { store } from '../store.js';
+import { ChatButtons, ChatList, KeptNote, useAssistantChats } from './assistantChats.js';
 import { Icon } from './icons.js';
 
 // The guide, loaded once: the model answers how to do things from it.
@@ -163,15 +166,77 @@ export function AssistantPanel({ env, start = null, actions, onClose }) {
   const decide = useRef(null); // resolves the step waiting for Apply / Skip / Stop
   const input = useRef(null);
   const end = useRef(null);
+  // The chat kept on this device (assistantChatStore.js): taken up when the panel opens again,
+  // unless it opens asking something new; New chat keeps the old one in Chats.
+  const rows = useAssistantChats();
+  const [chatId, setChatId] = useState(null);
+  const [kept, setKept] = useState(null); // the chat as taken up (its note at the top)
+  const [listOpen, setListOpen] = useState(Boolean(start?.chats));
+  const chat = useRef({ id: null, meta: null });
+  const now = useRef({ turns, explainOnly });
+  now.current = { turns, explainOnly };
+
+  /** Keeps the chat as it is now (after each answer, an Undo, and when the panel closes). */
+  const persist = () => {
+    const { id, meta } = chat.current;
+    const ts = now.current.turns;
+    if (!id || !ts.length) return;
+    const row = assistantChats.list().find((r) => r.id === id);
+    const lastText = [...ts].reverse().flatMap((t) => [...t.parts].reverse()).find((p) => p.text)?.text ?? '';
+    assistantChats.save({
+      id,
+      ...meta,
+      title: row?.named ? row.title : meta.title,
+      named: Boolean(row?.named),
+      saved: Boolean(row?.saved),
+      turns: ts.length,
+      preview: chatPreview(lastText),
+      state: { explainOnly: now.current.explainOnly, turns: ts, history: history.current },
+    });
+    assistantChats.setCurrent(id);
+  };
+  /** Shows a kept chat: its cards as they ended (Undo still works), the model's messages for follow-ups. */
+  const openChat = async (id, { keepList = false } = {}) => {
+    const c = await assistantChats.load(id);
+    if (!c) return;
+    chat.current = { id: c.id, meta: { title: c.title, createdAt: c.createdAt, link: c.link ?? null } };
+    history.current = Array.isArray(c.state?.history) ? c.state.history : [];
+    setTurns(settledTurns(c.state?.turns));
+    setExplainOnly(Boolean(c.state?.explainOnly));
+    setChatId(c.id);
+    setKept(c);
+    setError('');
+    if (!keepList) setListOpen(false);
+    assistantChats.setCurrent(c.id);
+    setTimeout(() => input.current?.focus(), 0);
+  };
+  const newChat = ({ keepList = false } = {}) => {
+    if (busy) return;
+    history.current = [];
+    chat.current = { id: null, meta: null };
+    setTurns([]);
+    setError('');
+    setChatId(null);
+    setKept(null);
+    if (!keepList) setListOpen(false);
+    assistantChats.setCurrent(null);
+    setTimeout(() => input.current?.focus(), 0);
+  };
 
   useLayoutEffect(() => input.current?.focus(), []);
   useEffect(() => {
     refreshBoards().catch(() => {});
-    return () => (controller.current?.abort(), decide.current?.('stop'));
+    return () => (controller.current?.abort(), decide.current?.('stop'), persist());
   }, []);
   useEffect(() => end.current?.scrollIntoView({ block: 'nearest' }), [turns, busy]);
   useLayoutEffect(() => {
-    if (start?.question && ready) ask(start.question);
+    if (start?.question && ready) return void ask(start.question);
+    // Taken up again: the chat asked for, else the one shown last (none after New chat).
+    assistantChats.ready().then(() => {
+      if (chat.current.id || now.current.turns.length) return;
+      const id = start?.chatId ?? assistantChats.current();
+      if (typeof id === 'string') openChat(id, { keepList: true });
+    });
   }, []);
 
   const updateLast = (fn) => setTurns((ts) => (ts.length ? [...ts.slice(0, -1), fn(ts.at(-1))] : ts));
@@ -186,7 +251,8 @@ export function AssistantPanel({ env, start = null, actions, onClose }) {
 
   /** One answer from the model, streamed into a new part; resolves to the plan. */
   const modelTurn = async (userContent, withPicture, signal, opts) => {
-    const messages = assistantMessages(userContent, withPicture ? picture() : '', history.current, opts);
+    // A long chat: its oldest messages shortened to what the model takes (less for one on this computer).
+    const messages = assistantMessages(userContent, withPicture ? picture() : '', fitMessages(history.current, historyBudget(connectionOf(llm))), opts);
     let partIndex = -1;
     updateLast((t) => {
       partIndex = t.parts.length;
@@ -315,6 +381,12 @@ export function AssistantPanel({ env, start = null, actions, onClose }) {
     const signal = (controller.current = new AbortController()).signal;
     setError('');
     setQuestion('');
+    setListOpen(false);
+    if (!chat.current.id) {
+      const e = env();
+      chat.current = { id: newChatId(), meta: { title: chatTitle(q), createdAt: nowIso(), link: chatLink({ open: e.open, project: e.project }) } };
+      setChatId(chat.current.id);
+    }
     setTurns((ts) => [...ts, { question: q, parts: [], problems: [] }]);
     setBusy('asking');
     try {
@@ -343,7 +415,7 @@ export function AssistantPanel({ env, start = null, actions, onClose }) {
     } finally {
       setBusy(null);
       setPhase('');
-      setTimeout(() => input.current?.focus(), 0);
+      setTimeout(() => (input.current?.focus(), persist()), 0);
     }
   };
 
@@ -366,6 +438,7 @@ export function AssistantPanel({ env, start = null, actions, onClose }) {
     }
     setTurns((ts) => ts.map((t) => ({ ...t, parts: t.parts.map((p) => (p.steps ? { steps: p.steps.map((s) => (s === card ? { ...s, status: 'undone', kept } : s)) } : p)) })));
     history.current.push({ role: 'user', content: `(I clicked Undo on “${card.text}”: what it changed is back as it was${kept ? `, except ${kept} that changed since` : ''}.)` }, { role: 'assistant', content: 'Understood.' });
+    setTimeout(persist, 0);
   };
 
   const stop = () => {
@@ -376,7 +449,7 @@ export function AssistantPanel({ env, start = null, actions, onClose }) {
   const head = html`<div class="aip-head">
     <span class="aip-title-bar"><${Icon} name="sparkle" size=${17} />Assistant</span>
     <span class="spacer" />
-    ${turns.length > 0 && html`<button type="button" class="btn ghost sm" title="Start over" disabled=${Boolean(busy)} onClick=${() => ((history.current = []), setTurns([]), setError(''))}>New</button>`}
+    ${ready && html`<${ChatButtons} chatId=${chatId} saved=${Boolean(rows.find((r) => r.id === chatId)?.saved)} listOpen=${listOpen} busy=${Boolean(busy)} onToggleList=${() => setListOpen((o) => !o)} onNew=${() => newChat()} />`}
     <button type="button" class="icon-btn sm" aria-label="Close" title="Close (Esc)" onClick=${onClose}><${Icon} name="x" size=${16} /></button>
   </div>`;
 
@@ -391,9 +464,21 @@ export function AssistantPanel({ env, start = null, actions, onClose }) {
     </div>`;
   }
 
+  if (listOpen) {
+    const e = env();
+    return html`<div class="aip-body">
+      ${head}
+      <div class="aip-scroll">
+        <${ChatList} here=${{ itemId: e.open?.id ?? null, itemTitle: e.open?.title, project: e.open?.project || e.project || '' }} currentId=${chatId} toast=${actions.toast}
+          onOpen=${(r) => openChat(r.id)} onDeleted=${(id) => id === chat.current.id && newChat({ keepList: true })} />
+      </div>
+    </div>`;
+  }
+
   return html`<div class="aip-body">
     ${head}
     <div class="aip-scroll">
+      ${kept && turns.length > 0 && html`<${KeptNote} chat=${kept} />`}
       ${!turns.length &&
       html`<div class="aip-intro">
         <p class="small muted">Say what to do (add, change, tag, move, mark done, comment, plan, release boards) or ask how to do something. Small changes are done at once, each with Undo; changing many items asks first, and deleting asks with a warning. The model sees your projects and tags, and only the items it looks up.</p>

@@ -750,6 +750,7 @@ export function App() {
     'plan-week': () => actions.plan('week'),
     'model-settings': () => (go({ view: 'settings' }), scrollToWhenShown('model')),
     assistant: () => openAssistant(),
+    'assistant-chats': () => openAssistant({ chats: true }),
     'pinned-past-filters': () => {
       const on = !getSettings().pinnedPastFilters;
       saveSettings({ pinnedPastFilters: on });
@@ -1068,6 +1069,8 @@ export function App() {
             ? { label: where, shown: filtered }
             : { label: route.view === 'release-board' && route.boardSlug ? `the release board ${route.boardSlug}` : where },
       open: open && { id: open.id, title: open.title, type: open.type, project: open.project },
+      // The project the screen shows alone (the scope), for the assistant's chats.
+      project: scope.length === 1 && scope[0].startsWith('project:') ? (byKey.get(scope[0].slice(8))?.name ?? '') : '',
     };
   };
 

@@ -1,5 +1,6 @@
 import { html, render } from '../vendor/preact-htm.js';
 import { App } from './app.js';
+import { assistantChats } from './assistantChatStore.js';
 import { requestPersistence } from './kv.js';
 import { applyTheme, onSettings } from './settings.js';
 import { store } from './store.js';
@@ -10,8 +11,12 @@ const root = document.getElementById('root');
 try {
   applyTheme();
   onSettings((s) => applyTheme(s.theme));
-  await store.load();
+  await Promise.all([store.load(), assistantChats.ready()]);
   render(html`<${App} />`, root);
+  // The assistant's chats are written a moment after each answer: at once when the app is hidden or closed.
+  const keepChats = () => assistantChats.flush().catch(() => {});
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && keepChats());
+  window.addEventListener('pagehide', keepChats);
   startSync();
   requestPersistence();
 } catch (err) {

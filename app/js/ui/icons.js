@@ -2,6 +2,8 @@ import { html } from '../../vendor/preact-htm.js';
 
 // 24×24 stroke icons.
 const PATHS = {
+  history: () => html`<path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" />`,
+  star: () => html`<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z" />`,
   pin: () => html`<path d="M9 4h6l-1 6 3.5 3.5V15h-11v-1.5L10 10z" /><path d="M12 15v6" />`,
   home: () => html`<path d="M3 10.5 12 3l9 7.5" /><path d="M5 9v12h14V9" /><path d="M10 21v-6h4v6" />`,
   board: () => html`<rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16M15 4v16" />`,
