@@ -5426,6 +5426,8 @@ button.rb-tick:disabled { opacity: 0.6; cursor: progress; }
 .rb-decide h4 { margin-top: 0; }
 .rb-decide.decided { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; border-color: var(--border); background: none; }
 .rb-options { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+/* An option is often a sentence: it wraps inside the drawer (buttons stay on one line elsewhere). */
+.rb-options .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; justify-content: flex-start; line-height: 1.35; }
 .rb-decide-row { display: flex; gap: 8px; align-items: center; }
 .rb-decide-row input { min-height: 34px; padding: 5px 10px; font-size: 13px; }
 .rb-decide p { margin: 8px 0 0; }
