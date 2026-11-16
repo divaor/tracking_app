@@ -6,7 +6,7 @@
 import { html, useContext, useEffect, useState } from '../../vendor/preact-htm.js';
 import { boardDate, boardSummary, commandGroups, featureView, isLive, liveRecords, searchBoard, statusLabel, STATUSES, testGroups, waitingActions } from '../boards.js';
 import { olderLog, olderLogMonths } from '../boardStore.js';
-import { Bar, BoardEdit, BoardText, boardDay, Chip, Command, DecisionCard, Empty, ItemLink, opensRow, ReleaseCards, RelLink, SectionTitle, untilText, useIsNew } from './boardParts.js';
+import { Bar, BoardEdit, BoardText, boardDay, Chip, Command, DecisionCard, Empty, ItemLink, opensRow, ReleaseCards, RelLink, SectionTitle, untilText, useIsNew, usePending } from './boardParts.js';
 import { Icon } from './icons.js';
 import { Timeline, TimelineLegend, TIMELINE_ZOOMS } from './boardTimeline.js';
 
@@ -16,16 +16,12 @@ const releaseName = (r, id) => (r ? `${r.id} · ${r.title ?? ''}` : id || '');
 export function ActionList({ actions, titles, onOpen, project = '' }) {
   const edit = useContext(BoardEdit);
   const isNew = useIsNew();
-  const [busy, setBusy] = useState('');
+  const [pending, run] = usePending();
   if (!actions.length) return html`<${Empty}>Nothing waits on you.</${Empty}>`;
-  const tick = async (a) => {
-    setBusy(a.id);
-    await edit.tick({ kind: 'action', id: a.id }, true, String(a.text ?? ''), a);
-    setBusy('');
-  };
-  return html`<ol class="rb-list rb-numbered">${actions.map((a, i) => html`<li key=${a.id} class=${isNew(a) ? 'rb-new' : ''}>
+  const tick = (a) => run(a.id, true, () => edit.tick({ kind: 'action', id: a.id }, true, String(a.text ?? ''), a));
+  return html`<ol class="rb-list rb-numbered">${actions.map((a, i) => html`<li key=${a.id} class=${`${isNew(a) ? 'rb-new' : ''} ${a.id in pending ? 'done saving' : ''}`}>
     ${edit
-      ? html`<button type="button" class="rb-check" role="checkbox" aria-checked="false" aria-label=${`Done: ${a.text}`} title="Mark as done" disabled=${busy === a.id} onClick=${() => tick(a)}><${Icon} name="check" size=${13} /></button>`
+      ? html`<button type="button" class=${`rb-check ${a.id in pending ? 'on saving' : ''}`} role="checkbox" aria-checked=${a.id in pending} aria-busy=${a.id in pending} aria-label=${`Done: ${a.text}`} title=${a.id in pending ? 'Saving…' : 'Mark as done'} onClick=${() => tick(a)}><${Icon} name="check" size=${13} /></button>`
       : html`<span class="rb-num">${i + 1}</span>`}<div>
     <div class="rb-ttl"><${BoardText} text=${a.text} titles=${titles} /></div>
     ${a.detail && html`<div class="rb-desc"><${BoardText} text=${a.detail} titles=${titles} /></div>`}

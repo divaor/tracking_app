@@ -16,11 +16,17 @@ const isWriteConflict = (err) => err?.status === 409 || err?.status === 422;
  * Merges `localItems` with the file at `path` and writes the result back when
  * it differs. Retries when another device wrote in between (sha mismatch).
  * Never overwrites a remote file it cannot parse.
+ * `knownSha`: the file's version this device synced last, given only when nothing changed here
+ * since; while the file is still that version there is nothing to do (`unchanged`), and it is
+ * not downloaded (a large data file was downloaded on every round until 2.7.1).
  */
-export async function syncOnce({ client, path, branch, localItems, localProjects = [], device = 'unknown device', now = nowIso, maxAttempts = 4 }) {
+export async function syncOnce({ client, path, branch, localItems, localProjects = [], device = 'unknown device', now = nowIso, maxAttempts = 4, knownSha = '' }) {
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const remote = await client.getFile(path, branch || undefined);
+    const remote = await client.getFile(path, branch || undefined, knownSha && attempt === 1 ? { unlessSha: knownSha } : undefined);
+    if (knownSha && attempt === 1 && remote?.sha === knownSha) {
+      return { items: localItems, projects: localProjects, sha: remote.sha, pushed: false, unchanged: true, counts: { added: 0, updated: 0, deleted: 0 } };
+    }
     const data = remote ? parseData(remote.text) : { items: [], projects: [], extra: {} };
     const remoteItems = data.items;
     const merged = pruneTombstones(mergeItems(remoteItems, localItems), now());

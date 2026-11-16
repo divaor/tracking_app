@@ -124,3 +124,37 @@ test('gives up after repeated conflicts and surfaces non-conflict errors immedia
   await assert.rejects(syncOnce({ client: repo, path: 't.json', localItems: [createItem({ title: 'x' })], now }), /bad token/);
   assert.equal(puts, 1);
 });
+
+test('nothing changed here and the file is as this device synced it last: not downloaded, nothing written (2.7.1)', async () => {
+  const item = createItem({ title: 'kept' }, T0);
+  const repo = fakeRepo();
+  const first = await syncOnce({ client: repo, path: 'tracker.json', localItems: [item], device: 'Phone', now });
+  let reads = 0;
+  const getFile = repo.getFile;
+  repo.getFile = async (path, ref, opts) => {
+    reads++;
+    // The GitHub client answers this way when the version is known (no text downloaded).
+    if (opts?.unlessSha && opts.unlessSha === repo.sha) return { sha: repo.sha, text: null, unchanged: true };
+    return getFile(path, ref);
+  };
+  const quiet = await syncOnce({ client: repo, path: 'tracker.json', localItems: first.items, device: 'Phone', now, knownSha: first.sha });
+  assert.equal(quiet.unchanged, true);
+  assert.equal(quiet.pushed, false);
+  assert.equal(quiet.sha, first.sha);
+  assert.equal(quiet.items, first.items, 'the items as they are here');
+  assert.equal(reads, 1);
+  assert.equal(repo.commits.length, 1);
+
+  // Another device wrote meanwhile: the version moved, so it is read and merged as usual.
+  const other = createItem({ title: 'from the laptop' }, T1);
+  await syncOnce({ client: repo, path: 'tracker.json', localItems: [...first.items, other], device: 'Laptop', now });
+  const moved = await syncOnce({ client: repo, path: 'tracker.json', localItems: first.items, device: 'Phone', now, knownSha: first.sha });
+  assert.equal(moved.unchanged, undefined);
+  assert.deepEqual(moved.items.map((i) => i.title).sort(), ['from the laptop', 'kept']);
+
+  // A client that cannot skip (local mode's store) gives the text: the same sha still means nothing to do.
+  const plain = fakeRepo({ text: repo.text });
+  plain.sha = 'same';
+  const local = await syncOnce({ client: plain, path: 'tracker.json', localItems: moved.items, device: 'Phone', now, knownSha: 'same' });
+  assert.equal(local.unchanged, true);
+});

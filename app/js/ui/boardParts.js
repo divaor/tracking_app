@@ -121,21 +121,40 @@ export function CopyButton({ text }) {
   })}><${Icon} name=${copied ? 'check' : 'copy'} size=${14} />${copied ? 'Copied' : 'Copy'}</button>`;
 }
 
+/**
+ * Ticks show at once (2.7.1): `pending` holds what was tapped while it is written; `run(key,
+ * value, write)` shows `value` for `key` until `write()` settles, then the board says (a failed
+ * write: as it was, and the error's toast). Taps on one still being written are ignored.
+ */
+export function usePending() {
+  const [pending, setPending] = useState({});
+  const run = async (key, value, write) => {
+    if (key in pending) return;
+    setPending((p) => ({ ...p, [key]: value }));
+    try {
+      await write();
+    } finally {
+      setPending((p) => {
+        const { [key]: _gone, ...rest } = p;
+        return rest;
+      });
+    }
+  };
+  return [pending, run];
+}
+
 export function Command({ c, titles, highlight, release }) {
   const edit = useContext(BoardEdit);
-  const [busy, setBusy] = useState(false);
-  const done = c.status === 'done';
-  const tick = async () => {
-    setBusy(true);
-    await edit.tick({ kind: 'command', release: release.id, command: c.id || c.label }, !done, String(c.label ?? ''));
-    setBusy(false);
-  };
+  const [pending, run] = usePending();
+  const saving = 'c' in pending;
+  const done = saving ? pending.c : c.status === 'done';
+  const tick = () => run('c', !done, () => edit.tick({ kind: 'command', release: release.id, command: c.id || c.label }, !done, String(c.label ?? '')));
   return html`<div class="rb-cmd ${highlight ? 'highlight' : ''} ${done ? 'done' : ''}" id=${c.id ? `rb-cmd-${c.id}` : undefined}>
     <div class="rb-cmd-head">
       <div><div class="rb-ttl"><${BoardText} text=${c.label} titles=${titles} /></div>${c.when && html`<div class="small muted"><${BoardText} text=${c.when} titles=${titles} /></div>`}</div>
       <div class="rb-nowrap">
         ${edit && release
-          ? html`<button type="button" class="rb-done-btn ${done ? 'on' : ''}" aria-pressed=${done} disabled=${busy} title=${done ? 'Mark as not run' : 'Mark as run'} onClick=${tick}><${Icon} name=${done ? 'check' : 'circle'} size=${14} />${done ? 'Done' : 'Mark done'}</button>`
+          ? html`<button type="button" class="rb-done-btn ${done ? 'on' : ''} ${saving ? 'saving' : ''}" aria-pressed=${done} aria-busy=${saving} title=${saving ? 'Saving…' : done ? 'Mark as not run' : 'Mark as run'} onClick=${tick}><${Icon} name=${done ? 'check' : 'circle'} size=${14} />${done ? 'Done' : 'Mark done'}</button>`
           : html`<${Chip} status=${done ? 'done' : 'pending'} label=${done ? 'Done' : 'To do'} />`}
         ${c.code && html`<${CopyButton} text=${c.code} />`}
       </div>
@@ -189,18 +208,18 @@ export function KeyValues({ rows }) {
 
 export function Steps({ steps, titles, part, record }) {
   const edit = useContext(BoardEdit);
-  const [busy, setBusy] = useState(-1);
+  const [pending, run] = usePending();
   if (!steps?.length) return html`<p class="muted small">No steps listed.</p>`;
   const label = (s) => (typeof s === 'string' ? s : String(s?.label ?? ''));
-  const tick = async (s, i) => {
-    setBusy(i);
-    await edit.tick({ kind: 'step', part, id: record.id, index: i, label: label(s) }, !s?.done, label(s));
-    setBusy(-1);
+  const shown = (s, i) => (i in pending ? pending[i] : Boolean(s?.done));
+  const tick = (s, i) => {
+    const want = !shown(s, i);
+    run(i, want, () => edit.tick({ kind: 'step', part, id: record.id, index: i, label: label(s) }, want, label(s)));
   };
-  return html`<ol class="rb-steps">${steps.map((s, i) => html`<li key=${i} class=${s?.done ? 'done' : ''}>
+  return html`<ol class="rb-steps">${steps.map((s, i) => html`<li key=${i} class=${`${shown(s, i) ? 'done' : ''} ${i in pending ? 'saving' : ''}`}>
     ${edit && record
-      ? html`<button type="button" class="rb-tick" role="checkbox" aria-checked=${Boolean(s?.done)} aria-label=${label(s)} disabled=${busy === i} title=${s?.done ? 'Mark as not done' : 'Mark as done'}
-          onClick=${() => tick(s, i)}>${s?.done ? html`<${Icon} name="check" size=${13} />` : ''}</button>`
+      ? html`<button type="button" class=${`rb-tick ${i in pending ? 'saving' : ''}`} role="checkbox" aria-checked=${shown(s, i)} aria-busy=${i in pending} aria-label=${label(s)} title=${i in pending ? 'Saving…' : shown(s, i) ? 'Mark as not done' : 'Mark as done'}
+          onClick=${() => tick(s, i)}>${shown(s, i) ? html`<${Icon} name="check" size=${13} />` : ''}</button>`
       : html`<span class="rb-tick" aria-label=${s?.done ? 'done' : 'to do'}>${s?.done ? html`<${Icon} name="check" size=${13} />` : ''}</span>`}
     <div><div><${BoardText} text=${typeof s === 'string' ? s : s?.label} titles=${titles} /></div>
     ${(s?.date || s?.by || s?.item) && html`<div class="small muted">${[boardDay(s.date), s.by].filter(Boolean).join(' · ')} ${s.item ? html`<${ItemLink} id=${s.item} titles=${titles} />` : ''}</div>`}</div>

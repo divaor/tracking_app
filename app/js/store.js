@@ -174,6 +174,13 @@ export const store = {
     save();
   },
 
+  // A sync round that found the file as this device last synced it and nothing to send:
+  // only the sync state changes (no merge, no save of every item).
+  markSynced(counterAtStart, metaPatch = {}) {
+    meta = { ...meta, ...metaPatch, lastSyncAt: nowIso(), dirty: changeCounter !== counterAtStart };
+    kvSet(META_KEY, meta).catch((err) => console.error('Saving sync state failed', err));
+  },
+
   markUnsynced() {
     meta = { ...meta, dirty: true, sha: null };
     save();

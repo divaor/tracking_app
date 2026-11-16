@@ -130,7 +130,16 @@ async function run() {
       localItems: store.all(),
       localProjects: store.allProjects(),
       device: settings.device || 'unknown device',
+      // Nothing changed here since the last round: the file is downloaded only if it moved.
+      knownSha: store.meta.dirty ? '' : (store.meta.sha ?? ''),
     });
+    if (result.unchanged) {
+      store.markSynced(counter, { sha: result.sha });
+      const at = new Date().toISOString();
+      set({ phase: 'idle', error: null, lastSyncAt: at });
+      for (const fn of syncedListeners) fn();
+      return;
+    }
     const before = store.all();
     // The first download on a device is not news; later changes are.
     const firstSync = !store.meta.lastSyncAt;

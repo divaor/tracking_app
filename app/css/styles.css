@@ -5408,6 +5408,16 @@ button.rb-tick:disabled { opacity: 0.6; cursor: progress; }
 .rb-done-btn:hover:not(:disabled) { border-color: var(--st-done); color: var(--st-done); }
 .rb-done-btn.on { color: var(--st-done); background: color-mix(in srgb, var(--st-done) 13%, transparent); border: 1px solid color-mix(in srgb, var(--st-done) 30%, transparent); }
 .rb-done-btn:disabled { opacity: 0.6; cursor: progress; }
+/* A tick shown at once while it is written (2.7.1): checked, with a ring turning round it. */
+.rb-check.on { background: var(--st-done); border-color: var(--st-done); color: #fff; }
+.rb-tick.saving, .rb-check.saving { position: relative; cursor: progress; }
+.rb-tick.saving::after, .rb-check.saving::after {
+  content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid transparent;
+  border-top-color: var(--st-done); border-right-color: var(--st-done); animation: spin 0.9s linear infinite;
+}
+.rb-done-btn.saving { cursor: progress; }
+.rb-done-btn.saving svg { animation: spin 0.9s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .rb-tick.saving::after, .rb-check.saving::after, .rb-done-btn.saving svg { animation-duration: 2.4s; } }
 
 .rb-comments { margin-top: 16px; }
 .rb-comments.compact { margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 6px; }

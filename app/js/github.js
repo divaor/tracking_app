@@ -144,8 +144,10 @@ export function createGitHubClient({
       return blob.encoding === 'base64' ? base64ToBytes(blob.content ?? '') : new TextEncoder().encode(blob.content ?? '');
     },
 
-    // Returns { sha, text } or null when the file (or branch) does not exist.
-    async getFile(filePath, ref) {
+    // Returns { sha, text } or null when the file (or branch) does not exist. `unlessSha`: the
+    // version already known here; when the file is still that one, { sha, unchanged: true } comes
+    // back without its text (a file over 1 MB is not downloaded at all).
+    async getFile(filePath, ref, { unlessSha = '' } = {}) {
       let data;
       try {
         data = await request('GET', `${repoPath}/contents/${encodePath(filePath)}`, { query: { ref } });
@@ -156,6 +158,7 @@ export function createGitHubClient({
       if (Array.isArray(data) || data?.type !== 'file') {
         throw new GitHubError(`“${filePath}” in ${owner}/${repo} is a folder, not a file. Choose a file path such as tracker.json.`, 400);
       }
+      if (unlessSha && data.sha === unlessSha) return { sha: data.sha, text: null, unchanged: true };
       let content = data.content;
       if (!content && data.size > 0) {
         // Files over 1 MB come back without inline content; the blob API has them.

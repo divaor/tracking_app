@@ -129,13 +129,25 @@ export async function importBoardFile(text, project) {
  * `create`: a project's name, when a board that is not there yet may be started (`change(null)`).
  * `onWrite(before, after)` is told the versions written (the assistant keeps them for Undo).
  */
+/** A board file's version there now (from its folder's listing), or null when it is not listed. */
+async function currentSha(client, branch, path) {
+  const listed = await client.listDir(BOARDS_DIR, branch || undefined).catch(() => null);
+  return listed?.find((e) => e.path === path)?.sha ?? null;
+}
+
 export async function changeBoard(slug, change, what, { create = '', onWrite } = {}) {
   const { client, branch } = await dataClient();
   const device = getSettings().device || 'this device';
   const path = `${BOARDS_DIR}/${slug}.json`;
   for (let attempt = 0; attempt < 4; attempt++) {
-    const file = await client.getFile(path, branch || undefined);
-    const there = file ? parseBoard(file.text) : null;
+    // From the board as read here while it is still the version there (the folder's listing,
+    // a few hundred bytes, says): no download of the whole board before a one-word change (until
+    // 2.7.1 every tick downloaded and uploaded it whole). Changed elsewhere: read it first, so
+    // a refused write never sends it in vain; a write refused all the same (409/422) reads again.
+    const kept = attempt === 0 ? boards.get(slug) : null;
+    const current = kept?.sha && kept.board ? await currentSha(client, branch, path) : null;
+    const file = current && current === kept.sha ? { sha: kept.sha, cached: true } : await client.getFile(path, branch || undefined);
+    const there = file?.cached ? structuredClone(kept.board) : file ? parseBoard(file.text) : null;
     if (!there && (file || !create)) throw new Error(file ? `${path} cannot be read, so it was left as it is.` : 'That board is not in your data any more.');
     const board = change(there, { at: nowIso(), by: device });
     try {

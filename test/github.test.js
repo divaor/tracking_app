@@ -88,3 +88,15 @@ test('ensureBranch explains empty repositories', async () => {
   const client = createGitHubClient({ token: 't', owner: 'me', repo: 'data', fetchImpl });
   await assert.rejects(client.ensureBranch('tracker'), /repository is empty/);
 });
+
+test('getFile with the version known here: a file still at it is not downloaded (2.7.1)', async () => {
+  const { fetchImpl, calls } = mockFetch({
+    'GET /repos/me/data/contents/big.json': () => [200, { type: 'file', sha: 'big', size: 2_000_000, content: '', encoding: 'none' }],
+    'GET /repos/me/data/git/blobs/big': () => [200, { content: encodeBase64('{"items":[]}'), encoding: 'base64' }],
+  });
+  const client = createGitHubClient({ token: 't', owner: 'me', repo: 'data', fetchImpl });
+  assert.deepEqual(await client.getFile('big.json', 'main', { unlessSha: 'big' }), { sha: 'big', text: null, unchanged: true });
+  assert.equal(calls.filter((c) => c.pathname.includes('/git/blobs/')).length, 0, 'the 4 MB blob is not fetched');
+  // Another version there: read as usual.
+  assert.equal((await client.getFile('big.json', 'main', { unlessSha: 'older' })).text, '{"items":[]}');
+});
