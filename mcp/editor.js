@@ -11,6 +11,8 @@ export const EDITOR_INDEX = `${EDITOR_DIR}/index.json`;
 const FILES_DIR = `${EDITOR_DIR}/files`;
 // Files the editor encrypts end to end start with this line; the connector cannot read them.
 export const ENCRYPTED_MARK = 'TRACKER-EDITOR-ENCRYPTED v1';
+// A file locked with a password of its own in Tinta (its locked.js): ciphertext too, never read or written here.
+export const LOCKED_MARK = 'TINTA-LOCKED v1';
 const SEARCH_FILES = 60; // files read per search, most recently changed first
 const SEARCH_MAX_BYTES = 300 * 1024;
 const SEARCH_MAX_MATCHES = 40;
@@ -47,9 +49,12 @@ export function serializeEditorIndex(files, extra = {}) {
   return `${JSON.stringify({ app: 'tracker-editor', schema: 1, updatedAt, ...rest, files: sorted }, null, 2)}\n`;
 }
 
-const isEncrypted = (record, content = '') => Boolean(record.encrypted) || content.startsWith(ENCRYPTED_MARK);
-const encryptedMessage = (record) =>
-  `“${record.name}” is end-to-end encrypted. Only the Tinta app can read it, with the user's passphrase; open it there.`;
+const isLockedText = (content = '') => String(content).startsWith(LOCKED_MARK);
+const isEncrypted = (record, content = '') => Boolean(record.encrypted) || String(content).startsWith(ENCRYPTED_MARK) || isLockedText(content);
+const encryptedMessage = (record, content = '') =>
+  isLockedText(content)
+    ? `“${record.name}” is locked with a password of its own. Only the Tinta app can open it, with that password; open it there.`
+    : `“${record.name}” is end-to-end encrypted. Only the Tinta app can read it, with the user's passphrase; open it there.`;
 
 /**
  * `canonicalProject(name)` resolves a project name to the tracker's existing
@@ -128,7 +133,7 @@ export function createEditorFiles({ client, branch = '', device = 'Claude', edit
       if (isEncrypted(record)) return { ...summary(record), encrypted: true, message: encryptedMessage(record) };
       const file = await client.getFile(contentPath(record), ref);
       if (!file) throw notUploaded(record);
-      if (isEncrypted(record, file.text)) return { ...summary(record), encrypted: true, message: encryptedMessage(record) };
+      if (isEncrypted(record, file.text)) return { ...summary(record), encrypted: true, message: encryptedMessage(record, file.text) };
       const start = Math.min(Math.max(Number(offset) || 0, 0), file.text.length);
       const content = file.text.slice(start, start + maxReadChars);
       const end = start + content.length;
@@ -200,7 +205,7 @@ export function createEditorFiles({ client, branch = '', device = 'Claude', edit
         const at = now();
         const current = id ? resolve(index.files, id) : null;
         if (!index.sha && branch && attempt === 1) await client.ensureBranch(branch);
-        const refuse = () => new EditorError(`${encryptedMessage(current)} It was not changed.`);
+        const refuse = (text = '') => new EditorError(`${encryptedMessage(current, text)} It was not changed.`);
         if (current && isEncrypted(current)) throw refuse();
         const rename = Boolean(current && newName && newName !== current.name);
         let record;
@@ -219,7 +224,7 @@ export function createEditorFiles({ client, branch = '', device = 'Claude', edit
 
         const path = contentPath(record);
         const old = current ? await client.getFile(contentPath(current), ref) : null;
-        if (current && old && isEncrypted(current, old.text)) throw refuse();
+        if (current && old && isEncrypted(current, old.text)) throw refuse(old.text);
         if (before === undefined) before = old ? old.text : null;
         // The text: new, changed, or moved to the renamed path.
         if (!current || hasContent || rename) {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { serializeDocument } from '../app/js/model.js';
-import { EDITOR_INDEX, ENCRYPTED_MARK } from '../mcp/editor.js';
+import { EDITOR_INDEX, ENCRYPTED_MARK, LOCKED_MARK } from '../mcp/editor.js';
 import { createServerFromEnv } from '../mcp/server.js';
 import { MAX_READ_CHARS } from '../mcp/tracker.js';
 import { createFakeGitHub } from './helpers/fake-github.js';
@@ -227,6 +227,26 @@ test('encrypted editor files are never returned or overwritten', async () => {
     assert.equal(github.read(EDITOR_INDEX), before);
   }
   assert.equal(record('flag').encrypted, true);
+});
+
+test('files locked with a password in Tinta are never returned, searched or overwritten', async () => {
+  const { github, call } = setup();
+  const locked = `${LOCKED_MARK}\n{"v":1,"kdf":"PBKDF2-SHA256","iter":600000}\nZGVwbG95IGtleXM=\n`;
+  seed(github, [{ id: 'keys', name: 'keys.md', text: locked }]);
+  const read = await call('read_editor_file', { id: 'keys' });
+  assert.equal(read.data.encrypted, true);
+  assert.equal(read.data.content, undefined);
+  assert.match(read.data.message, /locked with a password of its own.*Tinta/);
+  assert.ok(!read.text.includes('ZGVwbG95'));
+  assert.deepEqual((await call('search_editor_files', { query: 'ZGVwbG95' })).data.files, []);
+  const before = github.read(EDITOR_INDEX);
+  for (const args of [{ content: 'plain' }, { name: 'renamed.md' }, { tags: ['x'] }]) {
+    const save = await call('save_editor_file', { id: 'keys', ...args });
+    assert.equal(save.isError, true);
+    assert.match(save.text, /locked with a password.*not changed/);
+  }
+  assert.equal(github.read('editor/files/keys/keys.md'), locked);
+  assert.equal(github.read(EDITOR_INDEX), before);
 });
 
 test('deleted editor files stay deleted', async () => {

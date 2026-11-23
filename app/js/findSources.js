@@ -110,6 +110,8 @@ export function boardSources(slug, board) {
 export const EDITOR_INDEX = 'editor/index.json';
 // Files the editor encrypts end to end start with this line: never read here.
 export const ENCRYPTED_MARK = 'TRACKER-EDITOR-ENCRYPTED v1';
+// A Tinta file locked with a password of its own (Tinta's locked.js): kept apart like an encrypted one.
+export const LOCKED_MARK = 'TINTA-LOCKED v1';
 
 /** The editor's safeName (the connector's mcp/editor.js has the same): the last part of a file's path. */
 export function safeName(name, fallback = 'untitled.txt') {
@@ -139,7 +141,7 @@ export function parseEditorIndex(text) {
 }
 
 /** Whether an editor file is end-to-end encrypted (by its record, or its text's first line). */
-export const editorEncrypted = (record, text = '') => Boolean(record.encrypted) || str(text).startsWith(ENCRYPTED_MARK);
+export const editorEncrypted = (record, text = '') => Boolean(record.encrypted) || str(text).startsWith(ENCRYPTED_MARK) || str(text).startsWith(LOCKED_MARK);
 
 /** An editor file as a source (`text`: its text when read; never for an encrypted one). */
 export function editorSource(record, text = '') {

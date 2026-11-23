@@ -167,7 +167,7 @@ When you don't remember the words, ask instead (with a model on, section 9): typ
 - The model works out what to look for: the words the answer would hold (other forms and languages too), shapes like commands or SQL, projects, tags, kinds, dates. The app searches **here**: your items (titles, notes, comments, feedback, file names, links), the **text files attached to them**, your **release boards**, and **Tinta's files** when they are in the same data (synced through the same GitHub repository, or on this device). Then the model picks the best and says why for each one.
 - The list shows what it found, in that order, with the reason under each item; files on items, board records and Tinta files show above the items. A file opens on its item; a board record opens on its board; a Tinta file (marked **Tinta**) opens in the editor. **N more that match** shows the rest. The question stays as a chip above the list: **×** goes back to the list.
 - **Ask the assistant about these** hands the items found to the assistant: *tag these #docker*, *move these to next week*.
-- **What the model sees**: your project and tag names and today's date, then the names, places and matching lines of the best candidates, never whole files. **Encrypted Tinta files** are found by their names on this device and shown apart; the model never sees anything of them, not even their names, and they open in Tinta with your passphrase. **Settings → Model → Find by asking: send only names** leaves out the matching lines.
+- **What the model sees**: your project and tag names and today's date, then the names, places and matching lines of the best candidates, never whole files. **Encrypted Tinta files** (and files locked with a password there) are found by their names on this device and shown apart; the model never sees anything of them, not even their names, and they open in Tinta with your passphrase. **Settings → Model → Find by asking: send only names** leaves out the matching lines.
 - Plain words still search as before, at once and without the model. Without a model (or with a service that answers later), searching works as before.
 
 ### Pinned items
@@ -401,7 +401,7 @@ Claude links to items as `https://divaor.github.io/tracking_app/#/item/<ID>`:
 
 Claude sees the files on an item and can look at the pictures (a screenshot of a problem, a photo of a whiteboard): ask *"look at the screenshot on the kitchen leak task"*. It cannot read PDFs or Word files through the tracker.
 
-Claude only deletes items when you explicitly ask. It never reads or changes files you encrypted in Tinta. Every change it makes is a commit in your data repo, so anything can be undone from the repo history.
+Claude only deletes items when you explicitly ask. It never reads or changes files you encrypted or locked with a password in Tinta. Every change it makes is a commit in your data repo, so anything can be undone from the repo history.
 
 ## 12. Tinta, the editor
 

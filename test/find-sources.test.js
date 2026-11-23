@@ -82,6 +82,7 @@ test('Tracker Editor files: the index, their paths, encrypted ones by name only'
   assert.equal(parseEditorIndex('{oops'), null);
   assert.equal(parseEditorIndex('{"files": 3}'), null);
   assert.equal(editorEncrypted({ name: 'x' }, `${ENCRYPTED_MARK}\nAAAA`), true);
+  assert.equal(editorEncrypted({ name: 'x' }, 'TINTA-LOCKED v1\n{"v":1}\nAAAA\n'), true, 'locked with a password in Tinta: by name only too');
   const plain = editorSource({ id: 'a', name: 'docker.md', project: 'Deep Time', tags: ['docker'], modifiedAt: '2026-10-30T10:00:00Z' }, 'docker compose up -d');
   assert.deepEqual([plain.id, plain.kind, plain.from, plain.place, plain.text, plain.encrypted, plain.untitled], ['e:a', 'editor', 'editor', 'Tinta · Deep Time', 'docker compose up -d', false, false]);
   const secret = editorSource({ id: 'c', name: 'keys.md', encrypted: true }, 'the password is hunter2');
