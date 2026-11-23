@@ -21,7 +21,7 @@ try {
   requestPersistence();
 } catch (err) {
   console.error(err);
-  root.textContent = `Tracker could not start: ${err?.message ?? err}`;
+  root.textContent = `Rumbo could not start: ${err?.message ?? err}`;
   root.className = 'fatal';
 }
 

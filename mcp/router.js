@@ -47,7 +47,7 @@ export function createHttpHandler({ handle, config, notifier = null, oauthStore 
     const secret = config.secret;
 
     if (request.method === 'OPTIONS' && !path.startsWith('/mcp')) return new Response(null, { status: 204, headers: CORS });
-    if (path === '/' && request.method === 'GET') return plain('Tracker MCP connector. Add this address + /mcp to Claude as a custom connector.\n', 200);
+    if (path === '/' && request.method === 'GET') return plain('Rumbo MCP connector. Add this address + /mcp to Claude as a custom connector.\n', 200);
     if (!secret || secret.length < 16) return plain('MCP_SECRET is not configured (use at least 16 characters).\n', 500);
 
     if (path.startsWith(UPLOAD_PATH)) return upload(request, path.slice(UPLOAD_PATH.length));

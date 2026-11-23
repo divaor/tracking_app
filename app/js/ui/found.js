@@ -17,11 +17,11 @@ function OtherRow({ r, actions }) {
   const reason = reasonOf(r);
   const body = html`<${Icon} name=${KIND_ICON[r.kind] ?? 'doc'} size=${16} />
     <span class="found-main">
-      <span class="found-name">${r.name || '(no name)'}${r.from === 'editor' && html`<span class="found-from" title="A file of Tracker Editor: it opens there">Tracker Editor</span>`}</span>
+      <span class="found-name">${r.name || '(no name)'}${r.from === 'editor' && html`<span class="found-from" title="A file of Tinta: it opens there">Tinta</span>`}</span>
       <span class="found-place muted small">${r.place}</span>
       ${reason && html`<span class="found-why small">${reason}</span>`}
     </span>`;
-  if (r.kind === 'editor') return html`<${EditorLink} route=${{ kind: 'file', id: r.editorId }} className="found-row kind-editor" title="Open it in Tracker Editor">${body}</${EditorLink}>`;
+  if (r.kind === 'editor') return html`<${EditorLink} route=${{ kind: 'file', id: r.editorId }} className="found-row kind-editor" title="Open it in Tinta">${body}</${EditorLink}>`;
   const open = () => (r.kind === 'file' ? actions.openFile(r.itemId, r.path) : (location.hash = r.href));
   return html`<button type="button" class=${`found-row kind-${r.kind}`} onClick=${open}>${body}</button>`;
 }
@@ -67,8 +67,8 @@ export function FoundView({ found, itemsById, actions, today, canAssist }) {
     <${Results} list=${results} itemsById=${itemsById} actions=${actions} today=${today} />
     ${encrypted.length > 0 &&
     html`<section class="found-locked">
-      <h3><${Icon} name="eye" size=${15} />Encrypted in Tracker Editor <span class="muted small">${encrypted.length}</span></h3>
-      <p class="muted small">Found by their names only: what they hold is never read here or sent to the model. They open in Tracker Editor, with your passphrase.</p>
+      <h3><${Icon} name="eye" size=${15} />Encrypted in Tinta <span class="muted small">${encrypted.length}</span></h3>
+      <p class="muted small">Found by their names only: what they hold is never read here or sent to the model. They open in Tinta, with your passphrase.</p>
       <div class="found-others">${encrypted.map((r) => html`<${OtherRow} key=${r.id} r=${{ ...r, why: '' }} actions=${actions} />`)}</div>
     </section>`}
     ${found.more?.length > 0 &&

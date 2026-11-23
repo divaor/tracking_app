@@ -1,6 +1,8 @@
-# Tracker — notes for Claude
+# Rumbo (formerly Tracker) — notes for Claude
 
 Personal tracker for tasks, ideas, Claude work and documents. Electron on desktop, PWA on mobile, synced via one JSON file in a GitHub repo.
+
+- The app is called **Rumbo** since 2.8 (Tracker before); Tracker Editor is **Tinta**. Only shown names changed (titles, manifest, `productName`, the Android label, the APK and installer names, user-visible text, the connector's wording). Keep everything else: `appId`/`applicationId` `com.divaor.tracker`, `tracker-app://`, the manifest id, the Pages and repo addresses, `tracker.json`, the `Tracker data` folder and its pointer, kv keys and secret names, AppLog's tag, and the `Tracker: …` commit messages (CommitNote.java and the editor read them). Electron's userData stays `<appData>/Tracker` (`app.setPath` at the top of main.cjs): changing `productName` would otherwise move it and lose the settings and the page's storage. In these notes "the tracker" and "Tracker Editor" still name the two apps.
 
 ## Commands
 

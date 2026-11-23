@@ -44,7 +44,7 @@ test('the repo over the folder: two apps writing at once both land; a README exp
   const paths = (await tracker.listTree()).map((e) => e.path);
   assert.equal(paths.length, 13);
   assert.equal((await editor.getFile('files/3/b.md')).text, 't3');
-  assert.ok(readFileSync(path.join(dir, 'README.txt'), 'utf8').includes('Tracker and Tracker Editor'));
+  assert.ok(readFileSync(path.join(dir, 'README.txt'), 'utf8').includes('Rumbo and Tinta'));
   assert.ok(!existsSync(path.join(dir, '.lock')), 'the lock is let go');
   const store = createLocalStore(dir);
   assert.ok((await store.list('blob/')).length >= 13);

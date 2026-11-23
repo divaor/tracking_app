@@ -49,7 +49,7 @@ export function serializeEditorIndex(files, extra = {}) {
 
 const isEncrypted = (record, content = '') => Boolean(record.encrypted) || content.startsWith(ENCRYPTED_MARK);
 const encryptedMessage = (record) =>
-  `“${record.name}” is end-to-end encrypted. Only the Tracker Editor app can read it, with the user's passphrase; open it there.`;
+  `“${record.name}” is end-to-end encrypted. Only the Tinta app can read it, with the user's passphrase; open it there.`;
 
 /**
  * `canonicalProject(name)` resolves a project name to the tracker's existing

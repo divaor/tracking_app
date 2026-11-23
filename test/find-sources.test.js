@@ -37,11 +37,11 @@ test('items as sources: what a person remembers them by', () => {
   assert.equal(s.id, `i:${leak.id}`);
   assert.equal(s.kind, 'item');
   assert.equal(s.name, 'Fix the leak');
-  assert.equal(s.place, 'Tracker · Kitchen');
+  assert.equal(s.place, 'Rumbo · Kitchen');
   assert.deepEqual([s.type, s.status, s.project, s.tags], ['task', 'pending', 'Kitchen', ['home']]);
   assert.match(s.text, /^Fix the leak\nUnder the sink\nMe: Called the plumber\nFiles: plan\.md, photo\.jpg\nhttps:\/\/example\.com\/pipe$/);
   assert.match(itemSource(proposal).text, /Feedback: Looks good/);
-  assert.equal(itemSource({ ...proposal, project: '' }).place, 'Tracker');
+  assert.equal(itemSource({ ...proposal, project: '' }).place, 'Rumbo');
 });
 
 test('text files on items: pictures and deleted items left out', () => {
@@ -83,7 +83,7 @@ test('Tracker Editor files: the index, their paths, encrypted ones by name only'
   assert.equal(parseEditorIndex('{"files": 3}'), null);
   assert.equal(editorEncrypted({ name: 'x' }, `${ENCRYPTED_MARK}\nAAAA`), true);
   const plain = editorSource({ id: 'a', name: 'docker.md', project: 'Deep Time', tags: ['docker'], modifiedAt: '2026-10-30T10:00:00Z' }, 'docker compose up -d');
-  assert.deepEqual([plain.id, plain.kind, plain.from, plain.place, plain.text, plain.encrypted, plain.untitled], ['e:a', 'editor', 'editor', 'Tracker Editor · Deep Time', 'docker compose up -d', false, false]);
+  assert.deepEqual([plain.id, plain.kind, plain.from, plain.place, plain.text, plain.encrypted, plain.untitled], ['e:a', 'editor', 'editor', 'Tinta · Deep Time', 'docker compose up -d', false, false]);
   const secret = editorSource({ id: 'c', name: 'keys.md', encrypted: true }, 'the password is hunter2');
   assert.deepEqual([secret.text, secret.encrypted], ['', true], 'never its text');
   assert.equal(editorSource({ id: 'd', name: 'new 3' }).untitled, true);
@@ -95,7 +95,7 @@ test('the picture for the plan: the kinds there are, items’ and the editor’s
   assert.deepEqual(picture.kinds.map((k) => k.id), ['item', 'file', 'editor']);
   assert.deepEqual(picture.tags, ['home', 'docker']);
   assert.deepEqual(picture.types.map((t) => t.id), ['task', 'idea', 'claude', 'doc']);
-  assert.match(picture.about, /Tracker Editor/);
+  assert.match(picture.about, /Tinta/);
   assert.doesNotMatch(JSON.stringify(picture), /secret name/, 'never the editor files’ names');
 });
 

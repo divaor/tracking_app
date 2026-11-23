@@ -104,7 +104,7 @@ export function ItemMeta({ item, today, maxTags = 6 }) {
   }
   if (item.url) {
     const inEditor = parseEditorLink(item.url, getSettings().editorUrl);
-    parts.push(html`<span class="meta" title=${inEditor ? 'Opens in Tracker Editor' : item.url}><${Icon} name=${inEditor ? 'code' : 'link'} size=${13} /></span>`);
+    parts.push(html`<span class="meta" title=${inEditor ? 'Opens in Tinta' : item.url}><${Icon} name=${inEditor ? 'code' : 'link'} size=${13} /></span>`);
   }
   for (const tag of item.tags.slice(0, maxTags)) parts.push(html`<span class="tag">#${tag}</span>`);
   if (item.tags.length > maxTags) parts.push(html`<span class="tag">+${item.tags.length - maxTags}</span>`);

@@ -32,4 +32,4 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end('Not found');
   }
-}).listen(port, host, () => console.log(`Tracker web app: http://${host}:${port}`));
+}).listen(port, host, () => console.log(`Rumbo web app: http://${host}:${port}`));

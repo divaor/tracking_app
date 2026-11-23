@@ -13,8 +13,9 @@ const LOCK_STALE_MS = 10000;
 const LOCK_WAIT_MS = 10000;
 const POINTER = 'Tracker data.json';
 
-const README = `This folder holds the data of Tracker and Tracker Editor on this computer
-(their items, projects, files and history). Both apps read and write it.
+const README = `This folder holds the data of Rumbo and Tinta (named Tracker and Tracker Editor
+before) on this computer: their items, projects, files and history. Both apps
+read and write it.
 
 Copy the whole folder to keep a backup. Don't change files in it by hand.
 `;

@@ -30,4 +30,4 @@ createServer(async (req, res) => {
     console.error(err);
     res.writeHead(500).end();
   }
-}).listen(port, host, () => console.log(`Tracker MCP server on http://${host}:${port}/mcp`));
+}).listen(port, host, () => console.log(`Rumbo MCP server on http://${host}:${port}/mcp`));

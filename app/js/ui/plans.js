@@ -176,7 +176,7 @@ export function PlanCard({ items, today }) {
         ? html`<${PlanMeta} entry=${entry} items=${items} today=${today} /><${PlanBody} entry=${entry} />`
         : html`<p class="muted small">${kind === 'day' ? 'The model suggests what to do first today, from your open items. It is kept: every device sees it, and you can update it as the day goes.' : 'The model reviews what got done this week and what is stuck. It is kept with the day, to look back on.'}</p>`}
     ${writing?.kind === kind && writing.status === 'error' && html`<p class="notice error"><${Icon} name="alert" size=${15} /><span>${writing.error}</span></p>`}
-    ${!modelReady() && entry && html`<p class="muted small">Connect a model in Settings to update it here, or ask Claude to (with the Tracker connector).</p>`}
+    ${!modelReady() && entry && html`<p class="muted small">Connect a model in Settings to update it here, or ask Claude to (with the Rumbo connector).</p>`}
   </section>`;
 }
 

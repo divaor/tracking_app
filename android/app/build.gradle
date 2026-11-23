@@ -48,7 +48,7 @@ android {
     }
     // Tracker-2.0.0.apk
     applicationVariants.all { variant ->
-        variant.outputs.all { outputFileName = "Tracker-${appVersion}${variant.buildType.name == 'release' ? '' : '-' + variant.buildType.name}.apk" }
+        variant.outputs.all { outputFileName = "Rumbo-${appVersion}${variant.buildType.name == 'release' ? '' : '-' + variant.buildType.name}.apk" }
     }
 }
 

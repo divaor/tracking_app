@@ -118,7 +118,7 @@ export function createOAuth({ secret, issuer, redirectHosts = [], store = null }
   }
 
   function protectedResourceMetadata() {
-    return json({ resource, authorization_servers: [issuer], scopes_supported: [SCOPE], bearer_methods_supported: ['header'], resource_name: 'Tracker' });
+    return json({ resource, authorization_servers: [issuer], scopes_supported: [SCOPE], bearer_methods_supported: ['header'], resource_name: 'Rumbo' });
   }
 
   function serverMetadata() {
@@ -191,7 +191,7 @@ export function createOAuth({ secret, issuer, redirectHosts = [], store = null }
 
   function page(title, inner, status = 200, formAction = "form-action 'self'") {
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(title)} · Tracker</title><style>
+<title>${escapeHtml(title)} · Rumbo</title><style>
 :root{color-scheme:light dark;--bg:#f6f5f1;--card:#fff;--text:#1d1c19;--muted:#6b675f;--border:#e2dfd7;--accent:#4f46e5}
 @media (prefers-color-scheme:dark){:root{--bg:#181816;--card:#22211e;--text:#ece9e2;--muted:#a9a49a;--border:#36342f;--accent:#8b85f5}}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -201,7 +201,7 @@ label{display:block;margin:16px 0 6px;font-weight:600}input{width:100%;padding:1
 .row{display:flex;gap:10px;margin-top:18px}button{flex:1;padding:10px 14px;border-radius:9px;border:1px solid var(--border);background:transparent;color:inherit;font:inherit;font-weight:600;cursor:pointer}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff}.error{color:#c23b3b;font-weight:600}.brand{display:flex;gap:10px;align-items:center;margin-bottom:16px;font-weight:700}
 .dot{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#4338ca)}</style></head>
-<body><main><div class="brand"><span class="dot"></span>Tracker</div><h1>${escapeHtml(title)}</h1>${inner}</main></body></html>`;
+<body><main><div class="brand"><span class="dot"></span>Rumbo</div><h1>${escapeHtml(title)}</h1>${inner}</main></body></html>`;
     return new Response(html, {
       status,
       headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Content-Security-Policy': `default-src 'none'; style-src 'unsafe-inline'; ${formAction ? `${formAction}; ` : ''}frame-ancestors 'none'` },

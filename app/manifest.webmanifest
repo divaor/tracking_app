@@ -1,6 +1,6 @@
 {
-  "name": "Tracker",
-  "short_name": "Tracker",
+  "name": "Rumbo",
+  "short_name": "Rumbo",
   "description": "Tasks, ideas, Claude work and documents to read — synced through GitHub.",
   "id": "./",
   "start_url": "./",

@@ -56,7 +56,7 @@ export function ModelCard({ actions }) {
     ${connection === 'async' ? html`<${AsyncModelForm} actions=${actions} />` : connection === 'api' ? html`<${ApiModelForm} actions=${actions} />` : html`<${OpenAiModelForm} actions=${actions} />`}
     <label class="field checkbox span-2">
       <input type="checkbox" checked=${Boolean(settings.findNamesOnly)} onChange=${(e) => saveSettings({ findNamesOnly: e.currentTarget.checked })} />
-      <span>Find by asking: send only names<small>A question in the search box goes to your model twice: to work out what to look for, then to pick the best. With this on, the second time it sees only the names and places of what was found, not the lines that matched. Encrypted Tracker Editor files never go, not even their names.</small></span>
+      <span>Find by asking: send only names<small>A question in the search box goes to your model twice: to work out what to look for, then to pick the best. With this on, the second time it sees only the names and places of what was found, not the lines that matched. Encrypted Tinta files never go, not even their names.</small></span>
     </label>
     <label class="field checkbox span-2">
       <input type="checkbox" checked=${Boolean(settings.planAuto)} onChange=${(e) => saveSettings({ planAuto: e.currentTarget.checked })} />
@@ -110,7 +110,7 @@ function OpenAiModelForm({ actions }) {
   };
   const options = [...new Set([form.chatModel, ...(models ?? [])].filter(Boolean))];
   return html`
-    <p class="muted">A model running on this computer: nothing leaves your machine. Works with <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a>, <a href="https://lmstudio.ai" target="_blank" rel="noopener">LM Studio</a> and other servers with an OpenAI-compatible API. Tracker Editor can use the same one.</p>
+    <p class="muted">A model running on this computer: nothing leaves your machine. Works with <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a>, <a href="https://lmstudio.ai" target="_blank" rel="noopener">LM Studio</a> and other servers with an OpenAI-compatible API. Tinta can use the same one.</p>
     ${!window.desktop && html`<p class="notice"><${Icon} name="alert" size=${15} />In a browser this only reaches the model if the server allows this site. The desktop app needs no extra setup.</p>`}
     <div class="field-grid">
       <div class="field span-2"><span>Server</span>
@@ -220,7 +220,7 @@ function ApiModelForm({ actions }) {
     </div>
     ${claude &&
     html`<details class="help"><summary>Claude: an API key, not your Claude subscription</summary>
-      <p>The Claude API is paid per use with a key from the <a href="https://platform.claude.com/" target="_blank" rel="noopener">Claude Console</a>. A Claude Pro or Max subscription cannot be connected here: Anthropic allows its sign-in only in its own apps. To use your subscription with the tracker, add the Tracker connector in the Claude app (Settings → Connectors): Claude can then read, add and update your items from its own app, on your phone too.</p>
+      <p>The Claude API is paid per use with a key from the <a href="https://platform.claude.com/" target="_blank" rel="noopener">Claude Console</a>. A Claude Pro or Max subscription cannot be connected here: Anthropic allows its sign-in only in its own apps. To use your subscription with the tracker, add the Rumbo connector in the Claude app (Settings → Connectors): Claude can then read, add and update your items from its own app, on your phone too.</p>
     </details>`}`;
 }
 
@@ -270,7 +270,7 @@ function AsyncModelForm({ actions }) {
     saveSettings({ llm: { enabled: true, provider: 'async', profile: profileText, chatModel: model || 'default', webhook: hook } });
     actions.toast('Model service saved and turned on.');
   };
-  return html`<p class="muted">For a model service that answers later: a request gives back a task id, and the answer comes from a status address, or by webhook to this computer. Describe the service in a connection profile (the same as in Tracker Editor); the API key is stored ${window.desktop ? 'in this computer’s keychain' : 'in this browser'}, not in the profile.</p>
+  return html`<p class="muted">For a model service that answers later: a request gives back a task id, and the answer comes from a status address, or by webhook to this computer. Describe the service in a connection profile (the same as in Tinta); the API key is stored ${window.desktop ? 'in this computer’s keychain' : 'in this browser'}, not in the profile.</p>
     ${!window.desktop && html`<p class="notice"><${Icon} name="alert" size=${15} />In a browser the service must allow requests from this page (CORS), and webhooks are not available. The desktop app needs neither.</p>`}
     <div class="field-grid">
       <label class="field span-2"><span>Connection profile (JSON)</span>
@@ -285,7 +285,7 @@ function AsyncModelForm({ actions }) {
       ${window.desktop?.webhook &&
       html`<${Check} checked=${hook.enabled} label="Receive answers by webhook" hint="The service calls this computer when a task ends; the app still checks the status now and then" onChange=${(v) => setHookField({ enabled: v })} />
         ${hook.enabled &&
-        html`<${Field} label="Port" hint="Not the same port as Tracker Editor's"><input type="number" min="1024" max="65535" value=${hook.port} onInput=${(e) => setHookField({ port: Number(e.currentTarget.value) })} /></${Field}>
+        html`<${Field} label="Port" hint="Not the same port as Tinta's"><input type="number" min="1024" max="65535" value=${hook.port} onInput=${(e) => setHookField({ port: Number(e.currentTarget.value) })} /></${Field}>
           <${Field} label="Path"><input value=${hook.path} onInput=${(e) => setHookField({ path: e.currentTarget.value })} spellcheck=${false} /></${Field}>
           <${Field} label="Address the service calls" wide hint=${`Fills {{webhook_url}}, e.g. http://my-pc.example.com:${hook.port}${hook.path}`}><input value=${hook.publicUrl} onInput=${(e) => setHookField({ publicUrl: e.currentTarget.value.trim() })} spellcheck=${false} /></${Field}>
           <${Field} label="Webhook secret" wide hint=${saved.secret ? 'Saved. Events must be signed with it (HMAC-SHA256).' : 'Strongly advised: without it, anything on your network could send answers.'}><input type="password" value=${hookSecret} onInput=${(e) => setHookSecret(e.currentTarget.value)} placeholder=${saved.secret ? '••••••••' : ''} autocomplete="off" /></${Field}>`}`}
@@ -300,7 +300,7 @@ function AsyncModelForm({ actions }) {
       <ul>
         <li><code>submit</code>: the address, method and JSON body that send a question, and <code>taskId</code>, where the task id is in the answer.</li>
         <li><code>status</code>: how to ask how the task is going; <code>state</code>, <code>answer</code> and <code>error</code> say where those are, <code>done</code> and <code>failed</code> list the states that end it.</li>
-        <li>Placeholders: ${PLACEHOLDERS.map((p, i) => html`${i ? ', ' : ''}<code>{{${p}}}</code>`)}. Tracker Editor's README describes every field.</li>
+        <li>Placeholders: ${PLACEHOLDERS.map((p, i) => html`${i ? ', ' : ''}<code>{{${p}}}</code>`)}. Tinta's README describes every field.</li>
       </ul>
     </details>`;
 }
@@ -346,7 +346,7 @@ export function QuickAddCard() {
     </div>
     ${capture &&
     html`<h3 class="settings-sub">From anywhere on this computer</h3>
-      <p class="muted small">A shortcut that works in any app opens a small window to add a task or an idea. It keeps working with the window closed while Tracker runs in the tray.</p>
+      <p class="muted small">A shortcut that works in any app opens a small window to add a task or an idea. It keeps working with the window closed while Rumbo runs in the tray.</p>
       <div class="field-grid">
         <${Check} checked=${capture.enabled} label="Quick add shortcut" onChange=${(v) => setPrefs({ enabled: v })} />
         <${Field} label="Shortcut">

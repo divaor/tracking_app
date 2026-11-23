@@ -1,11 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Tracker</string>
-    <string name="title_activity_main">Tracker</string>
+    <string name="app_name">Rumbo</string>
+    <string name="title_activity_main">Rumbo</string>
     <string name="package_name">com.divaor.tracker</string>
     <string name="custom_url_scheme">com.divaor.tracker</string>
-    <string name="share_label">Tracker</string>
-    <string name="process_text_label">Add to Tracker</string>
+    <string name="share_label">Rumbo</string>
+    <string name="process_text_label">Add to Rumbo</string>
     <string name="shortcut_new">Quick add</string>
     <string name="shortcut_voice">Voice note</string>
     <string name="shortcut_log">Send a log</string>

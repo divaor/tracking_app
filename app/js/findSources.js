@@ -14,7 +14,7 @@ export const FIND_KINDS = [
   { id: 'item', label: 'items: tasks, ideas, Claude work and documents to read' },
   { id: 'file', label: 'text files attached to items' },
   { id: 'board', label: 'release board records: releases, features, tests, decisions, steps waiting on the person' },
-  { id: 'editor', label: 'Tracker Editor files: notes, snippets and drafts' },
+  { id: 'editor', label: 'Tinta files: notes, snippets and drafts' },
 ];
 export const FIND_TYPES = TYPES.map((t) => ({ id: t.id, label: t.plural.toLowerCase() }));
 
@@ -30,7 +30,7 @@ export function itemSource(item) {
     id: `i:${item.id}`,
     kind: 'item',
     name: item.title || 'Untitled',
-    place: item.project ? `Tracker · ${item.project}` : 'Tracker',
+    place: item.project ? `Rumbo · ${item.project}` : 'Rumbo',
     project: item.project,
     tags: item.tags,
     type: item.type,
@@ -149,7 +149,7 @@ export function editorSource(record, text = '') {
     kind: 'editor',
     from: 'editor',
     name: record.name,
-    place: record.project ? `Tracker Editor · ${record.project}` : 'Tracker Editor',
+    place: record.project ? `Tinta · ${record.project}` : 'Tinta',
     project: str(record.project),
     tags: Array.isArray(record.tags) ? record.tags : [],
     date: record.modifiedAt || record.updatedAt || '',
@@ -177,7 +177,7 @@ export function findPicture({ today, items, projects, boards = [], files = 0, ed
     tags: [...tags.values()],
     kinds: FIND_KINDS.filter((k) => have[k.id]),
     types: FIND_TYPES,
-    about: `a personal tracker of tasks, ideas, Claude work and documents to read${have.board ? ', with release boards' : ''}${have.editor ? ', and the files of Tracker Editor, the person’s text editor' : ''}`,
+    about: `a personal tracker of tasks, ideas, Claude work and documents to read${have.board ? ', with release boards' : ''}${have.editor ? ', and the files of Tinta, the person’s text editor' : ''}`,
   };
 }
 

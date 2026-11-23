@@ -9,9 +9,9 @@ import { MAX_PLAN_DAYS } from './tracker.js';
 import { UPLOAD_MINUTES } from './uploads.js';
 import { AREAS, DECISIONS, KINDS, PRIORITIES, STATUSES, TYPE_IDS, safeFileName } from '../app/js/model.js';
 
-export const SERVER_INFO = { name: 'tracker', title: 'Tracker', version: APP_VERSION };
+export const SERVER_INFO = { name: 'tracker', title: 'Rumbo', version: APP_VERSION };
 
-export const INSTRUCTIONS = `Tracker is the user's personal tracker for tasks, ideas, Claude work and documents, used in the Tracker app on their computers and phone. Every write is a commit to a private GitHub repo.
+export const INSTRUCTIONS = `Rumbo (formerly Tracker) is the user's personal tracker for tasks, ideas, Claude work and documents, used in its app on their computers and phone. Every write is a commit to a private GitHub repo.
 
 Model
 - Item types: task, idea, claude (Claude work: Claude Code sessions, PRs, chats, artifacts), doc (things for the user to read or review).
@@ -38,11 +38,11 @@ Projects and tags
 - Call list_projects before your first write to reuse the exact project and tag spellings. A new project: save_project (area work or personal; ask if unclear). New tags are created by using them.
 - Without such an instruction, set project only when it is obvious (a project named after the repo).
 
-Tracker Editor files
-- The user's text editor (Tracker Editor) keeps notes, snippets and drafts in the same repo. Not tracker items: use the *_editor_file(s) tools.
+Tinta files
+- The user's text editor, Tinta (formerly Tracker Editor), keeps notes, snippets and drafts in the same repo. Not tracker items: use the *_editor_file(s) tools.
 - "Save this to my editor" → save_editor_file with a name with extension (notes.md, query.sql…) and the COMPLETE text; project and tags as for items.
 - "Find X in my editor files", "what did I paste about Y" → search_editor_files, then read_editor_file. To change one, read it, then save_editor_file with its id and the full new text.
-- Encrypted files cannot be read or changed here; tell the user to open them in the editor.
+- Encrypted files cannot be read or changed here: they open only in Tinta.
 
 Conventions
 - Set url to the most relevant link (Claude session, PR, artifact) when you know it.
@@ -121,7 +121,7 @@ export function createTools(getTracker, { uploads = null } = {}) {
   return [
     {
       name: 'get_overview',
-      title: 'Tracker overview',
+      title: 'Rumbo overview',
       description: 'Summary of the tracker: the plan the user keeps for today (latestPlan), counts per type and status, pinned items, comments waiting for your reply (with the latest comment), items in progress, items due within 7 days, documents waiting for review, and recent review decisions with feedback.',
       inputSchema: { type: 'object', properties: {} },
       annotations: readOnly,
@@ -444,8 +444,8 @@ export function createTools(getTracker, { uploads = null } = {}) {
     },
     {
       name: 'list_editor_files',
-      title: 'List Tracker Editor files',
-      description: 'Files in Tracker Editor, the user\'s text editor (notes, snippets, drafts; not tracker items), most recently changed first: name, id, project, tags, size, when and by whom, and a link that opens it in the editor.',
+      title: 'List Tinta files',
+      description: 'Files in Tinta, the user\'s text editor (notes, snippets, drafts; not tracker items), most recently changed first: name, id, project, tags, size, when and by whom, and a link that opens it in the editor.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -460,8 +460,8 @@ export function createTools(getTracker, { uploads = null } = {}) {
     },
     {
       name: 'search_editor_files',
-      title: 'Search Tracker Editor files',
-      description: 'Search the text of the user\'s Tracker Editor files (case-insensitive), most recently changed files first. Returns matching files with line numbers and snippets; then use read_editor_file. Covers the 60 newest files and skips encrypted and very large ones; the note says when it stopped early.',
+      title: 'Search Tinta files',
+      description: 'Search the text of the user\'s Tinta files (case-insensitive), most recently changed files first. Returns matching files with line numbers and snippets; then use read_editor_file. Covers the 60 newest files and skips encrypted and very large ones; the note says when it stopped early.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -475,8 +475,8 @@ export function createTools(getTracker, { uploads = null } = {}) {
     },
     {
       name: 'read_editor_file',
-      title: 'Read a Tracker Editor file',
-      description: 'Read one Tracker Editor file by id (or its exact name). Long files come in pages: pass nextOffset from the previous result as offset. End-to-end encrypted files cannot be read here.',
+      title: 'Read a Tinta file',
+      description: 'Read one Tinta file by id (or its exact name). Long files come in pages: pass nextOffset from the previous result as offset. End-to-end encrypted files cannot be read here.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -490,8 +490,8 @@ export function createTools(getTracker, { uploads = null } = {}) {
     },
     {
       name: 'save_editor_file',
-      title: 'Save a Tracker Editor file',
-      description: 'Save text to Tracker Editor. Without id it creates a file (name and content required). With id it changes that file: content replaces its whole text; name renames it; project and tags replace its project and tags. It syncs to the editor on the user\'s devices. Encrypted files are never changed.',
+      title: 'Save a Tinta file',
+      description: 'Save text to Tinta. Without id it creates a file (name and content required). With id it changes that file: content replaces its whole text; name renames it; project and tags replace its project and tags. It syncs to the editor on the user\'s devices. Encrypted files are never changed.',
       inputSchema: {
         type: 'object',
         properties: {

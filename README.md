@@ -1,8 +1,10 @@
-# Tracker
+# Rumbo
+
+*Called Tracker until version 2.8; its editor, Tinta, was Tracker Editor. Only the names changed: app IDs, links (`tracker-app://`), the data repo and `Documents/Tracker data` stay the same.*
 
 One place for your **tasks**, **ideas**, the **Claude work** you have going, and the **documents you need to read**. Each item moves from **Pending → In progress → Done** (documents: To read → Reading → Read).
 
-It runs as an **Electron desktop app** on your computers and as an **installable web app** on your phone. A new install keeps everything **on this computer** (shared with Tracker Editor on the same computer, no account needed); turn on sync and everything goes through a JSON file in a **private GitHub repository**, copied there first so nothing is lost.
+It runs as an **Electron desktop app** on your computers and as an **installable web app** on your phone. A new install keeps everything **on this computer** (shared with Tinta on the same computer, no account needed); turn on sync and everything goes through a JSON file in a **private GitHub repository**, copied there first so nothing is lost.
 
 <img src="docs/board.png" alt="Board view on desktop" width="640"> <img src="docs/phone.png" alt="Overview on a phone in dark mode" width="180">
 
@@ -20,8 +22,8 @@ It runs as an **Electron desktop app** on your computers and as an **installable
 - **Lists**: filter by category and status, sort by priority, due date and more. Search with plain text or `#tags`.
 - **Markdown notes and documents**: paste a doc or import a `.md` file, or drop files onto the window. Checklists (`- [ ] step`) can be ticked right in the reader.
 - **Quick add**: `Write report #work !high @tomorrow` sets a tag, the priority and a due date. Pasting a link fills the Link field. On a phone, tap the microphone and say it. On the desktop, a shortcut opens a small quick add window from any app.
-- **A model of your own** (optional, as in Tracker Editor: Ollama or LM Studio on your computer, Claude or another AI provider with your own API key, or a model service that answers later): quick add understands plain language ("call Ana tomorrow about the invoice, urgent" gets its due date, priority, project and tags), each item gets **Ask the model about this** (summarize, break into steps, draft your review of a document, questions, risks, translate, or any question), the Overview can **plan your day** or **review your week**, and **the assistant** changes things when you ask in your own words (items, projects, tags, release boards), each change with Undo. See [6. Model](#6-model-optional).
-- **Tracker Editor**: the companion [text editor](https://github.com/divaor/tracker-editor) keeps many files open, synced to the same data repo with the same projects and tags. Items sent from it get **Open in editor**, and attached files get **Edit in editor**; your edits come back here. Set its address under **Settings → Tracker Editor**. The desktop app opens these links in the editor's desktop app when it is installed.
+- **A model of your own** (optional, as in Tinta: Ollama or LM Studio on your computer, Claude or another AI provider with your own API key, or a model service that answers later): quick add understands plain language ("call Ana tomorrow about the invoice, urgent" gets its due date, priority, project and tags), each item gets **Ask the model about this** (summarize, break into steps, draft your review of a document, questions, risks, translate, or any question), the Overview can **plan your day** or **review your week**, and **the assistant** changes things when you ask in your own words (items, projects, tags, release boards), each change with Undo. See [6. Model](#6-model-optional).
+- **Tinta**: the companion [text editor](https://github.com/divaor/tracker-editor) keeps many files open, synced to the same data repo with the same projects and tags. Items sent from it get **Open in editor**, and attached files get **Edit in editor**; your edits come back here. Set its address under **Settings → Tinta**. The desktop app opens these links in the editor's desktop app when it is installed.
 - **Notifications**: your phone gets a push notification when Claude sends a document to review, stores a file or changes your tasks, even when the app is closed. The desktop app shows native notifications and can keep running in the system tray.
 - **Offline first**: every device keeps a full local copy and syncs automatically when online. Every change is a commit in your data repo, so its history is also your backup.
 - **Help** (`F1` or `?`): every command and shortcut in one searchable list, where a click runs it (print it as a cheat sheet), and the full guide ([`app/help/guide.md`](app/help/guide.md)).
@@ -112,7 +114,7 @@ The connector lets Claude work with your tracker from any chat (web, desktop, ph
 
 Documents Claude sends are saved as files in your data repo, under `files/…`, and show up under **Docs**. Open one in the app to read it; HTML artifacts get a safe preview. Then **Approve**, **Request changes** or **Reject** it and leave feedback, which Claude can read back.
 
-Claude can also list, search, read and save your [Tracker Editor](https://github.com/divaor/tracker-editor) files, which live in the same repo under `editor/`. It never reads or changes files you encrypted in the editor.
+Claude can also list, search, read and save your [Tinta](https://github.com/divaor/tracker-editor) files, which live in the same repo under `editor/`. It never reads or changes files you encrypted in the editor.
 
 To set it up:
 
@@ -135,24 +137,24 @@ Full guide: **[mcp/README.md](mcp/README.md)**.
 
 ## 6. Model (optional)
 
-Connect the same kinds of model as [Tracker Editor](https://github.com/divaor/tracker-editor) in **Settings → Model**:
+Connect the same kinds of model as [Tinta](https://github.com/divaor/tracker-editor) in **Settings → Model**:
 
 - **A server on your computer** (Ollama, LM Studio or anything with an OpenAI-compatible API): press **Ollama**, then **Test and list models**, pick one and **Save and turn on**. Nothing leaves your machine. The desktop app makes the requests itself, so the server needs no setup; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS=https://divaor.github.io`).
 - **An AI provider with your own API key** (**AI provider**): **Claude**, OpenAI, Google Gemini, OpenRouter (many models with one key), Mistral, Groq, or another service with an OpenAI-compatible API. Pick the provider, paste your key (**Get a key** opens the provider's page), press **Test and list models**, pick a model and **Save and turn on**. What you ask about is sent to that provider, which bills your account for what you use. The key stays on the device: the keychain in the desktop app, the browser's storage on the web and on your phone; it is never synced or put in the settings (**Forget the key** removes it). Each device needs the key once. Works on the phone too.
-- **Your Claude subscription (Pro or Max) cannot be connected here**: Anthropic allows its sign-in only in its own apps, and the API is paid separately with a key from the [Claude Console](https://platform.claude.com/). To use your subscription with the tracker, add the Tracker connector in the Claude app ([4. Claude connector](#4-claude-connector)): Claude can then read, add and update your items from its own app, on your phone too.
-- **A service that answers later**: paste its connection profile (the same JSON as in Tracker Editor; **Start from the example** shows the shape), the model or agent name and the API key, which is kept in the keychain on the desktop. The desktop app can also receive answers by webhook (use a different port from Tracker Editor's).
+- **Your Claude subscription (Pro or Max) cannot be connected here**: Anthropic allows its sign-in only in its own apps, and the API is paid separately with a key from the [Claude Console](https://platform.claude.com/). To use your subscription with the tracker, add the Rumbo connector in the Claude app ([4. Claude connector](#4-claude-connector)): Claude can then read, add and update your items from its own app, on your phone too.
+- **A service that answers later**: paste its connection profile (the same JSON as in Tinta; **Start from the example** shows the shape), the model or agent name and the API key, which is kept in the keychain on the desktop. The desktop app can also receive answers by webhook (use a different port from Tinta's).
 
 With a model on:
 
 - **Quick add in plain language** (Settings → Quick add): the item is added at once as you typed it, then the model fills in the due date, priority, project (only existing ones) and tags it understood, with **Undo**. What you type with `+ # ! @` and the type you picked stay as they are, and a plain title is never rewritten.
 - **Ask the model about this**, in every item: Summarize, Break into steps (tasks), Turn into a plan (ideas), **Draft my feedback** (documents, from their files too), Questions to ask, Risks and gaps, In English / In Spanish, or any question with follow-ups. **Add to the notes** puts an answer (a checklist of steps, say) in the item; **Use as my feedback** fills your review of a document.
 - **Plan my day** / **Review my week** on the Overview: what to do first today, or what got done, what is stuck and what to focus on next.
-- **Find by asking**: a question in the search box ("the file where I copied a docker command", "tasks about the kitchen due this week", or `?` then anything), then **Enter**: the model works out what to look for, the app searches your items, the text files on them, your release boards and Tracker Editor's files (when they share the data), and the model picks the best with a reason for each. Encrypted Tracker Editor files are found by name only and never reach the model, not even their names.
+- **Find by asking**: a question in the search box ("the file where I copied a docker command", "tasks about the kitchen due this week", or `?` then anything), then **Enter**: the model works out what to look for, the app searches your items, the text files on them, your release boards and Tinta's files (when they share the data), and the model picks the best with a reason for each. Encrypted Tinta files are found by name only and never reach the model, not even their names.
 - **The assistant** (A, Ctrl+K, or the ✦ at the top): say what to do in your own words ("move my overdue tasks to next week", "make a project Kitchen with tasks…", "tag everything about the coal forests #layer-08", "tick Built on Deep Time's 2.3") or ask how to do something. It looks up what it needs and makes the changes as cards: small ones at once with **Undo**, changing more than 5 items or renaming waits for **Apply**, deleting asks with a warning. Undo puts back only what that step changed (what changed since stays). **Only explain** makes it say where to click instead. Not with a service that answers later.
 
 ## 7. Quick add from anywhere (desktop) and by voice (phone)
 
-- **Desktop**: in **Settings → Quick add**, turn on the shortcut (`Ctrl+Alt+T` by default; click the field and press the keys you want). It opens a small window over any app: pick Task, Idea, Claude work or Document, type the line and press `Enter`. It works with the window closed while Tracker runs in the tray, and also from the tray menu and **File → Quick Add…**.
+- **Desktop**: in **Settings → Quick add**, turn on the shortcut (`Ctrl+Alt+T` by default; click the field and press the keys you want). It opens a small window over any app: pick Task, Idea, Claude work or Document, type the line and press `Enter`. It works with the window closed while Rumbo runs in the tray, and also from the tray menu and **File → Quick Add…**.
 - **Phone**: the microphone in quick add fills it with what you say, after anything you typed. Pick the language in **Settings → Quick add**. It uses the browser's speech service (Google's on Android), so it needs a connection.
 
 ## Using it
@@ -254,10 +256,10 @@ app/                  the web app (also loaded by Electron)
   js/assist.js        what the model is asked (quick add, items, plans) and how replies are checked
   js/assistant.js     the model client from Settings
   js/assistantSteps.js  the assistant's steps: what the model may do, the looks, the changes and their Undo
-  js/askFind.js       Find by asking: the plan, the search, the pick (the same file as Tracker Editor's)
+  js/askFind.js       Find by asking: the plan, the search, the pick (the same file as Tinta's)
   js/findSources.js, findAsk.js, editorFiles.js   what Find by asking searches here, and the run
   js/ui/assistantPanel.js  the assistant's panel
-  js/llm.js, asyncLlm.js, asyncConnection.js, localFetch.js   model clients, copied from Tracker Editor
+  js/llm.js, asyncLlm.js, asyncConnection.js, localFetch.js   model clients, copied from Tinta
   js/sync.js          one pull → merge → push round
   js/github.js        GitHub Contents API client
   js/syncManager.js   when to sync (after edits, interval, focus, online)

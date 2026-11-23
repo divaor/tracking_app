@@ -71,7 +71,7 @@ const server = http.createServer((req, res) => {
         res.end(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\ndata: [DONE]\n\n`);
         return;
       }
-      if (asking?.messages?.[0]?.content?.includes('You are the assistant inside Tracker')) {
+      if (asking?.messages?.[0]?.content?.includes('You are the assistant inside Rumbo')) {
         const done = String(asking.messages.at(-1).content).startsWith('Results of the steps');
         const text = done ? 'Added it.' : 'Adding it.\n```tracker-steps\n[{"op": "add-items", "items": [{"title": "Check the tyres", "due": "2026-12-01"}]}]\n```';
         res.writeHead(200, { 'content-type': 'text/event-stream' });
@@ -228,7 +228,7 @@ try {
     check('Listen: the phone’s voices, and one speaks', !tts.error && tts.voices > 0 && tts.spoken === 'done', tts);
   });
 
-  await part('Share → Tracker: text', async () => {
+  await part('Share → Rumbo: text', async () => {
     adb('shell', 'am', 'start', '-a', 'android.intent.action.SEND', '-t', 'text/plain', '--es', 'android.intent.extra.TEXT', '"Read this later https://example.com/article"', '-n', `${PKG}/.MainActivity`);
     const ok = await until(async () => (await page.evaluate(() => [...document.querySelectorAll('.modal input')].map((i) => i.value).join(' | '))).includes('https://example.com/article'));
     const fields = await page.evaluate(() => [...document.querySelectorAll('.modal input')].map((i) => i.value).filter(Boolean));
@@ -240,7 +240,7 @@ try {
     check('Back closes it', await until(async () => !(await page.$('.modal'))));
   });
 
-  await part('Share → Tracker: a picture', async () => {
+  await part('Share → Rumbo: a picture', async () => {
     // A picture in the phone's Pictures, through the media store (a content:// address, as a gallery shares it).
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
     const local = path.join(OUT, 'tracker-check.png');

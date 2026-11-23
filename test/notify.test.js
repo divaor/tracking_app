@@ -157,7 +157,7 @@ test('push endpoints: public key for the app, test notification with the GitHub 
     s.server.http(new Request('https://c.example/push/test', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   const ok = await (await post('good-token', { deviceId: 'phone' })).json();
   assert.equal(ok.ok, true);
-  assert.equal(phone.decrypt(s.pushes[0].body).title, 'Tracker notifications work');
+  assert.equal(phone.decrypt(s.pushes[0].body).title, 'Rumbo notifications work');
   assert.equal((await post('bad-token', { deviceId: 'phone' })).status, 403);
   assert.equal((await (await post('good-token', { deviceId: 'nope' })).json()).ok, false);
   const preflight = await s.server.http(new Request('https://c.example/push/test', { method: 'OPTIONS' }));

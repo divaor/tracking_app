@@ -102,7 +102,7 @@ function FileView({ file, onSaved, onError, onRemove }) {
       <span class="spacer" />
       ${readable && html`<${ListenButton} readKey=${`file:${file.path}`} name=${file.name} title="Listen to this document, the sentence marked as it goes"
         source=${() => sourceOf(viewRef.current?.querySelector('.file-markdown, .file-source'))} />`}
-      <${EditorLink} route=${{ kind: 'repo', path: file.path }} className="btn ghost sm" title="Edit this file in Tracker Editor; your changes come back here">
+      <${EditorLink} route=${{ kind: 'repo', path: file.path }} className="btn ghost sm" title="Edit this file in Tinta; your changes come back here">
         <${Icon} name="code" size=${15} />Edit in editor
       </${EditorLink}>
       <button type="button" class="btn ghost sm" disabled=${state.status !== 'ready'} onClick=${() => download(file.name, state.text, kind)}>
@@ -442,7 +442,7 @@ export function FilesPanel({ item, actions, initialFile = '' }) {
           </button>
           ${!text &&
           html`${editorShows(f) &&
-            html`<${EditorLink} route=${{ kind: 'repo', path: f.path }} className="icon-btn sm" title="Open in Tracker Editor (as it looks)"><${Icon} name="code" size=${14} /></${EditorLink}>`}
+            html`<${EditorLink} route=${{ kind: 'repo', path: f.path }} className="icon-btn sm" title="Open in Tinta (as it looks)"><${Icon} name="code" size=${14} /></${EditorLink}>`}
             <button type="button" class="icon-btn sm" title="Download" aria-label=${`Download ${f.name}`} onClick=${() => downloadFile(f).catch(fail(f))}><${Icon} name="download" size=${14} /></button>
             <button type="button" class="icon-btn sm danger" title="Remove from this item" aria-label=${`Remove ${f.name}`} onClick=${() => remove(f)}><${Icon} name="trash" size=${14} /></button>`}
         </div>`;

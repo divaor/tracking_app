@@ -1,4 +1,4 @@
-# Claude connector for Tracker
+# Claude connector for Rumbo
 
 This folder is an MCP server that lets Claude read and update your tracker. Once it's connected, you can say things like these in any Claude chat or Claude Code session:
 
@@ -16,7 +16,7 @@ This folder is an MCP server that lets Claude read and update your tracker. Once
 The review loop works like this:
 
 1. Claude sends a proposal or artifact.
-2. You open it in the Tracker app on your PC or phone. The files are rendered there, and HTML gets a safe preview with scripts turned off.
+2. You open it in the Rumbo app on your PC or phone. The files are rendered there, and HTML gets a safe preview with scripts turned off.
 3. You pick **Approve**, **Request changes** or **Reject** and write your feedback.
 4. Claude reads your decision and feedback back from any session.
 
@@ -93,15 +93,15 @@ Wrangler prints the Worker's address, for example `https://tracker-mcp.<your-sub
 ### 4. Add it to Claude
 
 1. In Claude (claude.ai or the desktop app), go to **Customize → Connectors → Add custom connector**.
-2. Name it **Tracker** and paste `https://tracker-mcp.<your-subdomain>.workers.dev/mcp`.
+2. Name it **Rumbo** and paste `https://tracker-mcp.<your-subdomain>.workers.dev/mcp`.
 3. Claude opens the connector's sign-in page. Enter your connector password and press **Allow**.
-4. In a chat, make sure **Tracker** is enabled under **+ → Connectors**.
+4. In a chat, make sure **Rumbo** is enabled under **+ → Connectors**.
 
 A connector added this way is available in Claude on the web, desktop and mobile. It also works in **Claude Code**, both the CLI and Claude Code on the web, when you sign in with the same Claude account. There's nothing to install per machine, and Claude renews its access automatically.
 
 ### 5. Turn on notifications (optional)
 
-- **Phone:** open the Tracker web app installed on your Home Screen, go to **Settings → Notifications**, enter the connector address (without `/mcp`) and tap **Turn on notifications**.
+- **Phone:** open the Rumbo web app installed on your Home Screen, go to **Settings → Notifications**, enter the connector address (without `/mcp`) and tap **Turn on notifications**.
   - On iPhone this needs iOS 16.4 or later, and the app must be opened from its Home Screen icon.
   - Do this on each phone or browser you want notified.
 - **Desktop app:** notifications are on by default. It checks for changes every minute and can keep running in the system tray.
@@ -161,7 +161,7 @@ It listens on `127.0.0.1:8787` by default. Put it behind HTTPS (a reverse proxy 
 | `TRACKER_FILES_DIR` | no | Folder for documents. Default `files`. |
 | `TRACKER_DEVICE` | no | Name used in commit messages. Default `Claude`. |
 | `TRACKER_APP_URL` | no | Web app address, so replies include links that open the item, e.g. `https://you.github.io/tracking_app/`. |
-| `TRACKER_EDITOR_URL` | no | Tracker Editor address for links to editor files. Default `https://divaor.github.io/tracker-editor/`. |
+| `TRACKER_EDITOR_URL` | no | Tinta address for links to editor files. Default `https://divaor.github.io/tracker-editor/`. |
 | `OAUTH_REDIRECT_HOSTS` | no | Extra hosts allowed as OAuth redirect targets (comma-separated; `*` allows any https host). |
 | `MCP_PUBLIC_URL` | no | Public origin when self-hosting behind a proxy. |
 | `VAPID_SUBJECT` | no | Contact URL or `mailto:` for push services. Default: `TRACKER_APP_URL`. |
@@ -184,7 +184,7 @@ Tools:
 - **`send_document`**: saves a proposal or artifact as a file and files it as a doc, or adds a new version to an existing doc.
 - **`attach_file`**: attaches a picture, PDF or any other file (up to 10 MB) to an item, as the app does: downloaded from a public https link (`source_url`), given as base64 (`content_base64`, small files), or, with neither, through an upload link that a shell sends the file to (in Claude Code: `curl -sS -T screenshot.png '<link>'`). A file of the same name on the item is replaced.
 - **`get_board`**, **`get_board_records`**, **`update_board`**, **`set_session`**, **`import_board`**, **`export_board`**: a project's release board (`boards/<project>.json`: releases, features, tests, decisions, events, sessions, repos, actions, briefs, log). `get_board` says where it stands in a few lines (and what changed since a time); `update_board` changes records by id with only the fields given (dotted paths reach inside), adds a log line and says which session did it, in one commit that is redone on the newer version when another writer got there first; `import_board` brings in a release board page or its data file (an upload link for big ones), `export_board` gives it back in that format (a download link for big ones). The user ticks steps, commands and actions, decides decisions and comments on records in the app; `get_board` lists the comments Claude has not answered (`commentsAwaiting`) and `update_board` answers with `{ part, id, comment }` (on a command: `command`). Board changes that matter (a test failed, a release's status, a new decision or step for the user, a comment) are pushed to devices that chose **Release boards**.
-- **`list_editor_files`**, **`search_editor_files`**, **`read_editor_file`**, **`save_editor_file`**: your Tracker Editor files (`editor/index.json` and `editor/files/<id>/<name>` in the data repo). Search covers the 60 most recently changed files. Saving creates a file or replaces its text, name, project or tags; the editor picks it up on its next sync. Files encrypted in the editor are never read or changed.
+- **`list_editor_files`**, **`search_editor_files`**, **`read_editor_file`**, **`save_editor_file`**: your Tinta files (`editor/index.json` and `editor/files/<id>/<name>` in the data repo). Search covers the 60 most recently changed files. Saving creates a file or replaces its text, name, project or tags; the editor picks it up on its next sync. Files encrypted in the editor are never read or changed.
 
 Prompts (slash commands in Claude Code): `use_project`, `send_proposal`, `release_board`, `update_tracker`, `check_feedback`.
 
@@ -229,5 +229,5 @@ The server code has no dependencies and uses only web-standard APIs, so it runs 
 - `oauth.js`: the authorization server.
 - `tools.js`: tool and prompt definitions, plus the instructions Claude sees.
 - `tracker.js`: reads and writes the data repo, using the app's `model.js` and `github.js`.
-- `editor.js`: Tracker Editor files, in the editor's index format.
+- `editor.js`: Tinta files, in the editor's index format.
 - `notify.js` and `push.js`: push notifications (VAPID, encryption).

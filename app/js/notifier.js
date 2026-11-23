@@ -71,5 +71,5 @@ export function remind({ title, body, href }) {
 }
 
 export function testDesktopNotification() {
-  systemNotification({ title: 'Tracker notifications work', body: 'You will see changes from Claude here.' });
+  systemNotification({ title: 'Rumbo notifications work', body: 'You will see changes from Claude here.' });
 }

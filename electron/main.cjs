@@ -11,6 +11,10 @@ const http = require('node:http');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
+// The app was called Tracker until 2.8 (Rumbo since): its settings, keychain-encrypted secrets and the
+// page's storage stay in that folder, so an update keeps everything. Before anything reads userData.
+if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', path.join(app.getPath('appData'), 'Tracker'));
+
 const APP_DIR = path.join(__dirname, '..', 'app');
 const APP_ORIGIN = 'app://tracker';
 const REPO_URL = 'https://github.com/divaor/tracking_app';
@@ -307,7 +311,7 @@ ipcMain.handle('webhook:listen', async (event, opts = {}) => {
   hook = null;
   const server = http.createServer(onHook);
   await new Promise((resolve, reject) => {
-    server.once('error', (err) => reject(new Error(err.code === 'EADDRINUSE' ? `Port ${port} is already in use on this computer (Tracker Editor may use it: pick another).` : err.message)));
+    server.once('error', (err) => reject(new Error(err.code === 'EADDRINUSE' ? `Port ${port} is already in use on this computer (Tinta may use it: pick another).` : err.message)));
     server.listen(port, '0.0.0.0', resolve);
   });
   hook = { server, port, path: hookPath, header, sender: event.sender };
@@ -530,7 +534,7 @@ function updateTray(rebuild = false) {
     tray = null;
     return;
   }
-  tray.setToolTip('Tracker');
+  tray.setToolTip('Rumbo');
   tray.setContextMenu(trayMenu());
   tray.on('click', showWindow);
 }
@@ -538,12 +542,12 @@ function updateTray(rebuild = false) {
 function trayMenu() {
   const quick = quickPrefs();
   return Menu.buildFromTemplate([
-    { label: 'Open Tracker', click: showWindow },
+    { label: 'Open Rumbo', click: showWindow },
     { label: 'Quick Add…', accelerator: quick.enabled ? quick.shortcut : undefined, registerAccelerator: false, click: openQuickAdd },
     { label: 'Sync Now', click: () => mainWindow?.webContents.send('command', 'sync') },
     { type: 'separator' },
     {
-      label: 'Quit Tracker',
+      label: 'Quit Rumbo',
       click: () => {
         quitting = true;
         app.quit();
@@ -559,7 +563,7 @@ function createWindow() {
     minWidth: 360,
     minHeight: 480,
     show: false,
-    title: 'Tracker',
+    title: 'Rumbo',
     icon: path.join(APP_DIR, 'icons', 'icon-512.png'),
     backgroundColor: '#f6f5f1',
     autoHideMenuBar: process.platform !== 'darwin',
@@ -599,7 +603,7 @@ function createWindow() {
     mainWindow.hide();
     const prefs = readJson('prefs.json', {});
     if (!prefs.toldAboutTray && Notification.isSupported()) {
-      new Notification({ title: 'Tracker is still running', body: 'It keeps syncing in the background. Quit it from the tray icon.' }).show();
+      new Notification({ title: 'Rumbo is still running', body: 'It keeps syncing in the background. Quit it from the tray icon.' }).show();
       writeJson('prefs.json', { ...prefs, toldAboutTray: true });
     }
   });

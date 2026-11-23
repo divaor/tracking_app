@@ -43,7 +43,7 @@ export const COMMAND_LIST = [
   { id: 'pinned-past-filters', group: 'Search and filter', label: 'Show pinned items whatever the filters, or not (Settings → Appearance)' },
 
   { id: 'item-edit', group: 'In an item', label: 'Edit the open item', keys: 'E', run: false },
-  { id: 'item-attach', group: 'In an item', label: 'Attach files or pictures to the open item', how: 'Attach under the notes, drop files on the item, or paste a picture', run: false, hint: 'Pictures show in the item; PDFs and documents open with their program or in Tracker Editor' },
+  { id: 'item-attach', group: 'In an item', label: 'Attach files or pictures to the open item', how: 'Attach under the notes, drop files on the item, or paste a picture', run: false, hint: 'Pictures show in the item; PDFs and documents open with their program or in Tinta' },
   { id: 'item-pictures', group: 'In an item', label: 'Go through an item’s pictures (shown large)', keys: '← →', run: false, hint: 'Click a picture first; Esc closes it' },
   { id: 'item-find', group: 'In an item', label: 'Find in the open item (its notes, the file shown, comments): Enter next, Shift+Enter previous', keys: 'Mod+F · /', run: false, hint: 'Or the magnifier in the item’s bar; opened from a search, it finds those words' },
   { id: 'item-listen', group: 'In an item', label: 'Listen to the open item: its title, notes, the document shown and the comments, the sentence marked as it goes', keys: 'L', hint: 'Or the speaker in the item’s bar; from where it is scrolled to, or the selection' },

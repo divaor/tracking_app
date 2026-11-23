@@ -44,7 +44,7 @@ function DesktopNotifications({ prefs, setPrefs }) {
     <${Categories} prefs=${prefs} onChange=${setPrefs} withDevices />
     ${background !== null &&
     html`<${Check} checked=${background} label="Keep running in the background when the window is closed"
-      hint="Tracker stays in the system tray so notifications keep coming. Quit from the tray icon."
+      hint="Rumbo stays in the system tray so notifications keep coming. Quit from the tray icon."
       onChange=${async (v) => setBackground(await window.desktop.setRunInBackground(v))} />`}
     <div class="form-actions">
       <button type="button" class="btn sm" disabled=${!prefs.desktop} onClick=${testDesktopNotification}><${Icon} name="bell" size=${15} />Send a test notification</button>
@@ -85,7 +85,7 @@ function AndroidNotifications({ prefs, setPrefs, actions }) {
     ${!synced && html`<p class="notice warn"><${Icon} name="alert" size=${16} /><span>Notifications come from changes in your data repo: set up GitHub sync first (Settings → Where your data is).</span></p>`}
     <${Check} checked=${prefs.background} disabled=${!synced} label="Notify me while the app is closed" onChange=${(v) => (setPrefs({ background: v }), v && state && !state.allowed && allow())} />
     ${synced && prefs.background && state && !state.allowed &&
-    html`<p class="notice warn"><${Icon} name="alert" size=${16} /><span>Notifications are off for Tracker on this phone.</span>
+    html`<p class="notice warn"><${Icon} name="alert" size=${16} /><span>Notifications are off for Rumbo on this phone.</span>
       <button type="button" class="btn sm" onClick=${allow}>Allow notifications</button></p>`}
     <${Categories} prefs=${prefs} onChange=${setPrefs} withDevices />
     ${synced && prefs.background &&
@@ -134,7 +134,7 @@ function PushNotifications({ prefs, setPrefs, actions }) {
 
   if (!support.supported) {
     const message = {
-      'ios-install': 'On iPhone and iPad, add Tracker to your Home Screen (Share → Add to Home Screen), open it from the new icon, then turn on notifications here.',
+      'ios-install': 'On iPhone and iPad, add Rumbo to your Home Screen (Share → Add to Home Screen), open it from the new icon, then turn on notifications here.',
       insecure: 'Push notifications need the app to be opened over https (for example from GitHub Pages).',
       unsupported: 'This browser cannot receive push notifications. Try Chrome, Edge, Firefox or Safari.',
     }[support.reason];

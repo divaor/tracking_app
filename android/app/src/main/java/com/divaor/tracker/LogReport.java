@@ -40,7 +40,7 @@ final class LogReport {
 
     static String build(Context context) {
         StringBuilder out = new StringBuilder();
-        out.append("Tracker log, made ").append(AppLog.stamp()).append("\n");
+        out.append("Rumbo log, made ").append(AppLog.stamp()).append("\n");
         out.append("It holds what the app did and its errors, never passwords, keys, tokens or your items.\n\n");
         try {
             PackageInfo p = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
@@ -201,8 +201,8 @@ final class LogReport {
             Intent send = new Intent(Intent.ACTION_SEND)
                 .setType("text/plain")
                 .putExtra(Intent.EXTRA_STREAM, uri)
-                .putExtra(Intent.EXTRA_SUBJECT, "Tracker log")
-                .putExtra(Intent.EXTRA_TEXT, "Tracker log (attached).")
+                .putExtra(Intent.EXTRA_SUBJECT, "Rumbo log")
+                .putExtra(Intent.EXTRA_TEXT, "Rumbo log (attached).")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             send.setClipData(android.content.ClipData.newRawUri("", uri));
             return Intent.createChooser(send, "Send the log");

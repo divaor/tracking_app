@@ -166,7 +166,7 @@ export function ReadAloudCard({ settings, actions }) {
             <li>Install Docker Desktop, then run <code>docker run -d -p 8880:8880 --restart unless-stopped ghcr.io/remsky/kokoro-fastapi-cpu:latest</code> (with an NVIDIA graphics card, <code>kokoro-fastapi-gpu</code> is faster).</li>
             <li>Press <strong>Kokoro (this computer)</strong>, then <strong>Save</strong> and <strong>Hear a sample</strong>. It is free and nothing leaves your computer.</li>
             <li>Voices starting with <code>a</code> are American English, <code>b</code> British, <code>e</code> Spanish and <code>p</code> Portuguese; <code>f</code>/<code>m</code> is female or male.</li>
-            <li>The same server works for Tracker Editor: set it up once in each app.</li>
+            <li>The same server works for Tinta: set it up once in each app.</li>
           </ol>
         </details>`}
     <div class="form-actions">

@@ -29,13 +29,13 @@ const SeeAll = ({ href, label = 'See all' }) => html`<a class="see-all" href=${h
 
 function Welcome({ actions }) {
   return html`<div class="welcome-card">
-    <h2>Welcome to Tracker</h2>
+    <h2>Welcome to Rumbo</h2>
     <p>
       Keep tasks, ideas, the Claude work you have going and the documents you need to read in one place, each moving from
       <strong> Pending</strong> to <strong>In progress</strong> to <strong>Done</strong>.
     </p>
     <p>
-      Everything is saved on this device straight away${isLocal() ? ', and Tracker Editor on this computer works with it.' : '. Connect a private GitHub repository in Settings to keep your phone and other computers in sync.'}
+      Everything is saved on this device straight away${isLocal() ? ', and Tinta on this computer works with it.' : '. Connect a private GitHub repository in Settings to keep your phone and other computers in sync.'}
     </p>
     <div class="welcome-actions">
       <button class="btn primary" onClick=${() => actions.newItem({ type: 'task' })}><${Icon} name="task" />Add a task</button>

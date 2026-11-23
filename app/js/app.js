@@ -158,7 +158,7 @@ function Sidebar({ route, items, projects, scope, query, onProject, onTag, sync,
   };
   const categoryView = route.view === 'board' ? 'board' : 'list';
   return html`<aside class="sidebar" aria-label="Navigation">
-    <div class="brand"><img src="icons/icon.svg" alt="" width="28" height="28" /><span>Tracker</span></div>
+    <div class="brand"><img src="icons/icon.svg" alt="" width="28" height="28" /><span>Rumbo</span></div>
     <button type="button" class="btn primary new-btn" onClick=${onNew}><${Icon} name="plus" />New item</button>
     <nav>
       ${link({ view: 'home' }, 'Overview', 'home')}
@@ -438,10 +438,10 @@ export function App() {
     const inApp = () => (location.href = appItemLink(id));
     if (getSettings().openItemsInApp) {
       inApp();
-      toast('Opened in the Tracker app: that item is not in this browser.', { duration: 15000, action: { label: 'Open again', run: inApp } });
+      toast('Opened in the Rumbo app: that item is not in this browser.', { duration: 15000, action: { label: 'Open again', run: inApp } });
       return;
     }
-    toast('That item is not in this browser. Open it in the Tracker app on this computer?', {
+    toast('That item is not in this browser. Open it in the Rumbo app on this computer?', {
       duration: 30000,
       action: {
         label: 'Open in the app',

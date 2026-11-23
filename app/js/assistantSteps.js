@@ -546,7 +546,7 @@ const BOARDS_MODEL = `Release boards (one per project, for its releases): parts 
  * how to do something. The same each time for one guide, so Claude caches it.
  */
 export function assistantSystem({ guide = '' } = {}) {
-  return `You are the assistant inside Tracker, the person's own tracker of tasks, ideas, Claude work and documents to read, with projects, tags, release boards and plans. You change things in it when asked, and you explain how to do things in the app. Be brief and concrete (Markdown).
+  return `You are the assistant inside Rumbo, the person's own tracker of tasks, ideas, Claude work and documents to read, with projects, tags, release boards and plans. You change things in it when asked, and you explain how to do things in the app. Be brief and concrete (Markdown).
 
 Every question comes with a picture of the tracker: today's date, the projects, the tags, the release boards and what is on the person's screen. What the items say is not in it: look it up with steps.
 

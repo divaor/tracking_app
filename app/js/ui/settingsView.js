@@ -87,7 +87,7 @@ function SyncCard({ sync, actions }) {
       setMoving('Copying your data to GitHub…');
       try {
         const moved = await switchStorage('github', { ...clean, path: clean.path || 'tracker.json' });
-        actions.toast(`Your data is on GitHub now (${clean.owner}/${clean.repo}${moved.copied ? `, ${moved.copied} files copied` : ''}). Connect Tracker Editor too, with the same token.`, { duration: 10000 });
+        actions.toast(`Your data is on GitHub now (${clean.owner}/${clean.repo}${moved.copied ? `, ${moved.copied} files copied` : ''}). Connect Tinta too, with the same token.`, { duration: 10000 });
       } catch (err) {
         actions.toast(`Your data stays on this computer: ${err.message}`, { kind: 'error', duration: 10000 });
       } finally {
@@ -130,7 +130,7 @@ function SyncCard({ sync, actions }) {
     try {
       await switchStorage('local');
       setGithubOpen(false);
-      actions.toast('Your data is kept on this computer now. Tracker Editor here uses it too once it stops syncing with GitHub.', { duration: 10000 });
+      actions.toast('Your data is kept on this computer now. Tinta here uses it too once it stops syncing with GitHub.', { duration: 10000 });
     } catch (err) {
       actions.toast(`Still syncing with GitHub: ${err.message}`, { kind: 'error', duration: 10000 });
     } finally {
@@ -251,14 +251,14 @@ function SyncCard({ sync, actions }) {
     return html`<${Card} title="Where your data is" icon="folder" id="sync">
       <p class="muted">
         ${where?.dir
-          ? html`Kept on this computer, in <code>${where.dir}</code>. Tracker Editor on this computer uses the same folder: your projects and documents show in both, and its Send to tracker reaches you here.`
-          : 'Kept in this browser, on this device. Tracker Editor opened in this browser (or installed from it) shares it.'}
+          ? html`Kept on this computer, in <code>${where.dir}</code>. Tinta on this computer uses the same folder: your projects and documents show in both, and its Send to Rumbo reaches you here.`
+          : 'Kept in this browser, on this device. Tinta opened in this browser (or installed from it) shares it.'}
       </p>
       ${where?.dir && html`<div class="form-actions"><button type="button" class="btn sm" onClick=${() => window.desktop.data.show()}><${Icon} name="folder" size=${15} />Show the folder</button></div>`}
       ${moving && html`<p class="notice"><${Icon} name="sync" size=${16} />${moving}</p>`}
       ${githubOpen
         ? html`<h3 class="card-subtitle">Sync across your devices with GitHub</h3>
-            <p class="muted small">Everything here is copied to your private data repository first, so nothing is lost; then this app syncs with it (and so can your phone, other computers, Tracker Editor and the Claude connector).</p>
+            <p class="muted small">Everything here is copied to your private data repository first, so nothing is lost; then this app syncs with it (and so can your phone, other computers, Tinta and the Claude connector).</p>
             ${githubPart}`
         : html`<div class="field-grid">
               <${Field} label="This device’s name" hint="Shown on items changed here"><input value=${form.device} onInput=${set('device')} onChange=${() => saveSettings({ device: form.device.trim() })} placeholder="Work PC" /></${Field}>
@@ -304,7 +304,7 @@ function EditorCard() {
   useEffect(() => {
     window.desktop?.hasEditorApp?.().then(setInstalled, () => setInstalled(false));
   }, []);
-  return html`<${Card} title="Tracker Editor" icon="code" id="editor">
+  return html`<${Card} title="Tinta, the editor" icon="code" id="editor">
     <p>
       The companion text editor: many files open at once, synced to the same data repository, with projects and tags shared with the tracker.
       Items sent from it get <strong>Open in editor</strong>, and attached files get <strong>Edit in editor</strong>.
@@ -319,7 +319,7 @@ function EditorCard() {
       <a class="btn sm" href=${url.trim() || DEFAULT_EDITOR_URL} target="_blank" rel="noopener noreferrer"><${Icon} name="external" size=${15} />Open the editor</a>
     </div>
     ${installed !== null &&
-    html`<p class="muted small">${installed ? 'Links open in the Tracker Editor app on this computer.' : 'Links open in the browser. Install the Tracker Editor desktop app to open them there instead.'}</p>`}
+    html`<p class="muted small">${installed ? 'Links open in the Tinta app on this computer.' : 'Links open in the browser. Install the Tinta desktop app to open them there instead.'}</p>`}
   </${Card}>`;
 }
 
@@ -362,7 +362,7 @@ function AppsCard({ installPrompt, onInstall }) {
     <div class="apps">
       <div>
         <h3>Phone</h3>
-        <p><strong>Android:</strong> the Tracker app, from the repository’s <em>Releases</em> (<code>Tracker-…apk</code>), best with Obtainium, which keeps it up to date: share things to it, notifications while it is closed, the phone’s voices. <strong>iPhone</strong> (or any phone): open the web version (GitHub Pages) in the browser and install it: on iPhone tap <em>Share → Add to Home Screen</em>. Both work offline and sync when online.</p>
+        <p><strong>Android:</strong> the Rumbo app, from the repository’s <em>Releases</em> (<code>Rumbo-…apk</code>), best with Obtainium, which keeps it up to date: share things to it, notifications while it is closed, the phone’s voices. <strong>iPhone</strong> (or any phone): open the web version (GitHub Pages) in the browser and install it: on iPhone tap <em>Share → Add to Home Screen</em>. Both work offline and sync when online.</p>
         ${isWeb && installPrompt && html`<button type="button" class="btn primary sm" onClick=${onInstall}><${Icon} name="install" size=${15} />Install this app</button>`}
       </div>
       <div>
@@ -372,7 +372,7 @@ function AppsCard({ installPrompt, onInstall }) {
         !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) &&
         html`<label class="field checkbox">
           <input type="checkbox" checked=${getSettings().openItemsInApp} onChange=${(e) => saveSettings({ openItemsInApp: e.currentTarget.checked })} />
-          <span>Open item links in the desktop app<small>A link to an item that is not in this browser (as Claude gives) goes to the Tracker app on this computer</small></span>
+          <span>Open item links in the desktop app<small>A link to an item that is not in this browser (as Claude gives) goes to the Rumbo app on this computer</small></span>
         </label>`}
       </div>
     </div>
@@ -422,6 +422,6 @@ export function SettingsView({ sync, actions, items, installPrompt, onInstall, t
         <button type="button" class="btn" onClick=${() => actions.help('guide')}><${Icon} name="doc" size=${16} />Guide</button>
       </div>
     </${Card}>
-    <p class="about muted">Tracker ${APP_VERSION} · ${environmentLabel()}${store.meta.lastSyncAt ? ` · last synced ${formatDateTime(store.meta.lastSyncAt)}` : ''}</p>
+    <p class="about muted">Rumbo ${APP_VERSION} · ${environmentLabel()}${store.meta.lastSyncAt ? ` · last synced ${formatDateTime(store.meta.lastSyncAt)}` : ''}</p>
   </div>`;
 }

@@ -1,6 +1,6 @@
 {
   "appId": "com.divaor.tracker",
-  "appName": "Tracker",
+  "appName": "Rumbo",
   "webDir": "app",
   "android": {
     "path": "android",

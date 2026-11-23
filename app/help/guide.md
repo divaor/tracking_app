@@ -1,8 +1,10 @@
-# Tracker guide
+# Rumbo guide
+
+Rumbo was called Tracker until version 2.8, and its editor, Tinta, was Tracker Editor. Only the names changed: your data, links and settings are the same.
 
 One place for your tasks, ideas, the Claude work you have going and the documents you need to read, on your computers, your phone and inside Claude.
 
-Version 2.6.2 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
+Version 2.8.0 · Download: https://github.com/divaor/tracking_app/releases/latest · Web app: https://divaor.github.io/tracking_app/
 
 Press **F1** (or **?**) anywhere for this guide and the list of every command and shortcut.
 
@@ -17,24 +19,24 @@ Every item has a **type** and a **status**:
 - **Docs**: things to read or review, such as proposals, artifacts, READMEs, specs, reports and articles.
 - Status moves **Pending → In progress → Done**. For docs the same steps read **To read → Reading → Read**.
 
-**Your data starts on this computer.** A new install keeps everything on the device: on the desktop in a data folder (`Documents/Tracker data`) that Tracker Editor on the same computer shares, in the browser in its own storage (the editor opened in the same browser shares it). Projects, tags, documents and Tracker Editor's Send to tracker all work, and nothing about syncing shows.
+**Your data starts on this computer.** A new install keeps everything on the device: on the desktop in a data folder (`Documents/Tracker data`) that Tinta on the same computer shares, in the browser in its own storage (the editor opened in the same browser shares it). Projects, tags, documents and Tinta's Send to Rumbo all work, and nothing about syncing shows.
 
-**To use your phone and other computers too**, turn on *Sync across your devices with GitHub* (Settings → Where your data is): everything on this device is copied to your private data repo first, so nothing is lost. Each device then keeps a full copy and syncs it through `tracker.json` in that repo. Claude reads and writes the same file through the connector, and Tracker Editor keeps its files in the same repo. Every change becomes a commit, so the repo history is also your backup.
+**To use your phone and other computers too**, turn on *Sync across your devices with GitHub* (Settings → Where your data is): everything on this device is copied to your private data repo first, so nothing is lost. Each device then keeps a full copy and syncs it through `tracker.json` in that repo. Claude reads and writes the same file through the connector, and Tinta keeps its files in the same repo. Every change becomes a commit, so the repo history is also your backup.
 
 ## 2. Get it and connect it
 
-### Android: the Tracker app
+### Android: the Rumbo app
 
 An app for your phone, updated from the releases like the desktop app. It works offline and syncs when you're online.
 
 1. Install **Obtainium** (from https://github.com/ImranR98/Obtainium/releases or F-Droid). It installs apps from their GitHub releases and keeps them up to date.
-2. In Obtainium: **Add app**, paste `https://github.com/divaor/tracking_app`, **Add**, then **Install** (`Tracker-<version>.apk`). The first time, Android asks to let Obtainium install apps: allow it.
-3. Open Tracker and connect it to your data (below). Obtainium tells you when there's a new version and installs it over the old one; your items and settings stay. (Or download the `.apk` from the releases page and open it; then updates are by hand.)
+2. In Obtainium: **Add app**, paste `https://github.com/divaor/tracking_app`, **Add**, then **Install** (`Rumbo-<version>.apk`). The first time, Android asks to let Obtainium install apps: allow it.
+3. Open Rumbo and connect it to your data (below). Obtainium tells you when there's a new version and installs it over the old one; your items and settings stay. (Or download the `.apk` from the releases page and open it; then updates are by hand.)
 
 What the app adds over the web app:
 
-- **Share → Tracker** from any app. Text and links become a new item to look over before you add it. Pictures and other files become a new item, or go on an item you pick.
-- **Add to Tracker** in the menu of text you select in any app: a new item from it.
+- **Share → Rumbo** from any app. Text and links become a new item to look over before you add it. Pictures and other files become a new item, or go on an item you pick.
+- **Add to Rumbo** in the menu of text you select in any app: a new item from it.
 - **Long-press the icon** for **Quick add**, **Voice note** (say the item) and **Send a log**.
 - **Notifications while the app is closed**: it looks for what Claude and your other devices changed about every 15 minutes (section 13).
 - **The phone's own voices** for Listen (Google's, or an engine you install), and **its speech input** for the microphone in quick add.
@@ -55,8 +57,8 @@ The web app installed to your Home Screen. It works offline and syncs when you'r
 
 Download the file for your computer from the latest release (https://github.com/divaor/tracking_app/releases/latest):
 
-- **Windows:** `Tracker.Setup.<version>.exe` installs it. If you can't install software (for example on a work PC), `Tracker-<version>-portable.exe` runs without installing.
-- **Mac (Apple silicon):** the `.dmg`. Open it and drag Tracker to Applications.
+- **Windows:** `Rumbo.Setup.<version>.exe` installs it. If you can't install software (for example on a work PC), `Rumbo-<version>-portable.exe` runs without installing.
+- **Mac (Apple silicon):** the `.dmg`. Open it and drag Rumbo to Applications.
 - **Linux:** the `.AppImage`. Make it executable (`chmod +x`) and run it.
 
 The installers aren't code-signed, so your computer warns you once. Windows SmartScreen: **More info → Run anyway**. Mac: right-click the app → **Open**.
@@ -65,7 +67,7 @@ The desktop app looks and works like the web app. It also shows native notificat
 
 ### Keep your data on this computer (the default)
 
-Nothing to set up. **Settings → Where your data is** says where it is (on the desktop, **Show the folder** opens it; copying that folder is a backup). Install Tracker Editor on the same computer and the two work together straight away: its projects are yours, it opens the tracker's documents, its *Send to tracker* lands here at once.
+Nothing to set up. **Settings → Where your data is** says where it is (on the desktop, **Show the folder** opens it; copying that folder is a backup). Install Tinta on the same computer and the two work together straight away: its projects are yours, it opens the tracker's documents, its *Send to Rumbo* lands here at once.
 
 - History is kept here too, for 180 days.
 - Phone notifications and the Claude connector need GitHub sync (below).
@@ -80,7 +82,7 @@ Do this once on each device. You need a private repository for your data (for ex
 3. Under *Repository permissions*, set **Contents** to **Read and write**, then create the token.
 4. In the app, open **Settings → Where your data is → Sync across your devices with GitHub…**. Enter the owner, the repository, the token, and a name for this device (for example *Work PC* or *Phone*).
 5. Press **Test connection**, then **Copy my data to GitHub and sync**. Everything on this device goes to the repo first (an empty repo gets all of it; one with data from other devices is merged item by item, the newest edit winning). The badge then shows *Synced*.
-6. **Tracker Editor on this computer** offers to follow (*Your data moved to GitHub: Connect*): connect it with the same token.
+6. **Tinta on this computer** offers to follow (*Your data moved to GitHub: Connect*): connect it with the same token.
 
 To go back, **Stop syncing with GitHub and keep everything on this computer…** at the bottom of the card copies anything that is only on GitHub to this computer first; the repo keeps its copy.
 
@@ -91,9 +93,9 @@ The device name appears in commit messages and in notifications about changes fr
 ### Connect Claude
 
 1. Deploy the connector (see `mcp/README.md` in the repository; the **Deploy Claude connector** workflow does it from the Actions tab).
-2. In Claude, go to **Customize → Connectors → Add custom connector**, name it **Tracker** and paste `https://<your connector>/mcp`.
+2. In Claude, go to **Customize → Connectors → Add custom connector**, name it **Rumbo** and paste `https://<your connector>/mcp`.
 3. A sign-in page opens. Enter your connector password and press **Allow**.
-4. In a chat, make sure Tracker is on under **+ → Connectors**.
+4. In a chat, make sure Rumbo is on under **+ → Connectors**.
 
 The connector then works in Claude on the web, desktop and phone, and in Claude Code signed in with the same account. Claude renews its access on its own.
 
@@ -135,7 +137,7 @@ Pick a type (Task, Idea, Claude work, Document), type one line and press **Enter
 `Write report +platform #work !high @tomorrow` creates a high-priority task in Platform, tagged `work`, due tomorrow.
 
 - **Plain language** (with a model, Settings → Quick add): type *call Ana tomorrow about the invoice, urgent*. The item is added at once as you typed it, then the model fills in the due date, priority, project (only ones you have) and tags it understood, with **Undo**. What you typed with `+ # ! @` and the type you picked stay as they are, and a plain title is never rewritten.
-- **From any app (desktop):** turn on the shortcut in **Settings → Quick add** (`Ctrl+Alt+T` by default; click the field and press the keys you want). A small window opens over whatever you're doing: pick the type, type the line, press **Enter**. It works with the window closed while Tracker runs in the tray, and from the tray menu and **File → Quick Add…**.
+- **From any app (desktop):** turn on the shortcut in **Settings → Quick add** (`Ctrl+Alt+T` by default; click the field and press the keys you want). A small window opens over whatever you're doing: pick the type, type the line, press **Enter**. It works with the window closed while Rumbo runs in the tray, and from the tray menu and **File → Quick Add…**.
 - **By voice (phone):** tap the microphone in quick add and say it; it goes after anything you typed. Pick the language in **Settings → Quick add**. It uses the browser's speech service, so it needs a connection.
 
 ## 5. Board
@@ -162,10 +164,10 @@ Filter by type and status, and sort by priority, due date and more (*Smart* list
 When you don't remember the words, ask instead (with a model on, section 9): type a question in the search box and press **Enter**, or **✦ Ask**. Start with **?** to ask for sure, even something short (`?docker`).
 
 - *the file where I copied a docker command* · *tasks about the kitchen due this week* · *what did Claude send me about language servers* · *the notes about the coal forest layer* · *the phone playtest on the board* · *my encrypted password files*
-- The model works out what to look for: the words the answer would hold (other forms and languages too), shapes like commands or SQL, projects, tags, kinds, dates. The app searches **here**: your items (titles, notes, comments, feedback, file names, links), the **text files attached to them**, your **release boards**, and **Tracker Editor's files** when they are in the same data (synced through the same GitHub repository, or on this device). Then the model picks the best and says why for each one.
-- The list shows what it found, in that order, with the reason under each item; files on items, board records and Tracker Editor files show above the items. A file opens on its item; a board record opens on its board; a Tracker Editor file (marked **Tracker Editor**) opens in the editor. **N more that match** shows the rest. The question stays as a chip above the list: **×** goes back to the list.
+- The model works out what to look for: the words the answer would hold (other forms and languages too), shapes like commands or SQL, projects, tags, kinds, dates. The app searches **here**: your items (titles, notes, comments, feedback, file names, links), the **text files attached to them**, your **release boards**, and **Tinta's files** when they are in the same data (synced through the same GitHub repository, or on this device). Then the model picks the best and says why for each one.
+- The list shows what it found, in that order, with the reason under each item; files on items, board records and Tinta files show above the items. A file opens on its item; a board record opens on its board; a Tinta file (marked **Tinta**) opens in the editor. **N more that match** shows the rest. The question stays as a chip above the list: **×** goes back to the list.
 - **Ask the assistant about these** hands the items found to the assistant: *tag these #docker*, *move these to next week*.
-- **What the model sees**: your project and tag names and today's date, then the names, places and matching lines of the best candidates, never whole files. **Encrypted Tracker Editor files** are found by their names on this device and shown apart; the model never sees anything of them, not even their names, and they open in Tracker Editor with your passphrase. **Settings → Model → Find by asking: send only names** leaves out the matching lines.
+- **What the model sees**: your project and tag names and today's date, then the names, places and matching lines of the best candidates, never whole files. **Encrypted Tinta files** are found by their names on this device and shown apart; the model never sees anything of them, not even their names, and they open in Tinta with your passphrase. **Settings → Model → Find by asking: send only names** leaves out the matching lines.
 - Plain words still search as before, at once and without the model. Without a model (or with a service that answers later), searching works as before.
 
 ### Pinned items
@@ -204,7 +206,7 @@ The speaker in an open item's bar (or **L**) reads it to you: the title, the not
 - **The player** at the bottom: **◀ ▶** the sentence before or after, **play/pause**, the speed (**1×**, click for faster), the voice, and **×** to stop. The speaker in the item pauses and goes on too.
 - Reading stops when you close the item or start editing it. Each item window reads on its own (desktop).
 - **Plans and documents:** the speaker on the Overview's plan card, the strip above List and Board and the plans in **Days** reads that plan or review; **Listen** in a document's bar (Markdown or text files in an item) reads only that document.
-- **The voice:** **Settings → Read aloud**, the same as in Tracker Editor:
+- **The voice:** **Settings → Read aloud**, the same as in Tinta:
   - **This device:** the voices of your phone or computer, the most natural one for the text's language unless you pick one. The list shows them by name, accent and voice (female or male), the text's language first; ▶ plays one. How human it sounds depends on the voices installed (the card says how to get better ones).
   - **Speech server:** natural voices from **Kokoro** on your computer (free, nothing leaves it) or **OpenAI** (with your key), or another server with an OpenAI-compatible API. Its key stays in this device's secure storage and goes only to that server. In a browser, a server on your computer is reachable only from that computer; the desktop app also reaches one elsewhere on your network.
 - With a speech server, your phone's or computer's media controls (lock screen, keyboard keys) pause and skip too.
@@ -226,8 +228,8 @@ Any item can carry files: photos, screenshots, PDFs, Word, Excel and PowerPoint 
 - **Attach** under the notes picks files. You can also **drop** files on an open item, or **paste** a picture (a screenshot, an image copied from a page). On a phone, **Photo** takes one with the camera.
 - **Pictures** show as small versions; a click shows one large. **←** and **→** go through them (on a phone, swipe sideways), **Esc** closes it (the item stays open). Download, open with its program (desktop app) or remove it from there.
 - **Zoom in on a picture**: on a phone, spread two fingers (the spot between them stays where it is) or double-tap where you want to look closer; drag to move around, double-tap again to see it whole. On a computer, click the picture or use `Ctrl` + the mouse wheel; the magnifier zooms in and out too.
-- **Text files** (Markdown, txt, CSV, code…) read inside the item; **Edit in editor** opens them in Tracker Editor.
-- **PDFs and documents** are chips with their type and size. A click opens one with its program in the desktop app (a copy, so changes there don't come back); in a browser it downloads. **Open in editor** (the `</>` button) shows a PDF, Word or other document as it looks in Tracker Editor. Programs and scripts are never opened.
+- **Text files** (Markdown, txt, CSV, code…) read inside the item; **Edit in editor** opens them in Tinta.
+- **PDFs and documents** are chips with their type and size. A click opens one with its program in the desktop app (a copy, so changes there don't come back); in a browser it downloads. **Open in editor** (the `</>` button) shows a PDF, Word or other document as it looks in Tinta. Programs and scripts are never opened.
 - **Photos over 4 MB are made smaller** (2,560 pixels on the long side) so your data repo doesn't fill up with phone photos. The message says so; **Keep full size** puts the original back.
 - Files are kept with your data, next to Claude's documents (`files/` in your data repo, or the data on this device), so every device and Claude see them. A file added without a connection shows an upload arrow and goes up with the next sync.
 - The bin on a file (or in the large picture) removes it from the item, with **Undo**. Its versions stay in the data repo's history.
@@ -305,12 +307,12 @@ A big project can have a **release board**: its releases, features, tests, decis
 
 ## 9. The model (optional)
 
-Connect a model of your own in **Settings → Model**, the same kinds as in Tracker Editor:
+Connect a model of your own in **Settings → Model**, the same kinds as in Tinta:
 
 - **A server on your computer** (**This computer**: Ollama, LM Studio or anything with an OpenAI-compatible API): press **Ollama**, then **Test and list models**, pick one and **Save and turn on**. Nothing leaves your machine. The desktop app makes the requests itself, so the server needs no setup; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS=https://divaor.github.io`).
 - **An AI provider with your own API key** (**AI provider**): **Claude**, OpenAI, Google Gemini, OpenRouter (many models with one key), Mistral, Groq, or another service with an OpenAI-compatible API. Pick the provider, paste your key (**Get a key** opens the provider's page), press **Test and list models**, pick a model and **Save and turn on**. What you ask about is sent to that provider, which bills your account for what you use. The key stays on the device: the keychain in the desktop app, the browser's storage on the web and on your phone; it is never synced or put in the settings (**Forget the key** removes it). Each device needs the key once. Works on the phone too.
-- **Your Claude subscription (Pro or Max) cannot be connected here**: Anthropic allows its sign-in only in its own apps, and the API is paid separately with a key from the [Claude Console](https://platform.claude.com/). To use your subscription with the tracker, add the Tracker connector in the Claude app (section 11): Claude can then read, add and update your items from its own app, on your phone too.
-- **A service that answers later** (**Answers later**): paste its connection profile (the same JSON as in Tracker Editor; **Start from the example** shows the shape), the model or agent name and the API key, which the desktop app keeps in the system keychain. The desktop app can also receive answers by webhook (use a different port from Tracker Editor's).
+- **Your Claude subscription (Pro or Max) cannot be connected here**: Anthropic allows its sign-in only in its own apps, and the API is paid separately with a key from the [Claude Console](https://platform.claude.com/). To use your subscription with the tracker, add the Rumbo connector in the Claude app (section 11): Claude can then read, add and update your items from its own app, on your phone too.
+- **A service that answers later** (**Answers later**): paste its connection profile (the same JSON as in Tinta; **Start from the example** shows the shape), the model or agent name and the API key, which the desktop app keeps in the system keychain. The desktop app can also receive answers by webhook (use a different port from Tinta's).
 
 With a model on:
 
@@ -359,7 +361,7 @@ Documents Claude sends arrive under **Docs**, with the file attached and a short
 - **Markdown** files are rendered, with tables, code and checklists.
 - **HTML artifacts** are shown in a safe preview with scripts turned off.
 - **Source** shows the raw file, and **Download** saves it.
-- **Edit in editor** opens the file in Tracker Editor; your edits come back here.
+- **Edit in editor** opens the file in Tinta; your edits come back here.
 - Pictures, PDFs and documents you attach yourself work the same on any item: see [Files and pictures](#files-and-pictures).
 
 ### Review
@@ -368,7 +370,7 @@ At the end of a document, choose **Approve**, **Request changes** or **Reject**,
 
 ## 11. Working with Claude
 
-In any Claude chat or Claude Code session with the Tracker connector on, just say what you want:
+In any Claude chat or Claude Code session with the Rumbo connector on, just say what you want:
 
 | Say | What Claude does |
 | --- | --- |
@@ -387,7 +389,7 @@ In any Claude chat or Claude Code session with the Tracker connector on, just sa
 | "Check my tracker for comments" | Finds the items whose latest comment is yours, reads them, acts on them and replies in the comments. |
 | "Plan my day in my tracker" / "Update my plan, the parser is done" | Writes the day's plan (or the week's review) from your items and keeps it on the tracker, a new version each time: the Overview, the strip over List and Board and Days show it. |
 | "What did I get done this week?" | Reads the plans and reviews kept and what got done each day. |
-| "Save this to my editor as deploy-notes.md" / "Find the SQL I pasted about invoices in my editor files" | Saves, finds and reads your Tracker Editor files. |
+| "Save this to my editor as deploy-notes.md" / "Find the SQL I pasted about invoices in my editor files" | Saves, finds and reads your Tinta files. |
 
 ### Links Claude gives you
 
@@ -399,14 +401,14 @@ Claude links to items as `https://divaor.github.io/tracking_app/#/item/<ID>`:
 
 Claude sees the files on an item and can look at the pictures (a screenshot of a problem, a photo of a whiteboard): ask *"look at the screenshot on the kitchen leak task"*. It cannot read PDFs or Word files through the tracker.
 
-Claude only deletes items when you explicitly ask. It never reads or changes files you encrypted in Tracker Editor. Every change it makes is a commit in your data repo, so anything can be undone from the repo history.
+Claude only deletes items when you explicitly ask. It never reads or changes files you encrypted in Tinta. Every change it makes is a commit in your data repo, so anything can be undone from the repo history.
 
-## 12. Tracker Editor
+## 12. Tinta, the editor
 
-Tracker Editor (https://github.com/divaor/tracker-editor) is the companion text editor: many files open in tabs, synced to the same data repo with the same projects and tags.
+Tinta (https://github.com/divaor/tracker-editor) is the companion text editor: many files open in tabs, synced to the same data repo with the same projects and tags.
 
-- Items sent from the editor get **Open in editor**, attached text files get **Edit in editor**, and PDFs and documents get **Open in editor** (shown as they look; Tracker Editor 0.34 or later).
-- Set its address in **Settings → Tracker Editor** (blank = the default web app). The desktop app opens these links in the editor's desktop app when it is installed.
+- Items sent from the editor get **Open in editor**, attached text files get **Edit in editor**, and PDFs and documents get **Open in editor** (shown as they look; Tinta 0.34 or later).
+- Set its address in **Settings → Tinta, the editor** (blank = the default web app). The desktop app opens these links in the editor's desktop app when it is installed.
 
 ## 13. Notifications
 
@@ -467,7 +469,7 @@ On a Mac, use **Cmd** for **Ctrl**.
 | Sync shows an error about the token | The token expired or lost access. Create a new fine-grained token for your data repo (Contents: Read and write) and paste it in Settings → Sync with GitHub (Where your data is when not syncing). |
 | "Set up GitHub sync to open attached files" | Files are read from your data repo, so that device needs sync set up. |
 | No notifications on iPhone | Needs iOS 16.4 or later, with the app opened from its Home Screen icon (not Safari). Then turn notifications on again in Settings. |
-| Claude says the connector isn't available | Turn Tracker on under **+ → Connectors** in that chat. If it asks you to sign in again, enter the connector password. |
+| Claude says the connector isn't available | Turn Rumbo on under **+ → Connectors** in that chat. If it asks you to sign in again, enter the connector password. |
 | Remove Claude's access everywhere | Change the connector's `MCP_SECRET` and deploy it again. Every Claude sign-in and phone notification subscription stops working until you connect again. |
 | The quick add shortcut does nothing | Another app may own the keys: Settings → Quick add says so. Pick other keys. |
 | The model doesn't answer | Settings → Model → **Test and list models**. A local server must be running; in a browser, Ollama must allow the site (`OLLAMA_ORIGINS`). With an AI provider: check the key and that the account has credit; a provider that refuses requests from web pages works from the desktop app. |
@@ -480,11 +482,11 @@ On a Mac, use **Cmd** for **Ctrl**.
 | A file shows an upload arrow | It is waiting to upload from that device (it was added offline, or the upload failed). It goes up with the next sync; until then other devices say it isn't there yet. |
 | "… is not in your data repo (yet)" when opening a file | It was attached on another device that hasn't synced since. Sync that device. |
 | A photo was made smaller and you wanted the original | Press **Keep full size** in the message, or attach it again and press it then. |
-| Open in editor shows a PDF as strange text | Update Tracker Editor to 0.34 or later. |
+| Open in editor shows a PDF as strange text | Update Tinta to 0.34 or later. |
 | Search doesn't find a phrase | Words without quotes are found apart, anywhere in the item; `"in quotes"` they must be next to each other, as written. A phrase is never found across two parts (the title and the notes, two comments). |
 | The phone app shows an old version | Close it completely and open it again while online. It updates itself on the next start. |
-| Obtainium says the Android app cannot be updated ("signatures do not match") | An APK built elsewhere (or a test build) is installed. Sync first (or Export a backup), uninstall Tracker and install it again from Obtainium. |
-| No notifications from the Android app | Settings → Notifications: GitHub sync must be set up and notifications allowed; **Look now** says when it last looked and any error. Some phones stop background work for apps they think unused: in Android's settings, set Tracker's battery use to *Unrestricted*. |
+| Obtainium says the Android app cannot be updated ("signatures do not match") | An APK built elsewhere (or a test build) is installed. Sync first (or Export a backup), uninstall Rumbo and install it again from Obtainium. |
+| No notifications from the Android app | Settings → Notifications: GitHub sync must be set up and notifications allowed; **Look now** says when it last looked and any error. Some phones stop background work for apps they think unused: in Android's settings, set Rumbo's battery use to *Unrestricted*. |
 | The microphone in quick add does nothing (Android app) | The app uses the phone's speech input (Google's): install or turn on the Google app, or Speech Services by Google. |
 
 ## 17. Updates and releases
@@ -492,6 +494,6 @@ On a Mac, use **Cmd** for **Ctrl**.
 All of this runs from the **Actions** tab of the app's repository, so it also works from your phone.
 
 - **Web and phone app:** deploys by itself when changes to `app/` reach `main`.
-- **Desktop and Android apps:** after the version is bumped (`package.json`, `app/js/version.js` and the cache name in `app/sw.js`), run **Release desktop app** with the new tag (for example `v2.0.0`), or push the tag. It builds the installers and the Android app (`Tracker-<version>.apk`, signed with the key in the `ANDROID_KEYSTORE` and `ANDROID_KEYSTORE_PASSWORD` secrets; without them the release has no APK) and publishes the release. Keep a copy of that key: every update must be signed with it.
+- **Desktop and Android apps:** after the version is bumped (`package.json`, `app/js/version.js` and the cache name in `app/sw.js`), run **Release desktop app** with the new tag (for example `v2.0.0`), or push the tag. It builds the installers and the Android app (`Rumbo-<version>.apk`, signed with the key in the `ANDROID_KEYSTORE` and `ANDROID_KEYSTORE_PASSWORD` secrets; without them the release has no APK) and publishes the release. Keep a copy of that key: every update must be signed with it.
 - **Android check:** Actions → **Android check** runs the app in an emulator and checks what a browser cannot (sharing, links, Back, the phone's voices, notifications).
 - **Claude connector:** run **Deploy Claude connector** after it changes. Its secrets live in the repository's Actions secrets.

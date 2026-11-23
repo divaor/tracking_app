@@ -76,7 +76,7 @@ export function createNotifier({ client, path = 'tracker.json', branch = '', sec
       const device = doc.devices.find((d) => d.id === deviceId && d.subscription);
       if (!device) return { ok: false, error: 'This device is not registered for notifications yet.' };
       try {
-        const status = await deliver(device, { title: 'Tracker notifications work', body: 'You will be notified when Claude sends documents or changes items.', tag: 'test' });
+        const status = await deliver(device, { title: 'Rumbo notifications work', body: 'You will be notified when Claude sends documents or changes items.', tag: 'test' });
         return status >= 200 && status < 300 ? { ok: true, status } : { ok: false, status, error: `The push service answered ${status}.` };
       } catch (err) {
         return { ok: false, error: `Could not reach the push service: ${err.message}` };
